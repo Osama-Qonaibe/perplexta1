@@ -93,16 +93,16 @@ export const AdminRateLimitMetricsView = ({
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="bg-red-500/10 border-2 border-red-500/30 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 animate-pulse">
+            <div className="bg-[var(--status-danger-subtle)] border-2 border-[var(--fg-danger)]/30 rounded-shape-lg p-4 flex flex-col md:flex-row items-center justify-between gap-4 animate-pulse">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]">
+                <div className="w-10 h-10 rounded-full bg-[var(--fg-danger)] flex items-center justify-center text-white shadow-[0_0_20px_rgba(239,68,68,0.5)]">
                   <AlertTriangle size={24} />
                 </div>
                 <div>
-                  <h4 className="text-sm font-black text-red-500 uppercase tracking-tighter">
+                  <h4 className="text-sm font-black text-[var(--fg-danger)] uppercase tracking-tighter">
                     {language === "ar" ? "تنبيه: تهديدات نشطة مكتشفة" : "CRITICAL: ACTIVE THREATS DETECTED"}
                   </h4>
-                  <p className="text-[10px] text-red-500/70 font-bold">
+                  <p className="text-[10px] text-[var(--fg-danger)]/70 font-bold">
                     {language === "ar" 
                       ? `${criticalThreats.length} عنوان IP تجاوزوا حد العتبة (${threshold}) في آخر 5 دقائق`
                       : `${criticalThreats.length} IPs exceeded threshold (${threshold}) in the last 5 minutes`}
@@ -111,7 +111,7 @@ export const AdminRateLimitMetricsView = ({
               </div>
               <div className="flex flex-wrap gap-2">
                 {criticalThreats.map((ip, i) => (
-                  <span key={`crit-threat-${ip.ip_address}-${i}`} className="px-3 py-1 rounded-lg bg-red-500 text-white text-[10px] font-black shadow-lg shadow-red-500/20">
+                  <span key={`crit-threat-${ip.ip_address}-${i}`} className="px-3 py-1 rounded-shape-md bg-[var(--fg-danger)] text-white text-[10px] font-black shadow-lg shadow-red-500/20">
                     {ip.ip_address} ({ip.count})
                   </span>
                 ))}
@@ -123,9 +123,9 @@ export const AdminRateLimitMetricsView = ({
 
       {/* Threshold Controller & Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="md:col-span-1 p-5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
+        <div className="md:col-span-1 p-5 rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 rounded-md bg-amber-500/10 text-amber-500">
+            <div className="p-2 rounded-shape-sm bg-[var(--status-warning-subtle)] text-[var(--fg-warning)]">
               <SlidersHorizontal size={20} />
             </div>
             <span className="text-sm font-black text-[var(--text-secondary)]">
@@ -139,19 +139,19 @@ export const AdminRateLimitMetricsView = ({
               max="50" 
               value={threshold} 
               onChange={(e) => setThreshold(parseInt(e.target.value))}
-              className="w-full h-1.5 bg-[var(--surface-inset)] rounded-lg appearance-none cursor-pointer accent-red-500"
+              className="w-full h-1.5 bg-[var(--surface-inset)] rounded-shape-md appearance-none cursor-pointer accent-red-500"
             />
             <div className="flex justify-between text-[10px] font-bold text-[var(--text-muted)]">
               <span>1</span>
-              <span className="text-red-500">{threshold} {language === "ar" ? "محاولات/د" : "blocks/5m"}</span>
+              <span className="text-[var(--fg-danger)]">{threshold} {language === "ar" ? "محاولات/د" : "blocks/5m"}</span>
               <span>50</span>
             </div>
           </div>
         </div>
 
-        <div className="p-5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
+        <div className="p-5 rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-md bg-accent/10 text-accent">
+            <div className="p-2 rounded-shape-sm bg-accent/10 text-accent">
               <ShieldAlert size={20} />
             </div>
             <span className="text-sm font-medium text-[var(--text-secondary)]">
@@ -164,9 +164,9 @@ export const AdminRateLimitMetricsView = ({
           </p>
         </div>
 
-        <div className="p-5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
+        <div className="p-5 rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-md bg-blue-500/10 text-blue-500">
+            <div className="p-2 rounded-shape-sm bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)]">
               <Globe size={20} />
             </div>
             <span className="text-sm font-medium text-[var(--text-secondary)]">
@@ -179,9 +179,9 @@ export const AdminRateLimitMetricsView = ({
           </p>
         </div>
 
-        <div className="p-5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
+        <div className="p-5 rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-md bg-amber-500/10 text-amber-500">
+            <div className="p-2 rounded-shape-sm bg-[var(--status-warning-subtle)] text-[var(--fg-warning)]">
               <Activity size={20} />
             </div>
             <span className="text-sm font-medium text-[var(--text-secondary)]">
@@ -199,7 +199,7 @@ export const AdminRateLimitMetricsView = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Trend Chart */}
-        <div className="p-6 rounded-lg border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
+        <div className="p-6 rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <Clock className="text-accent" size={20} />
@@ -234,7 +234,7 @@ export const AdminRateLimitMetricsView = ({
         </div>
 
         {/* Blocks by Type */}
-        <div className="p-6 rounded-lg border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
+        <div className="p-6 rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <ShieldAlert className="text-accent" size={20} />
@@ -277,7 +277,7 @@ export const AdminRateLimitMetricsView = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Top IPs */}
-        <div className="lg:col-span-1 p-6 rounded-lg border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
+        <div className="lg:col-span-1 p-6 rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
           <div className="flex items-center gap-3 mb-6">
             <Filter className="text-accent" size={20} />
             <h2 className="text-lg font-bold">
@@ -290,17 +290,17 @@ export const AdminRateLimitMetricsView = ({
               return (
                 <div 
                   key={`top-ip-${ip.ip_address}-${idx}`} 
-                  className={`flex items-center justify-between p-3 rounded-md bg-[var(--surface-page)] border transition-theme ${
-                    isHot ? "border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)] animate-pulse" : "border-[var(--border-default)]"
+                  className={`flex items-center justify-between p-3 rounded-shape-sm bg-[var(--surface-page)] border transition-theme ${
+                    isHot ? "border-[var(--fg-danger)]/40 shadow-[0_0_15px_rgba(239,68,68,0.2)] animate-pulse" : "border-[var(--border-default)]"
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    {isHot && <AlertTriangle size={14} className="text-red-500" />}
-                    <span className={`text-xs font-mono font-bold ${isHot ? "text-red-500" : "text-[var(--text-secondary)]"}`}>
+                    {isHot && <AlertTriangle size={14} className="text-[var(--fg-danger)]" />}
+                    <span className={`text-xs font-mono font-bold ${isHot ? "text-[var(--fg-danger)]" : "text-[var(--text-secondary)]"}`}>
                       {ip.ip_address}
                     </span>
                   </div>
-                  <span className={`text-xs font-black px-2 py-1 rounded-full ${isHot ? "bg-red-500 text-white" : "text-red-500 bg-red-500/10"}`}>
+                  <span className={`text-xs font-black px-2 py-1 rounded-full ${isHot ? "bg-[var(--fg-danger)] text-white" : "text-[var(--fg-danger)] bg-[var(--status-danger-subtle)]"}`}>
                     {ip.count} {language === "ar" ? "حظر" : "blocks"}
                   </span>
                 </div>
@@ -315,7 +315,7 @@ export const AdminRateLimitMetricsView = ({
         </div>
 
         {/* Recent Blocks Table */}
-        <div className="lg:col-span-2 p-6 rounded-lg border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
+        <div className="lg:col-span-2 p-6 rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <Activity className="text-accent" size={20} />
@@ -325,7 +325,7 @@ export const AdminRateLimitMetricsView = ({
             </div>
             <button 
               onClick={fetchMetrics}
-              className="p-2 rounded-md hover:bg-[var(--surface-page)] text-accent transition-theme active:scale-95"
+              className="p-2 rounded-shape-sm hover:bg-[var(--surface-page)] text-accent transition-theme active:scale-95"
             >
               <RefreshCw size={18} />
             </button>

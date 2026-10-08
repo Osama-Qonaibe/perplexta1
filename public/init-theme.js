@@ -35,9 +35,9 @@
       root.classList.add('dark');
       root.classList.remove('light');
       root.setAttribute('data-theme', 'dark');
-      root.style.setProperty('--pwa-theme-color', '#0b0c0e');
-      root.style.setProperty('--pwa-bg-color', '#0b0c0e');
-      if (meta) meta.setAttribute('content', '#0b0c0e');
+      root.style.setProperty('--pwa-theme-color', '#0d1117');
+      root.style.setProperty('--pwa-bg-color', '#0d1117');
+      if (meta) meta.setAttribute('content', '#0d1117');
     } else {
       root.classList.add('light');
       root.classList.remove('dark');

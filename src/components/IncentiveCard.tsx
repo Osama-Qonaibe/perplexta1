@@ -113,11 +113,11 @@ export const IncentiveCard: React.FC = () => {
     <AnimatePresence>
       {isVisible && (
         <motion.div 
-          initial={{ opacity: 0, y: 30, scale: 0.95, x: '-50%' }}
+          initial={{ opacity: 0, y: -20, scale: 0.95, x: '-50%' }}
           animate={{ opacity: 1, y: 0, scale: 1, x: '-50%' }}
-          exit={{ opacity: 0, scale: 0.95, y: 20, x: '-50%' }}
+          exit={{ opacity: 0, scale: 0.95, y: -15, x: '-50%' }}
           transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-          className={`fixed bottom-6 left-1/2 z-[200] w-[90%] max-w-[350px] rounded-2xl border border-[var(--border-default)] shadow-xl overflow-hidden bg-[var(--surface-subtle)]/95 backdrop-blur-2xl`}
+          className={`fixed top-[calc(54px+env(safe-area-inset-top,0px))] left-1/2 z-[200] w-[90%] max-w-[350px] rounded-[var(--radius-lg)] border border-[var(--border-default)] shadow-xl overflow-hidden bg-[var(--surface-subtle)]/95 backdrop-blur-2xl`}
           onClick={(e) => e.stopPropagation()} // Prevent close when clicking the card itself
         >
           {/* Progress Bar (Header) */}
@@ -132,7 +132,7 @@ export const IncentiveCard: React.FC = () => {
 
           <div className="p-3.5 sm:p-4">
             <div className={`flex items-start gap-2 ${dir === 'rtl' ? 'flex-row-reverse' : 'flex-row'}`}>
-              <div className={`w-9 h-9 rounded-xl ${content.bg} flex items-center justify-center shrink-0`}>
+              <div className={`w-9 h-9 rounded-[var(--radius-md)] ${content.bg} flex items-center justify-center shrink-0`}>
                 {content.icon}
               </div>
               
@@ -147,13 +147,13 @@ export const IncentiveCard: React.FC = () => {
 
               <button 
                 onClick={handleClose}
-                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-0.5 rounded-lg transition-colors cursor-pointer"
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-0.5 rounded-[var(--radius-sm)] transition-colors cursor-pointer"
               >
                 <X size={15} />
               </button>
             </div>
 
-            <div className={`mt-3 p-2.5 rounded-xl bg-[var(--surface-page)] border border-[var(--border-default)] ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+            <div className={`mt-3 p-2.5 rounded-[var(--radius-md)] bg-[var(--surface-page)] border border-[var(--border-default)] ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
               <div className="flex items-center gap-1 mb-1">
                 <Users size={13} className="text-accent" />
                 <span className="text-[11px] font-extrabold text-accent uppercase tracking-wider">

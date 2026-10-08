@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Sparkles, Play, Film } from 'lucide-react';
 import { MediaGalleryItem } from '../../server/db/types';
 import { getMediaUrl } from '../utils/mediaUtils';
+import { StrictMediaContainer } from './StrictMediaContainer';
 
 export interface MultiImageGalleryProps {
   images?: string[];
@@ -74,26 +75,26 @@ export const MultiImageGallery: React.FC<MultiImageGalleryProps> = ({
       <div
         key={item.id || idx}
         onClick={() => onOpenLightbox(item.url, items, idx)}
-        className="relative w-full h-full overflow-hidden cursor-pointer group bg-transparent select-none"
+        className="relative w-full h-full overflow-hidden cursor-pointer group bg-[var(--surface-subtle)]/30 dark:bg-black/20 flex items-center justify-center select-none"
       >
         {isVideo ? (
-          <div className="relative w-full h-full bg-[var(--surface-subtle)] flex items-center justify-center overflow-hidden">
+          <div className="relative w-full h-full bg-[#0a0a0a] flex items-center justify-center overflow-hidden">
             <video
               src={videoSrcWithTime}
               poster={posterUrl}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none"
+              className="w-full h-full object-cover transition-transform duration-slow group-hover:scale-105 pointer-events-none"
               muted
               playsInline
               preload="metadata"
             />
             {/* Play Badge Overlay */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/15 group-hover:bg-black/25 transition-colors">
-              <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-[4px] bg-black/60 hover:bg-black/75 text-white flex items-center justify-center backdrop-blur-md border border-white/30 shadow-xl group-hover:scale-110 transition-transform duration-300">
+              <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-[var(--radius-xs)] bg-black/60 hover:bg-black/75 text-white flex items-center justify-center backdrop-blur-md border border-white/30 shadow-xl group-hover:scale-110 transition-transform duration-media">
                 <Play size={22} className="fill-white translate-x-0.5" />
               </div>
             </div>
-            <span className="absolute bottom-2 start-2 px-1.5 py-0.5 rounded-md bg-black/70 text-white text-[10px] font-bold flex items-center gap-1 backdrop-blur-md shadow-sm z-10">
-              <Film size={11} className="text-accent" />
+            <span className="absolute bottom-2 start-2 px-1.5 py-0.5 rounded-[var(--radius-xs)] bg-black/70 text-white text-[10px] font-bold flex items-center gap-1 backdrop-blur-md shadow-sm z-10">
+              <Film size={11} className="text-[var(--fg-accent)]" />
               <span>{isRtl ? 'فيديو' : 'Video'}</span>
             </span>
           </div>
@@ -109,7 +110,7 @@ export const MultiImageGallery: React.FC<MultiImageGalleryProps> = ({
                 target.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1080&q=80';
               }
             }}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-slow group-hover:scale-105"
             loading="lazy"
           />
         )}
@@ -119,7 +120,7 @@ export const MultiImageGallery: React.FC<MultiImageGalleryProps> = ({
 
         {/* Caption badge if item has caption */}
         {item.caption && (
-          <div className="absolute top-2 start-2 px-2 py-0.5 rounded-[4px] bg-black/65 text-white text-[10px] font-medium backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity max-w-[85%] truncate pointer-events-none">
+          <div className="absolute top-2 start-2 px-2 py-0.5 rounded-[var(--radius-xs)] bg-black/65 text-white text-[10px] font-medium backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity max-w-[85%] truncate pointer-events-none">
             {item.caption}
           </div>
         )}
@@ -145,63 +146,28 @@ export const MultiImageGallery: React.FC<MultiImageGalleryProps> = ({
     const isVideo = item.type === 'video';
     const mediaSrc = getMediaUrl(item.url);
     const hasCustomThumbnail = Boolean(item.thumbnailUrl && item.thumbnailUrl !== item.url);
-    const posterUrl = hasCustomThumbnail ? getMediaUrl(item.thumbnailUrl!) : undefined;
-    const videoSrcWithTime = mediaSrc.includes('#') ? mediaSrc : `${mediaSrc}#t=0.5`;
     const displayUrl = hasCustomThumbnail ? getMediaUrl(item.thumbnailUrl!) : mediaSrc;
+
+    const mediaType = 
+      adFormat === 'reel' ? 'reel' :
+      adFormat === 'story' ? 'story' :
+      (adFormat === 'video' || isVideo) ? 'video' :
+      layout === 'square' ? 'square' : 'feed';
 
     return (
       <div
         onClick={() => onOpenLightbox(item.url, items, 0)}
-        className={`relative w-full bg-transparent cursor-pointer overflow-hidden group transition-theme touch-pan-y ${
-          adFormat === 'reel' || adFormat === 'story'
-            ? 'aspect-[4/5] max-h-[500px] mx-auto rounded-shape-md overflow-hidden border border-[var(--border-default)]/60 shadow-md bg-[var(--surface-subtle)]'
-            : adFormat === 'video' || adFormat === 'instream'
-            ? 'aspect-video max-h-[480px]'
-            : adFormat === 'banner'
-            ? 'aspect-[21/9]'
-            : 'aspect-square max-h-[500px] mx-auto flex items-center justify-center bg-[var(--surface-subtle)]'
-        }`}
+        className="relative w-full cursor-pointer group transition-theme touch-pan-y shrink-0"
       >
-        {isVideo ? (
-          <div className="relative w-full h-full bg-[var(--surface-subtle)] flex items-center justify-center overflow-hidden">
-            <video
-              src={videoSrcWithTime}
-              poster={posterUrl}
-              className="w-full h-full object-cover pointer-events-none"
-              muted
-              playsInline
-              preload="metadata"
-            />
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/15 group-hover:bg-black/25 transition-colors">
-              <div className="w-14 h-14 rounded-[4px] bg-black/60 hover:bg-black/75 text-white flex items-center justify-center backdrop-blur-md border border-white/30 shadow-2xl group-hover:scale-110 transition-transform duration-300">
-                <Play size={26} className="fill-white translate-x-0.5" />
-              </div>
-            </div>
-            <span className="absolute bottom-2.5 start-2.5 px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] font-bold flex items-center gap-1 backdrop-blur-md shadow-sm z-10">
-              <Film size={11} className="text-accent" />
-              <span>{isRtl ? 'فيديو' : 'Video'}</span>
-            </span>
-          </div>
-        ) : (
-          <img
-            src={displayUrl}
-            alt={item.caption || adTitle || 'Post image'}
-            referrerPolicy="no-referrer"
-            onError={(e) => {
-              const target = e.currentTarget;
-              if (!target.dataset.fallback) {
-                target.dataset.fallback = 'true';
-                target.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1080&q=80';
-              }
-            }}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.01] pointer-events-none"
-            loading="lazy"
-          />
-        )}
+        <StrictMediaContainer
+          type={mediaType as any}
+          src={isVideo ? mediaSrc : displayUrl}
+          isVideo={isVideo}
+        />
 
-        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-          <span className="px-3.5 py-1.5 rounded-[var(--radius-xs)] bg-[var(--surface-card)]/95 text-xs font-extrabold shadow-xl text-[var(--text-primary)] flex items-center gap-1 backdrop-blur-md border border-[var(--border-default)]">
-            <Sparkles size={14} className="text-accent" />
+        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none rounded-none z-10">
+          <span className="px-3.5 py-1.5 rounded-[var(--radius-xs)] bg-black/85 text-white text-xs font-extrabold shadow-xl flex items-center gap-1 backdrop-blur-md">
+            <Sparkles size={14} className="text-[var(--fg-accent)]" />
             <span>{isRtl ? 'عرض بصورة مكبرة' : 'Expand Media'}</span>
           </span>
         </div>
@@ -217,7 +183,7 @@ export const MultiImageGallery: React.FC<MultiImageGalleryProps> = ({
         <button
           type="button"
           onClick={isRtl ? handleNext : handlePrev}
-          className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-[4px] bg-black/60 hover:bg-black/80 text-white flex items-center justify-center z-10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100 backdrop-blur-xs"
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-[var(--radius-xs)] bg-black/60 hover:bg-black/80 text-white flex items-center justify-center z-10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100 backdrop-blur-xs"
         >
           <ChevronLeft size={20} />
         </button>
@@ -225,7 +191,7 @@ export const MultiImageGallery: React.FC<MultiImageGalleryProps> = ({
         <button
           type="button"
           onClick={isRtl ? handlePrev : handleNext}
-          className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-[4px] bg-black/60 hover:bg-black/80 text-white flex items-center justify-center z-10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100 backdrop-blur-xs"
+          className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-[var(--radius-xs)] bg-black/60 hover:bg-black/80 text-white flex items-center justify-center z-10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100 backdrop-blur-xs"
         >
           <ChevronRight size={20} />
         </button>
@@ -237,7 +203,7 @@ export const MultiImageGallery: React.FC<MultiImageGalleryProps> = ({
           {renderSingleMediaItem(currentItem, activeIndex)}
         </div>
 
-        <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold font-mono px-2.5 py-1 rounded-[4px] shadow z-10">
+        <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold font-mono px-2.5 py-1 rounded-[var(--radius-xs)] shadow z-10">
           {activeIndex + 1} / {totalCount}
         </div>
 
@@ -249,8 +215,8 @@ export const MultiImageGallery: React.FC<MultiImageGalleryProps> = ({
                 e.stopPropagation();
                 setActiveIndex(idx);
               }}
-              className={`h-1.5 rounded-[4px] transition-all cursor-pointer ${
-                idx === activeIndex ? 'bg-accent w-4' : 'bg-white/60 hover:bg-white/90 w-1.5'
+              className={`h-1.5 rounded-[var(--radius-xs)] transition-all cursor-pointer ${
+                idx === activeIndex ? 'bg-[var(--fg-accent)] w-4' : 'bg-white/60 hover:bg-white/90 w-1.5'
               }`}
             />
           ))}
@@ -262,7 +228,7 @@ export const MultiImageGallery: React.FC<MultiImageGalleryProps> = ({
   // 2 Items: 2 equal side-by-side columns
   if (totalCount === 2) {
     return (
-      <div className="grid grid-cols-2 gap-0.5 sm:gap-1 w-full aspect-[4/3] sm:aspect-[16/10] bg-transparent overflow-hidden select-none">
+      <div className="grid grid-cols-2 gap-0.5 sm:gap-1 w-full aspect-[4/5] sm:aspect-square max-h-[500px] bg-transparent overflow-hidden select-none">
         <div className="w-full h-full overflow-hidden">
           {renderSingleMediaItem(items[0], 0)}
         </div>
@@ -276,7 +242,7 @@ export const MultiImageGallery: React.FC<MultiImageGalleryProps> = ({
   // 3 Items: 1 large leading photo + 2 stacked photos
   if (totalCount === 3) {
     return (
-      <div className="grid grid-cols-2 gap-0.5 sm:gap-1 w-full aspect-[4/3] sm:aspect-[16/10] bg-transparent overflow-hidden select-none">
+      <div className="grid grid-cols-2 gap-0.5 sm:gap-1 w-full aspect-[4/5] sm:aspect-square max-h-[500px] bg-transparent overflow-hidden select-none">
         <div className="row-span-2 col-span-1 w-full h-full overflow-hidden">
           {renderSingleMediaItem(items[0], 0)}
         </div>
@@ -293,7 +259,7 @@ export const MultiImageGallery: React.FC<MultiImageGalleryProps> = ({
   // 4 Items: Facebook-style clean dynamic collage without restrictive square borders or box background
   if (totalCount === 4) {
     return (
-      <div className="grid grid-cols-2 gap-0.5 sm:gap-1 w-full aspect-[4/3] sm:aspect-[16/10] bg-transparent overflow-hidden select-none">
+      <div className="grid grid-cols-2 gap-0.5 sm:gap-1 w-full aspect-[4/5] sm:aspect-square max-h-[500px] bg-transparent overflow-hidden select-none">
         <div className="w-full h-full overflow-hidden">
           {renderSingleMediaItem(items[0], 0)}
         </div>
@@ -312,7 +278,7 @@ export const MultiImageGallery: React.FC<MultiImageGalleryProps> = ({
 
   // 5 or more Items: Facebook dynamic collage with +N overlay on the 4th quadrant
   return (
-    <div className="grid grid-cols-2 gap-0.5 sm:gap-1 w-full aspect-[4/3] sm:aspect-[16/10] bg-transparent overflow-hidden select-none">
+    <div className="grid grid-cols-2 gap-0.5 sm:gap-1 w-full aspect-[4/5] sm:aspect-square max-h-[500px] bg-transparent overflow-hidden select-none">
       <div className="w-full h-full overflow-hidden">
         {renderSingleMediaItem(items[0], 0)}
       </div>

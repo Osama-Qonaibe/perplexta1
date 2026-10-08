@@ -20,7 +20,7 @@ interface CollapsibleTableProps {
 }
 
 export const CollapsibleTable: React.FC<CollapsibleTableProps> = ({ children, dir, tableKey, isStreaming = false }) => {
-  // Session context stored collapse state per table key
+  // Persistent local storage key for table collapse state
   const storageKey = tableKey ? `perplexta_table_collapsed_${tableKey}` : null;
 
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -30,9 +30,13 @@ export const CollapsibleTable: React.FC<CollapsibleTableProps> = ({ children, di
     }
     if (storageKey) {
       try {
-        const saved = sessionStorage.getItem(storageKey);
-        if (saved !== null) {
-          return saved === 'true';
+        const savedLocal = localStorage.getItem(storageKey);
+        if (savedLocal !== null) {
+          return savedLocal === 'true';
+        }
+        const savedSession = sessionStorage.getItem(storageKey);
+        if (savedSession !== null) {
+          return savedSession === 'true';
         }
       } catch (e) {
         return false;
@@ -55,6 +59,7 @@ export const CollapsibleTable: React.FC<CollapsibleTableProps> = ({ children, di
       const next = !prev;
       if (storageKey) {
         try {
+          localStorage.setItem(storageKey, String(next));
           sessionStorage.setItem(storageKey, String(next));
         } catch (e) {
           // Ignore quota errors
@@ -140,30 +145,30 @@ export const CollapsibleTable: React.FC<CollapsibleTableProps> = ({ children, di
 
   return (
     <div
-      className="my-4 w-full rounded-xl sm:rounded-2xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-xs overflow-hidden transition-all text-start rtl:text-right ltr:text-left"
+      className="my-5 sm:my-6 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] shadow-xs overflow-hidden transition-colors text-start rtl:text-right ltr:text-left"
       dir={dir}
     >
       {/* Table Top Toolbar Header */}
-      <div className="flex items-center justify-between px-3.5 sm:px-4 py-2.5 bg-[var(--surface-subtle)] border-b border-[var(--border-default)] select-none">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-accent/10 text-accent flex items-center justify-center">
+      <div className={`flex items-center justify-between px-3 sm:px-3.5 py-1.5 sm:py-2 bg-[var(--surface-subtle)] ${!isCollapsed ? 'border-b border-[var(--border-default)]' : ''} select-none transition-colors`}>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--fg-accent)] flex items-center justify-center shrink-0 shadow-2xs">
             <TableIcon size={14} />
           </div>
-          <span className="text-xs sm:text-sm font-bold text-[var(--text-primary)]">
+          <span className="text-xs sm:text-[13px] font-bold text-[var(--text-primary)] truncate">
             {dir === 'rtl' ? 'جدول المقارنة والبيانات' : 'Data & Comparison Table'}
           </span>
         </div>
 
         {/* Header Right Actions */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={toggleCollapse}
-            className="px-2 py-1 rounded-lg text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)] border border-transparent hover:border-[var(--border-default)] flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+            className="h-8 px-2.5 sm:px-3 rounded-[var(--radius-sm)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--surface-card)] hover:bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:border-[var(--border-accent)]/50 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-2xs"
             title={isCollapsed ? (dir === 'rtl' ? 'توسيع الجدول' : 'Expand Table') : (dir === 'rtl' ? 'طي الجدول' : 'Collapse Table')}
           >
-            {isCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-            <span>
+            {isCollapsed ? <ChevronDown size={14} className="text-[var(--text-muted)]" /> : <ChevronUp size={14} className="text-[var(--text-muted)]" />}
+            <span className="whitespace-nowrap">
               {isCollapsed 
                 ? (dir === 'rtl' ? 'عرض الجدول' : 'Expand') 
                 : (dir === 'rtl' ? 'طي' : 'Collapse')
@@ -180,14 +185,14 @@ export const CollapsibleTable: React.FC<CollapsibleTableProps> = ({ children, di
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className="overflow-hidden"
           >
             {/* Scrollable Table Viewport */}
-            <div className="w-full overflow-x-auto">
+            <div className="w-full overflow-x-auto custom-scrollbar">
               <table 
                 ref={tableRef}
-                className="w-full border-collapse text-xs sm:text-sm text-start rtl:text-right ltr:text-left" 
+                className="w-full border-collapse text-xs sm:text-[13px] text-start rtl:text-right ltr:text-left" 
                 dir={dir}
               >
                 {children}
@@ -195,41 +200,41 @@ export const CollapsibleTable: React.FC<CollapsibleTableProps> = ({ children, di
             </div>
 
             {/* Bottom Column Action Bar (Copy / Download Template) */}
-            <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 sm:px-4 py-2.5 bg-[var(--surface-subtle)]/60 border-t border-[var(--border-default)]">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-3.5 py-2 bg-[var(--surface-subtle)]/70 border-t border-[var(--border-default)]">
               <div className="text-[11px] font-medium text-[var(--text-muted)] flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                <span className="w-1.5 h-1.5 rounded-[var(--radius-full)] bg-[var(--fg-accent)] shrink-0" />
                 <span>{dir === 'rtl' ? 'قالب جدول تفاعلي موثق' : 'Verified Interactive Data Grid'}</span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <button
                   type="button"
                   onClick={handleCopyMarkdown}
-                  className="px-2.5 py-1.5 rounded-lg bg-transparent hover:bg-[var(--surface-card)] border border-transparent hover:border-[var(--border-default)] text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  className="h-8 px-2.5 sm:px-3 rounded-[var(--radius-sm)] bg-[var(--surface-card)] hover:bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:border-[var(--border-accent)]/50 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
                   title={dir === 'rtl' ? 'نسخ محتوى الجدول' : 'Copy Table'}
                 >
-                  {copied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
-                  <span>{copied ? (dir === 'rtl' ? 'تم النسخ' : 'Copied') : (dir === 'rtl' ? 'نسخ الجدول' : 'Copy Table')}</span>
+                  {copied ? <Check size={14} className="text-[var(--fg-success)] shrink-0" /> : <Copy size={14} className="text-[var(--text-muted)] shrink-0" />}
+                  <span className="whitespace-nowrap">{copied ? (dir === 'rtl' ? 'تم النسخ' : 'Copied') : (dir === 'rtl' ? 'نسخ الجدول' : 'Copy Table')}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleDownloadCSV}
-                  className="px-2.5 py-1.5 rounded-lg bg-transparent hover:bg-[var(--surface-card)] border border-transparent hover:border-[var(--border-default)] text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  className="h-8 px-2.5 sm:px-3 rounded-[var(--radius-sm)] bg-[var(--surface-card)] hover:bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:border-[var(--border-accent)]/60 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
                   title={dir === 'rtl' ? 'تنزيل كملف CSV' : 'Download CSV'}
                 >
-                  <FileSpreadsheet size={13} className="text-emerald-600 dark:text-emerald-400" />
-                  <span>{dir === 'rtl' ? 'تنزيل CSV' : 'Download CSV'}</span>
+                  <FileSpreadsheet size={14} className="text-[var(--fg-accent)] shrink-0" />
+                  <span className="whitespace-nowrap">{dir === 'rtl' ? 'تنزيل CSV' : 'Download CSV'}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleDownloadMarkdown}
-                  className="px-2.5 py-1.5 rounded-lg bg-accent text-white hover:opacity-90 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
+                  className="h-8 px-2.5 sm:px-3 rounded-[var(--radius-sm)] bg-[var(--surface-card)] hover:bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:border-[var(--border-accent)]/60 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
                   title={dir === 'rtl' ? 'تصدير قالب الجدول' : 'Export Template'}
                 >
-                  <FileText size={13} />
-                  <span>{dir === 'rtl' ? 'تصدير القالب (.md)' : 'Export Template (.md)'}</span>
+                  <FileText size={14} className="text-[var(--text-muted)] shrink-0" />
+                  <span className="whitespace-nowrap">{dir === 'rtl' ? 'تصدير القالب (.md)' : 'Export Template (.md)'}</span>
                 </button>
               </div>
             </div>

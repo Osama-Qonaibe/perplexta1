@@ -1,2 +1,4 @@
 /build/*
 !/build/.npmkeep
+/src/main/assets/public/*
+!/src/main/assets/public/.gitkeep

@@ -1,9 +1,17 @@
 import express from 'express';
 import { pool } from '../db/index.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { body, param } from 'express-validator';
+import { body, param, validationResult } from 'express-validator';
 
 const router = express.Router();
+
+const handleValidationErrors = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  next();
+};
 
 router.get('/', authenticateToken, async (req: any, res) => {
   try {
@@ -20,9 +28,10 @@ router.get('/', authenticateToken, async (req: any, res) => {
 
 router.post('/:toolId', [
   authenticateToken,
-  param('toolId').notEmpty(),
-  body('is_connected').isBoolean(),
-  body('config').optional().isObject(),
+  param('toolId').notEmpty().withMessage('toolId is required'),
+  body('is_connected').isBoolean().withMessage('is_connected must be a boolean'),
+  body('config').optional().isObject().withMessage('config must be an object'),
+  handleValidationErrors,
 ], async (req: any, res: any) => {
   try {
     const { toolId } = req.params;

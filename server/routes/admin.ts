@@ -1,19 +1,22 @@
 import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';
-import { pool, ledgerPool, getSecurityPool } from '../db/index.js';
-import { authenticateAdmin, invalidateUserCache } from '../middleware/auth.js';
+import { createUserSchema } from '../schemas/user.schemas.js';
+import { AppError } from '../middleware/errorHandler.js';
+import { ERROR_CODES } from '../utils/errorCodes.js';
+import { pool, ledgerPool, getSecurityPool, mediaPool } from '../db/index.js';
+import { authenticateAdmin, invalidateUserCache, invalidateAllUserCaches } from '../middleware/auth.js';
 import { syncProviderModelsInternal, checkProviderStatus, invalidateVaultCache } from '../services/ai.js';
-import { memoryCache } from '../utils/cache.js';
+import { memoryCache, getCache, setCache } from '../utils/cache.js';
 import { runDatabaseMigrations } from '../db/migrations.js';
 import { encrypt, decrypt } from '../utils/crypto.js';
 import { invalidateStripeClient } from '../services/payments.js';
-import { invalidateFirebaseApp } from '../firebase-admin.js';
 import { sendEmail } from '../services/email.js';
 import { createNotification, logSystemActivity } from '../services/notifications.js';
 import { consolidateAllUserMemories } from '../services/memory.js';
+import { runMemoryContextMigration } from '../services/memoryMigrationService.js';
 import { reconcileAllWallets } from '../services/wallet.js';
-import { getSystemSettings, updateSystemSettings, checkSystemAssetsDiagnostic, repairSystemAssetsDiagnostic, getMissingAssetReport } from '../services/system.js';
+import { getSystemSettings, updateSystemSettings, checkSystemAssetsDiagnostic, repairSystemAssetsDiagnostic, getMissingAssetReport, resolvePersistentSystemAssetUrl } from '../services/system.js';
 import { syncAllContentSeoMetadata, auditContentSeoItems, syncSingleContentSeoItem, getSmartSeoSuggestion, applySmartSeoSuggestion } from '../services/seoSync.js';
 import { upload, handleMulterError } from '../middleware/upload.js';
 import { checkDiskSpace } from '../middleware/checkDiskSpace.js';
@@ -26,6 +29,7 @@ import {
   getDatabaseRegistry, 
   saveDatabaseConfig, 
   testDatabaseConnection, 
+  checkAllDatabasesHealth,
   exportDatabase, 
   importDatabase, 
   initAllTools, 
@@ -38,10 +42,22 @@ import {
   invalidateEconomySettingsCache, 
   invalidateOrchestratorConfigCache, 
   invalidatePlansCache, 
-  invalidateApiKeysVaultCache 
+  invalidateApiKeysVaultCache,
+  invalidateAllDataLoaders,
+  upsertSeoMetadata
 } from '../db/queries.js';
-import { invalidateFilePermissionCache } from '../services/filePermissionCache.js';
+import { invalidateFilePermissionCache, invalidateFileVersionCache } from '../services/filePermissionCache.js';
+import { invalidateGpuCache } from '../services/gpuVaultService.js';
+import { escapeHtml } from '../utils/security.js';
 import { io } from '../config/socket.js';
+import {
+  getAllMapProviders,
+  saveMapProvider,
+  testMapProviderConnection,
+  resetMapProviderKey,
+  updateProviderHealthStatus,
+  ensureMapProvidersTable
+} from '../services/mapProvidersService.js';
 
 const router = express.Router();
 router.use(adminLimiter);
@@ -284,13 +300,16 @@ router.post("/audit-logs/batch-delete", authenticateAdmin, async (req, res) => {
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ error: 'IDs array required' });
     }
+    const parsedIds = ids.map((i: any) => parseInt(String(i), 10)).filter((i: number) => !isNaN(i));
+    if (parsedIds.length === 0) {
+      return res.status(400).json({ error: 'Valid numeric IDs required' });
+    }
     const secPool = getSecurityPool();
     if (!secPool) {
       return res.status(503).json({ error: 'Security database offline' });
     }
-    await secPool.query('DELETE FROM admin_audit_logs WHERE id = ANY($1)', [ids]);
-    await auditLog((req as any).user?.id, 'Batch Delete Compliance Logs', 'security', { count: ids.length });
-    res.json({ success: true, count: ids.length });
+    await secPool.query('DELETE FROM admin_audit_logs WHERE id = ANY($1::int[])', [parsedIds]);
+    res.json({ success: true, count: parsedIds.length });
   } catch (error: any) {
     console.error('[AdminRouter] Batch delete audit logs failed:', error);
     res.status(500).json({ error: error.message || 'Batch delete failed' });
@@ -308,7 +327,6 @@ router.delete("/audit-logs/all", authenticateAdmin, async (req, res) => {
       return res.status(503).json({ error: 'Security database offline' });
     }
     await secPool.query('DELETE FROM admin_audit_logs');
-    await auditLog((req as any).user?.id, 'Clear Compliance Logs', 'security', {});
     res.json({ success: true });
   } catch (error: any) {
     console.error('[AdminRouter] Clear audit logs failed:', error);
@@ -438,6 +456,16 @@ router.post("/databases/test", authenticateAdmin, async (req, res) => {
   }
 });
 
+router.get("/databases/health-status", authenticateAdmin, async (req, res) => {
+  try {
+    const health = await checkAllDatabasesHealth();
+    res.json(health);
+  } catch (error: any) {
+    console.error('[Admin] Database health status check failed:', error);
+    res.status(500).json({ error: error.message || 'Failed to check database health status' });
+  }
+});
+
 router.post("/databases/migrate", authenticateAdmin, async (req, res) => {
   try {
     const { id, type } = req.body;
@@ -511,12 +539,68 @@ router.get("/plans", authenticateAdmin, async (req, res) => {
 
 router.post("/plans", authenticateAdmin, async (req, res) => {
   try {
-    const { name_en, name_ar, desc_en, desc_ar, badge, discount, is_active, is_visible, monthly_price, annual_price, color, features, limits, plan_type = 'user', hide_tools = false } = req.body;
+    const { 
+      name_en, 
+      name_ar, 
+      desc_en, 
+      desc_ar, 
+      badge, 
+      discount = 0, 
+      is_active = true, 
+      is_visible = true, 
+      monthly_price = 0, 
+      annual_price = 0, 
+      is_monthly_enabled = true,
+      is_annual_enabled = true,
+      is_daily_enabled = false,
+      daily_price = 0,
+      daily_days = 7,
+      daily_credits,
+      monthly_credits,
+      annual_credits,
+      color, 
+      features, 
+      limits, 
+      plan_type = 'user', 
+      hide_tools = false 
+    } = req.body;
+    
     if (!name_en) return res.status(400).json({ error: 'name_en is required' });
+    
+    // Ensure at least one billing cycle is enabled
+    const monthlyOn = is_monthly_enabled !== false;
+    const annualOn = is_annual_enabled !== false;
+    const dailyOn = Boolean(is_daily_enabled);
+    if (!monthlyOn && !annualOn && !dailyOn) {
+      return res.status(400).json({ error: 'At least one billing cycle must be enabled (Days, Monthly, or Annual)' });
+    }
+
+    const mCredits = monthly_credits !== undefined && monthly_credits !== null && Number(monthly_credits) >= 0
+      ? Number(monthly_credits)
+      : Math.round(Number(monthly_price || 0) * 1000);
+
+    const aCredits = annual_credits !== undefined && annual_credits !== null && Number(annual_credits) >= 0
+      ? Number(annual_credits)
+      : (Number(annual_price || 0) > 0 ? Math.round(Number(annual_price || 0) * 1000) : mCredits * 12);
+
+    const dCredits = daily_credits !== undefined && daily_credits !== null && Number(daily_credits) >= 0
+      ? Number(daily_credits)
+      : Math.round(Number(daily_price || 0) * 1000);
+
     await pool.query(`
-      INSERT INTO plans (name_en, name_ar, desc_en, desc_ar, badge, discount, is_active, is_visible, monthly_price, annual_price, color, features, limits, plan_type, hide_tools)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-    `, [name_en, name_ar, desc_en, desc_ar, badge, discount, is_active, is_visible, monthly_price, annual_price, color, JSON.stringify(features), JSON.stringify(limits), plan_type, hide_tools]);
+      INSERT INTO plans (
+        name_en, name_ar, desc_en, desc_ar, badge, discount, is_active, is_visible, 
+        monthly_price, annual_price, is_monthly_enabled, is_annual_enabled, is_daily_enabled, daily_price, daily_days,
+        daily_credits, monthly_credits, annual_credits,
+        color, features, limits, plan_type, hide_tools
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+    `, [
+      name_en, name_ar, desc_en, desc_ar, badge, Number(discount || 0), is_active, is_visible, 
+      Number(monthly_price || 0), Number(annual_price || 0), monthlyOn, annualOn, dailyOn, Number(daily_price || 0), parseInt(daily_days || 7, 10),
+      dCredits, mCredits, aCredits,
+      color, JSON.stringify(features), JSON.stringify(limits), plan_type, Boolean(hide_tools === true || hide_tools === 'true')
+    ]);
     invalidatePlansCache();
     await auditLog((req as any).user?.id, 'Create Plan', 'system', { name_en });
     res.json({ success: true });
@@ -529,14 +613,65 @@ router.post("/plans", authenticateAdmin, async (req, res) => {
 router.put("/plans/:id", authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name_en, name_ar, desc_en, desc_ar, badge, discount, is_active, is_visible, monthly_price, annual_price, color, features, limits, plan_type = 'user', hide_tools = false } = req.body;
+    const { 
+      name_en, 
+      name_ar, 
+      desc_en, 
+      desc_ar, 
+      badge, 
+      discount = 0, 
+      is_active = true, 
+      is_visible = true, 
+      monthly_price = 0, 
+      annual_price = 0, 
+      is_monthly_enabled = true,
+      is_annual_enabled = true,
+      is_daily_enabled = false,
+      daily_price = 0,
+      daily_days = 7,
+      daily_credits,
+      monthly_credits,
+      annual_credits,
+      color, 
+      features, 
+      limits, 
+      plan_type = 'user', 
+      hide_tools = false 
+    } = req.body;
+
+    const monthlyOn = is_monthly_enabled !== false;
+    const annualOn = is_annual_enabled !== false;
+    const dailyOn = Boolean(is_daily_enabled);
+    if (!monthlyOn && !annualOn && !dailyOn) {
+      return res.status(400).json({ error: 'At least one billing cycle must be enabled (Days, Monthly, or Annual)' });
+    }
+
+    const mCredits = monthly_credits !== undefined && monthly_credits !== null && Number(monthly_credits) >= 0
+      ? Number(monthly_credits)
+      : Math.round(Number(monthly_price || 0) * 1000);
+
+    const aCredits = annual_credits !== undefined && annual_credits !== null && Number(annual_credits) >= 0
+      ? Number(annual_credits)
+      : (Number(annual_price || 0) > 0 ? Math.round(Number(annual_price || 0) * 1000) : mCredits * 12);
+
+    const dCredits = daily_credits !== undefined && daily_credits !== null && Number(daily_credits) >= 0
+      ? Number(daily_credits)
+      : Math.round(Number(daily_price || 0) * 1000);
+
     await pool.query(`
       UPDATE plans SET 
         name_en = $1, name_ar = $2, desc_en = $3, desc_ar = $4, badge = $5, 
         discount = $6, is_active = $7, is_visible = $8, monthly_price = $9, annual_price = $10, 
-        color = $11, features = $12, limits = $13, plan_type = $14, hide_tools = $15, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $16
-    `, [name_en, name_ar, desc_en, desc_ar, badge, discount, is_active, is_visible, monthly_price, annual_price, color, JSON.stringify(features), JSON.stringify(limits), plan_type, hide_tools, id]);
+        is_monthly_enabled = $11, is_annual_enabled = $12, is_daily_enabled = $13, daily_price = $14, daily_days = $15,
+        daily_credits = $16, monthly_credits = $17, annual_credits = $18,
+        color = $19, features = $20, limits = $21, plan_type = $22, hide_tools = $23, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $24
+    `, [
+      name_en, name_ar, desc_en, desc_ar, badge, Number(discount || 0), is_active, is_visible, 
+      Number(monthly_price || 0), Number(annual_price || 0), monthlyOn, annualOn, dailyOn, Number(daily_price || 0), parseInt(daily_days || 7, 10),
+      dCredits, mCredits, aCredits,
+      color, JSON.stringify(features), JSON.stringify(limits), plan_type, Boolean(hide_tools === true || hide_tools === 'true'), id
+    ]);
     invalidatePlansCache();
     await auditLog((req as any).user?.id, 'Update Plan', 'system', { id, name_en });
     res.json({ success: true });
@@ -565,6 +700,12 @@ router.get("/users", authenticateAdmin, async (req, res) => {
     if (isNaN(limit) || limit < 1) limit = 500;
     if (limit > 1000) limit = 1000;
     if (isNaN(offset) || offset < 0) offset = 0;
+
+    const cacheKey = `admin:users:${limit}:${offset}`;
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
 
     const result = await pool.query(`
       SELECT 
@@ -602,6 +743,8 @@ router.get("/users", authenticateAdmin, async (req, res) => {
         points: wallet ? wallet.points : 0
       };
     });
+
+    await setCache(cacheKey, usersWithWallets, 120);
 
     res.json(usersWithWallets);
   } catch (error) {
@@ -876,10 +1019,10 @@ router.get("/orchestrator/routes", authenticateAdmin, async (req, res) => {
       console.log(`[Admin Orchestrator] Seeding ${missingTools.length} missing tools to DB tool_orchestrator...`);
       for (const t of missingTools) {
         await pool.query(`
-          INSERT INTO tool_orchestrator (tool_id, primary_provider, primary_model, is_active, cost_per_usage, task_description, task_description_ar)
-          VALUES ($1, '', '', true, $2, $3, $4)
+          INSERT INTO tool_orchestrator (tool_id, primary_provider, primary_model, is_active, task_description, task_description_ar)
+          VALUES ($1, '', '', true, $2, $3)
           ON CONFLICT (tool_id) DO NOTHING
-        `, [t.id, t.cost, t.desc, t.descAr]);
+        `, [t.id, t.desc, t.descAr]);
       }
     }
 
@@ -911,8 +1054,7 @@ router.post("/orchestrator/routes", authenticateAdmin, async (req, res) => {
           fallback_1_provider, fallback_1_model, 
           fallback_2_provider, fallback_2_model,
           fallback_3_provider, fallback_3_model,
-          is_active, cost_per_usage,
-          cost_per_1k_input_tokens, cost_per_1k_output_tokens
+          is_active
         } = route;
         
         if (!tool_id) continue;
@@ -928,10 +1070,9 @@ router.post("/orchestrator/routes", authenticateAdmin, async (req, res) => {
             fallback_1_provider, fallback_1_model, 
             fallback_2_provider, fallback_2_model,
             fallback_3_provider, fallback_3_model,
-            is_active, cost_per_usage,
-            cost_per_1k_input_tokens, cost_per_1k_output_tokens
+            is_active
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           ON CONFLICT (tool_id) DO UPDATE SET
             primary_provider = EXCLUDED.primary_provider,
             primary_model = EXCLUDED.primary_model,
@@ -942,9 +1083,6 @@ router.post("/orchestrator/routes", authenticateAdmin, async (req, res) => {
             fallback_3_provider = EXCLUDED.fallback_3_provider,
             fallback_3_model = EXCLUDED.fallback_3_model,
             is_active = EXCLUDED.is_active,
-            cost_per_usage = EXCLUDED.cost_per_usage,
-            cost_per_1k_input_tokens = EXCLUDED.cost_per_1k_input_tokens,
-            cost_per_1k_output_tokens = EXCLUDED.cost_per_1k_output_tokens,
             updated_at = CURRENT_TIMESTAMP
         `, [
           tool_id, 
@@ -952,10 +1090,7 @@ router.post("/orchestrator/routes", authenticateAdmin, async (req, res) => {
           fallback_1_provider || '', fallback_1_model || '', 
           fallback_2_provider || '', fallback_2_model || '',
           fallback_3_provider || '', fallback_3_model || '',
-          is_active !== undefined ? is_active : true, 
-          cost_per_usage !== undefined && cost_per_usage !== null ? cost_per_usage : 10,
-          cost_per_1k_input_tokens !== undefined ? cost_per_1k_input_tokens : 5,
-          cost_per_1k_output_tokens !== undefined ? cost_per_1k_output_tokens : 15
+          is_active !== undefined ? is_active : true
         ]);
       }
       await client.query('COMMIT');
@@ -1665,36 +1800,41 @@ router.get("/security-alerts", authenticateAdmin, async (req, res) => {
   }
 });
 
-router.get("/activity-stream", authenticateAdmin, async (req, res) => {
+router.get("/activity-stream", authenticateAdmin, async (req: any, res) => {
   try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    memoryCache.deletePattern('admin:activity');
     const result = await pool.query(
       'SELECT id, user_id, action, type, description, details, metadata, ip_address, created_at FROM system_logs ORDER BY created_at DESC LIMIT 50'
     );
     res.json(result.rows);
-  } catch {
+  } catch (error: any) {
+    console.error('[AdminRouter] Get activity stream error:', error);
     res.status(500).json({ error: 'Internal Error' });
   }
 });
 
-router.post("/users", authenticateAdmin, async (req, res) => {
+router.post("/users", authenticateAdmin, async (req, res, next) => {
   try {
-    const { name, email, password, role = 'user', balance = 0, points = 0 } = req.body;
-    
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email and password are required' });
+    const parsed = createUserSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(
+        'Validation failed',
+        ERROR_CODES.VALIDATION_FAILED.status,
+        ERROR_CODES.VALIDATION_FAILED.code
+      );
     }
 
-    if (typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
-      return res.status(400).json({ error: 'Name, email and password must be strings' });
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ error: 'Invalid email format' });
-    }
+    const { name, email, password, role, balance, points } = parsed.data;
 
     const check = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
-    if (check.rows.length > 0) return res.status(400).json({ error: 'Email already exists' });
+    if (check.rows.length > 0) {
+      throw new AppError(
+        'Email already exists',
+        ERROR_CODES.DB_UNIQUE_VIOLATION.status,
+        ERROR_CODES.DB_UNIQUE_VIOLATION.code
+      );
+    }
 
     const bcrypt = await import('bcryptjs');
     const hash = await bcrypt.default.hash(password, 10);
@@ -1722,6 +1862,7 @@ router.post("/users", authenticateAdmin, async (req, res) => {
       );
 
       await client.query('COMMIT');
+      memoryCache.deletePattern('admin:users');
       await auditLog((req as any).user?.id, 'Create User Manually', 'system', { targetUser: userId, email });
       if (io) {
         io.to('admin_room').emit('user_management_update', { action: 'user_created', userId });
@@ -1737,8 +1878,7 @@ router.post("/users", authenticateAdmin, async (req, res) => {
       client.release();
     }
   } catch (error) {
-    console.error('[Admin] Create user failed:', error);
-    res.status(500).json({ error: 'Failed to create user' });
+    next(error);
   }
 });
 
@@ -1766,6 +1906,8 @@ router.delete("/users/:id", authenticateAdmin, async (req, res) => {
       await client.query('DELETE FROM users WHERE id = $1', [id]);
 
       await client.query('COMMIT');
+      invalidateUserCache(id);
+      memoryCache.deletePattern('admin:users');
       await auditLog(adminId, 'Delete User', 'system', { targetUser: id });
       if (io) {
         io.to('admin_room').emit('user_management_update', { action: 'user_deleted', userId: id });
@@ -1871,9 +2013,9 @@ async function notifyUserAccountModification(
       sendEmail: true,
       emailBody: (user) => `
       <div style="font-family: sans-serif; background-color: #ffffff; padding: 25px; border-radius: 8px; border: 1px solid #f1f5f9;">
-        <h2 style="color: #334155; font-size: 20px; font-weight: 800; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;">${titleEn}</h2>
-        <p style="color: #334155; font-size: 15px; line-height: 1.8;">Hello <strong>${user.name || 'Valued User'}</strong>,</p>
-        <p style="color: #475569; font-size: 14px; line-height: 1.8;">${msgEn}</p>
+        <h2 style="color: #334155; font-size: 20px; font-weight: 800; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;">${escapeHtml(titleEn)}</h2>
+        <p style="color: #334155; font-size: 15px; line-height: 1.8;">Hello <strong>${escapeHtml(user.name || 'Valued User')}</strong>,</p>
+        <p style="color: #475569; font-size: 14px; line-height: 1.8;">${escapeHtml(msgEn)}</p>
         <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 6px; margin: 20px 0;">
           <span style="color: #64748b; font-size: 13px;">Automated notification from Perplexta Core Platform Engine.</span>
         </div>
@@ -1881,9 +2023,9 @@ async function notifyUserAccountModification(
     `,
       emailBodyAr: (user) => `
       <div style="font-family: Tajawal, sans-serif; direction: rtl; text-align: right; background-color: #ffffff; padding: 25px; border-radius: 8px; border: 1px solid #f1f5f9;">
-        <h2 style="color: #334155; font-size: 20px; font-weight: 800; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;">${titleAr}</h2>
-        <p style="color: #334155; font-size: 15px; line-height: 1.8;">مرحباً <strong>${user.name || 'عزيزنا المستخدم'}</strong>،</p>
-        <p style="color: #475569; font-size: 14px; line-height: 1.8;">${msgAr}</p>
+        <h2 style="color: #334155; font-size: 20px; font-weight: 800; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;">${escapeHtml(titleAr)}</h2>
+        <p style="color: #334155; font-size: 15px; line-height: 1.8;">مرحباً <strong>${escapeHtml(user.name || 'عزيزنا المستخدم')}</strong>،</p>
+        <p style="color: #475569; font-size: 14px; line-height: 1.8;">${escapeHtml(msgAr)}</p>
         <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 6px; margin: 20px 0;">
           <span style="color: #64748b; font-size: 13px;">تنبيه آلي صادق عن نظام إدارة المنصة (Perplexta Core Engine).</span>
         </div>
@@ -1970,6 +2112,7 @@ router.patch("/users/:id/permissions", authenticateAdmin, async (req, res) => {
       }, client);
       await client.query('COMMIT');
       invalidateUserCache(userIdNum);
+      memoryCache.deletePattern('admin:users');
       await auditLog((req as any).user?.id, 'Update User Permissions', 'system', { targetUser: userIdNum, changes: { role, status, kyc_status } });
       if (io) {
         io.to('admin_room').emit('user_management_update', { action: 'permissions_updated', userId: userIdNum, role, status, kyc_status });
@@ -2035,6 +2178,7 @@ router.patch("/users/:id/kyc-verification", authenticateAdmin, async (req, res) 
       }, client);
       await client.query('COMMIT');
       invalidateUserCache(userIdNum);
+      memoryCache.deletePattern('admin:users');
       if (io) {
         io.to('admin_room').emit('user_management_update', { action: 'kyc_updated', userId: userIdNum, kyc_status });
         io.to(`user_${userIdNum}`).emit('user_profile_updated', { userId: userIdNum, kyc_status });
@@ -2146,7 +2290,7 @@ router.post("/users/:id/balance", authenticateAdmin, async (req, res) => {
               Statement of Ledger Adjustment
             </h2>
             <p style="color: #475569; font-size: 15px; line-height: 1.8;">
-              Hello <strong>${user.name || 'Valued User'}</strong>,
+              Hello <strong>${escapeHtml(user.name || 'Valued User')}</strong>,
             </p>
             <p style="color: #475569; font-size: 15px; line-height: 1.8;">
               Please be advised that an official adjustment has been performed on your wallet by the system administrators:
@@ -2163,7 +2307,7 @@ router.post("/users/:id/balance", authenticateAdmin, async (req, res) => {
                 </tr>
                 <tr>
                   <td style="color: #64748b; padding: 6px 0;"><strong>Approved Reason:</strong></td>
-                  <td style="color: #334155; text-align: right;">${reason || 'Administrative adjustment'}</td>
+                  <td style="color: #334155; text-align: right;">${escapeHtml(reason || 'Administrative adjustment')}</td>
                 </tr>
               </table>
             </div>
@@ -2187,7 +2331,7 @@ router.post("/users/:id/balance", authenticateAdmin, async (req, res) => {
               تنبيه كشف الحساب المالي
             </h2>
             <p style="color: #475569; font-size: 15px; line-height: 1.8;">
-              أهلاً <strong>${user.name || 'عزيزنا العميل'}</strong>، مزار توازن وحسابات المحفظة تم تحديثه بنجاح.
+              أهلاً <strong>${escapeHtml(user.name || 'عزيزنا العميل')}</strong>، مزار توازن وحسابات المحفظة تم تحديثه بنجاح.
             </p>
             <p style="color: #475569; font-size: 15px; line-height: 1.8;">
               يرجى العلم بأنه تم إجراء تعديل رسمي على رصيد محفظتك المعتمد من قِبل إدارة النظام كالتالي:
@@ -2204,7 +2348,7 @@ router.post("/users/:id/balance", authenticateAdmin, async (req, res) => {
                 </tr>
                 <tr>
                   <td style="color: #64748b; padding: 6px 0;"><strong>السبب المعتمد:</strong></td>
-                  <td style="color: #334155; text-align: left;">${reason || 'تعديل إداري'}</td>
+                  <td style="color: #334155; text-align: left;">${escapeHtml(reason || 'تعديل إداري')}</td>
                 </tr>
               </table>
             </div>
@@ -2432,13 +2576,14 @@ router.get("/users/:id/transactions", authenticateAdmin, async (req, res) => {
 router.post("/reconcile-wallet/:id", authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    const targetLedger = ledgerPool || pool;
     
-    const walletRes = await ledgerPool.query('SELECT id FROM wallets WHERE user_id = $1', [id]);
+    const walletRes = await targetLedger.query('SELECT id FROM wallets WHERE user_id = $1', [id]);
     if (walletRes.rows.length === 0) return res.status(404).json({ error: 'Wallet not found' });
     
     const walletId = walletRes.rows[0].id;
 
-    const history = await ledgerPool.query(`
+    const history = await targetLedger.query(`
       SELECT sum(amount) as total 
       FROM ledger_transactions 
       WHERE wallet_id = $1 
@@ -2447,7 +2592,7 @@ router.post("/reconcile-wallet/:id", authenticateAdmin, async (req, res) => {
     `, [walletId]);
     const correctBalance = parseFloat(history.rows[0].total || 0);
     
-    await ledgerPool.query('UPDATE wallets SET balance = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [correctBalance, walletId]);
+    await targetLedger.query('UPDATE wallets SET balance = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [correctBalance, walletId]);
     await auditLog((req as any).user?.id, 'Reconcile Wallet', 'finance', { targetUser: id, newBalance: correctBalance });
     res.json({ success: true, new_balance: correctBalance });
   } catch (error) {
@@ -2473,20 +2618,26 @@ router.post("/activity/batch-delete", authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Maximum batch delete size is 500 records' });
     }
     
-    if (type === 'financial') {
-      await ledgerPool.query('DELETE FROM ledger_transactions WHERE id = ANY($1)', [ids]);
-    } else if (type === 'alert') {
-      await getSecurityPool().query('DELETE FROM security_alerts WHERE id = ANY($1)', [ids]);
-    } else {
-      const validTables: Record<string, string> = { log: 'system_logs' };
-      const table = validTables[type];
-      if (!table) return res.status(400).json({ error: 'Invalid type' });
-      await pool.query(`DELETE FROM ${table} WHERE id = ANY($1)`, [ids]);
+    const parsedIds = ids.map((i: any) => parseInt(String(i), 10)).filter((i: number) => !isNaN(i));
+    if (parsedIds.length === 0) {
+      return res.status(400).json({ error: 'Valid numeric IDs required' });
     }
-    await auditLog((req as any).user?.id, 'Batch Delete Activity', 'system', { type, count: ids.length });
-    res.json({ success: true, count: ids.length });
-  } catch {
-    res.status(500).json({ error: 'Batch delete failed' });
+
+    if (type === 'financial') {
+      const targetLedger = ledgerPool || pool;
+      await targetLedger.query('DELETE FROM ledger_transactions WHERE id = ANY($1::int[])', [parsedIds]);
+    } else if (type === 'alert') {
+      await getSecurityPool().query('DELETE FROM security_alerts WHERE id = ANY($1::int[])', [parsedIds]);
+    } else if (type === 'log') {
+      await pool.query('DELETE FROM system_logs WHERE id = ANY($1::int[])', [parsedIds]);
+    } else {
+      return res.status(400).json({ error: 'Invalid type' });
+    }
+    memoryCache.deletePattern('admin:');
+    res.json({ success: true, count: parsedIds.length });
+  } catch (error: any) {
+    console.error('[AdminRouter] Batch delete activity failed:', error);
+    res.status(500).json({ error: error?.message || 'Batch delete failed' });
   }
 });
 
@@ -2496,11 +2647,12 @@ router.delete("/financial/all", authenticateAdmin, async (req, res) => {
     if (confirmation !== 'DELETE_ALL') {
       return res.status(400).json({ error: 'Action confirmation required. Please specify "x-confirm-action: DELETE_ALL" custom header.' });
     }
-    const countRes = await ledgerPool.query('SELECT COUNT(*) FROM ledger_transactions');
-    await ledgerPool.query('DELETE FROM ledger_transactions');
-    await auditLog((req as any).user?.id, 'Purge All Financial Transactions', 'finance', { deletedCount: parseInt(countRes.rows[0].count) });
+    const targetLedger = ledgerPool || pool;
+    const countRes = await targetLedger.query('SELECT COUNT(*) FROM ledger_transactions');
+    await targetLedger.query('DELETE FROM ledger_transactions');
     res.json({ success: true });
-  } catch {
+  } catch (error: any) {
+    console.error('[AdminRouter] Purge financial failed:', error);
     res.status(500).json({ error: 'Purge failed' });
   }
 });
@@ -2508,15 +2660,20 @@ router.delete("/financial/all", authenticateAdmin, async (req, res) => {
 router.delete("/activity/:id/:type", authenticateAdmin, async (req, res) => {
   try {
     const { id, type } = req.params;
+    const numId = parseInt(id, 10);
+    if (isNaN(numId)) return res.status(400).json({ error: 'Invalid numeric ID' });
+
     if (type === 'alert') {
-      await getSecurityPool().query('DELETE FROM security_alerts WHERE id = $1', [id]);
+      await getSecurityPool().query('DELETE FROM security_alerts WHERE id = $1', [numId]);
     } else if (type === 'log') {
-      await pool.query('DELETE FROM system_logs WHERE id = $1', [id]);
+      await pool.query('DELETE FROM system_logs WHERE id = $1', [numId]);
     } else {
       return res.status(400).json({ error: 'Invalid type' });
     }
+    memoryCache.deletePattern('admin:');
     res.json({ success: true });
-  } catch {
+  } catch (error: any) {
+    console.error('[AdminRouter] Delete activity single failed:', error);
     res.status(500).json({ error: 'Delete failed' });
   }
 });
@@ -2524,29 +2681,26 @@ router.delete("/activity/:id/:type", authenticateAdmin, async (req, res) => {
 router.delete("/activity/all/:type", authenticateAdmin, async (req, res) => {
   try {
     const { type } = req.params;
-    const adminId = (req as any).user?.id;
 
     const normalizedType = type === 'ai_generation' ? 'ai' : 
                            (type === 'system_event' ? 'system' : type);
 
     if (normalizedType === 'ai') {
       await pool.query("DELETE FROM system_logs WHERE type = 'ai_generation'");
-      await auditLog(adminId, 'Clear AI Generation Logs', 'system', { type });
     } else if (normalizedType === 'system') {
       await pool.query("DELETE FROM system_logs WHERE type != 'ai_generation'");
-      await auditLog(adminId, 'Clear System Event Logs', 'system', { type });
     } else if (normalizedType === 'alert') {
       await getSecurityPool().query('DELETE FROM security_alerts');
-      await auditLog(adminId, 'Clear Security Alerts', 'system', { type });
-    } else if (normalizedType === 'log') {
+    } else if (normalizedType === 'log' || normalizedType === 'all') {
       await pool.query('DELETE FROM system_logs');
-      await auditLog(adminId, 'Clear All System Logs', 'system', { type });
     } else {
-      return res.status(400).json({ error: 'Invalid type. Use: ai, system, alert, or log' });
+      return res.status(400).json({ error: 'Invalid type. Use: ai, system, alert, log, or all' });
     }
 
+    memoryCache.deletePattern('admin:');
     res.json({ success: true });
-  } catch {
+  } catch (error: any) {
+    console.error('[AdminRouter] Activity cleanup failed:', error);
     res.status(500).json({ error: 'Cleanup failed' });
   }
 });
@@ -2554,9 +2708,10 @@ router.delete("/activity/all/:type", authenticateAdmin, async (req, res) => {
 router.delete("/security-alerts/all", authenticateAdmin, async (req, res) => {
   try {
     await getSecurityPool().query('DELETE FROM security_alerts');
-    await auditLog((req as any).user?.id, 'Clear All Security Alerts', 'system', {});
+    memoryCache.deletePattern('admin:');
     res.json({ success: true });
-  } catch {
+  } catch (error: any) {
+    console.error('[AdminRouter] Clear all security alerts failed:', error);
     res.status(500).json({ error: 'Cleanup failed' });
   }
 });
@@ -2564,9 +2719,13 @@ router.delete("/security-alerts/all", authenticateAdmin, async (req, res) => {
 router.delete("/security-alerts/:id", authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    await getSecurityPool().query('DELETE FROM security_alerts WHERE id = $1', [id]);
+    const numId = parseInt(id, 10);
+    if (isNaN(numId)) return res.status(400).json({ error: 'Invalid numeric ID' });
+    await getSecurityPool().query('DELETE FROM security_alerts WHERE id = $1', [numId]);
+    memoryCache.deletePattern('admin:');
     res.json({ success: true });
-  } catch {
+  } catch (error: any) {
+    console.error('[AdminRouter] Delete single security alert failed:', error);
     res.status(500).json({ error: 'Delete failed' });
   }
 });
@@ -2595,11 +2754,13 @@ router.post("/cache/clear", authenticateAdmin, async (req, res) => {
     const { target } = req.body || req.query;
     const cleared: string[] = [];
 
+    // Always flush general fast memory cache
     memoryCache.clear();
     cleared.push('memory_cache');
 
     if (!target || target === 'file_permission' || target === 'global') {
       invalidateFilePermissionCache();
+      invalidateFileVersionCache();
       cleared.push('file_permission');
     }
     if (!target || target === 'route_seo' || target === 'global') {
@@ -2608,18 +2769,34 @@ router.post("/cache/clear", authenticateAdmin, async (req, res) => {
     }
     if (!target || target === 'system_settings' || target === 'global') {
       invalidateSystemSettingsCache();
-      cleared.push('system_settings');
+      invalidateSystemAssetCache();
+      cleared.push('system_settings', 'system_assets');
+    }
+    if (target === 'orchestrator' || target === 'global') {
+      invalidateOrchestratorConfigCache();
+      invalidateVaultCache();
+      invalidateApiKeysVaultCache();
+      invalidateGpuCache();
+      cleared.push('orchestrator', 'api_keys_vault', 'gpu_vault');
+    }
+    if (target === 'economy' || target === 'global') {
+      invalidateEconomySettingsCache();
+      invalidatePlansCache();
+      cleared.push('economy_settings', 'plans');
     }
     if (target === 'global') {
-      invalidateEconomySettingsCache();
-      invalidateOrchestratorConfigCache();
-      invalidatePlansCache();
-      invalidateApiKeysVaultCache();
-      cleared.push('economy', 'orchestrator', 'plans', 'api_keys');
+      invalidateStripeClient();
+      invalidateAllDataLoaders();
+      invalidateAllUserCaches();
+      cleared.push('stripe_client', 'data_loaders', 'user_cache');
     }
 
     await auditLog((req as any).user?.id, 'Clear Cache', 'system', { target: target || 'global', cleared });
-    res.json({ success: true, cleared, message: `Successfully cleared cache: ${cleared.join(', ')}` });
+    res.json({ 
+      success: true, 
+      cleared, 
+      message: `Successfully cleared cache (${cleared.length} layers): ${cleared.join(', ')}` 
+    });
   } catch (error: any) {
     console.error('[AdminCache] Failed to clear cache:', error);
     res.status(500).json({ error: error.message || 'Failed to clear cache' });
@@ -2649,7 +2826,8 @@ router.delete("/ledger-transactions/:id", authenticateAdmin, async (req, res) =>
     if (isNaN(txIdNum)) {
       return res.status(400).json({ error: 'Invalid transaction ID format' });
     }
-    await ledgerPool.query('DELETE FROM ledger_transactions WHERE id = $1', [txIdNum]);
+    const targetLedger = ledgerPool || pool;
+    await targetLedger.query('DELETE FROM ledger_transactions WHERE id = $1', [txIdNum]);
     await auditLog((req as any).user?.id, 'Delete Ledger Transaction', 'finance', { transactionId: txIdNum });
     res.json({ success: true });
   } catch {
@@ -2734,8 +2912,30 @@ router.post("/settings", authenticateAdmin, async (req, res) => {
   }
 });
 
+const ensurePaymentColumns = async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE system_settings 
+      ADD COLUMN IF NOT EXISTS stripe_publishable_key TEXT,
+      ADD COLUMN IF NOT EXISTS stripe_secret_key TEXT,
+      ADD COLUMN IF NOT EXISTS stripe_webhook_secret TEXT,
+      ADD COLUMN IF NOT EXISTS stripe_live_mode BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS stripe_status VARCHAR(50) DEFAULT 'pending',
+      ADD COLUMN IF NOT EXISTS stripe_last_verified_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS paypal_client_id TEXT,
+      ADD COLUMN IF NOT EXISTS paypal_client_secret TEXT,
+      ADD COLUMN IF NOT EXISTS paypal_mode VARCHAR(50) DEFAULT 'sandbox',
+      ADD COLUMN IF NOT EXISTS paypal_status VARCHAR(50) DEFAULT 'pending',
+      ADD COLUMN IF NOT EXISTS paypal_last_verified_at TIMESTAMP;
+    `);
+  } catch (err: any) {
+    console.warn('[Admin] Auto-ensuring payment gateway columns warning:', err?.message || err);
+  }
+};
+
 router.post("/settings/stripe", authenticateAdmin, async (req, res) => {
   try {
+    await ensurePaymentColumns();
     const { secretKey, publishableKey, webhookSecret, isLiveMode } = req.body;
     
     let query = 'UPDATE system_settings SET updated_at = CURRENT_TIMESTAMP';
@@ -2774,6 +2974,7 @@ router.post("/settings/stripe", authenticateAdmin, async (req, res) => {
 
 router.post("/settings/stripe/verify", authenticateAdmin, async (req, res) => {
   try {
+    await ensurePaymentColumns();
     const settings = await pool.query('SELECT stripe_secret_key FROM system_settings LIMIT 1');
     if (!settings.rows[0]?.stripe_secret_key) {
       return res.status(400).json({ error: 'Stripe secret key not configured' });
@@ -2795,6 +2996,7 @@ router.post("/settings/stripe/verify", authenticateAdmin, async (req, res) => {
 
 router.post("/settings/paypal", authenticateAdmin, async (req, res) => {
   try {
+    await ensurePaymentColumns();
     const { clientId, clientSecret, mode } = req.body;
 
     if (clientId !== undefined && clientId !== '' && typeof clientId !== 'string') {
@@ -2842,6 +3044,7 @@ router.post("/settings/paypal", authenticateAdmin, async (req, res) => {
 
 router.post("/settings/paypal/verify", authenticateAdmin, async (req, res) => {
   try {
+    await ensurePaymentColumns();
     const settings = await pool.query('SELECT paypal_client_id, paypal_client_secret, paypal_mode FROM system_settings LIMIT 1');
     if (!settings.rows[0]?.paypal_client_id || !settings.rows[0]?.paypal_client_secret) {
       return res.status(400).json({ error: 'PayPal client credentials not configured' });
@@ -2862,6 +3065,164 @@ router.post("/settings/paypal/verify", authenticateAdmin, async (req, res) => {
   } catch (error: any) {
     console.error('[Admin] PayPal verify failed:', error);
     res.status(400).json({ error: 'Verification failed' });
+  }
+});
+
+const ensureAuthProvidersColumns = async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE system_settings 
+      ADD COLUMN IF NOT EXISTS google_client_id VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS google_client_secret TEXT,
+      ADD COLUMN IF NOT EXISTS github_client_id VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS github_client_secret TEXT,
+      ADD COLUMN IF NOT EXISTS apple_client_id VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS apple_team_id VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS apple_key_id VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS apple_private_key TEXT,
+      ADD COLUMN IF NOT EXISTS microsoft_client_id VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS microsoft_client_secret TEXT,
+      ADD COLUMN IF NOT EXISTS oauth_providers_config JSONB DEFAULT '{}'::jsonb;
+    `);
+  } catch (err: any) {
+    console.warn('[Admin] Auto-ensuring auth provider columns warning:', err?.message || err);
+  }
+};
+
+router.get("/settings/auth-providers", authenticateAdmin, async (req, res) => {
+  try {
+    await ensureAuthProvidersColumns();
+    const settings = await pool.query(`SELECT * FROM system_settings LIMIT 1`);
+    const row = settings.rows[0] || {};
+    const host = req.get('host') || 'localhost:3000';
+    const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+    const baseUrl = `${protocol}://${host}`;
+
+    res.json({
+      google: {
+        provider_id: "google",
+        name: "Google OAuth 2.0",
+        name_ar: "مصادقة قوقل (Google Sign-In)",
+        client_id: row.google_client_id || process.env.GOOGLE_CLIENT_ID || "",
+        has_secret: !!(row.google_client_secret || process.env.GOOGLE_CLIENT_SECRET),
+        is_configured: !!(row.google_client_id || process.env.GOOGLE_CLIENT_ID),
+        authorized_origins: [baseUrl, "http://localhost:3000"],
+        redirect_uris: [`${baseUrl}/api/auth/google/callback`, `http://localhost:3000/api/auth/google/callback`],
+        scopes: ["openid", "profile", "email"],
+        status: (row.google_client_id || process.env.GOOGLE_CLIENT_ID) ? "configured" : "pending"
+      },
+      github: {
+        provider_id: "github",
+        name: "GitHub OAuth",
+        name_ar: "مصادقة غيت هاب (GitHub)",
+        client_id: row.github_client_id || process.env.GITHUB_CLIENT_ID || "",
+        has_secret: !!(row.github_client_secret || process.env.GITHUB_CLIENT_SECRET),
+        is_configured: !!(row.github_client_id || process.env.GITHUB_CLIENT_ID),
+        redirect_uris: [`${baseUrl}/api/auth/github/callback`],
+        scopes: ["user:email", "read:user"],
+        status: (row.github_client_id || process.env.GITHUB_CLIENT_ID) ? "configured" : "pending"
+      },
+      apple: {
+        provider_id: "apple",
+        name: "Sign in with Apple",
+        name_ar: "تسجيل الدخول مع آبل (Apple ID)",
+        client_id: row.apple_client_id || process.env.APPLE_CLIENT_ID || "",
+        team_id: row.apple_team_id || "",
+        key_id: row.apple_key_id || "",
+        has_private_key: !!(row.apple_private_key || process.env.APPLE_PRIVATE_KEY),
+        is_configured: !!(row.apple_client_id && row.apple_team_id),
+        redirect_uris: [`${baseUrl}/api/auth/apple/callback`],
+        status: (row.apple_client_id && row.apple_team_id) ? "configured" : "pending"
+      },
+      microsoft: {
+        provider_id: "microsoft",
+        name: "Microsoft Entra / Azure AD",
+        name_ar: "مصادقة مايكروسوفت (Microsoft Entra)",
+        client_id: row.microsoft_client_id || process.env.MICROSOFT_CLIENT_ID || "",
+        has_secret: !!(row.microsoft_client_secret || process.env.MICROSOFT_CLIENT_SECRET),
+        is_configured: !!(row.microsoft_client_id || process.env.MICROSOFT_CLIENT_ID),
+        redirect_uris: [`${baseUrl}/api/auth/microsoft/callback`],
+        status: (row.microsoft_client_id || process.env.MICROSOFT_CLIENT_ID) ? "configured" : "pending"
+      },
+      custom_config: row.oauth_providers_config || {}
+    });
+  } catch (error) {
+    console.error('[Admin] Fetch auth providers error:', error);
+    res.status(500).json({ error: 'Failed to fetch authentication providers' });
+  }
+});
+
+router.post("/settings/auth-providers", authenticateAdmin, async (req, res) => {
+  try {
+    await ensureAuthProvidersColumns();
+    const { provider, clientId, clientSecret, teamId, keyId, privateKey, extraConfig } = req.body;
+    if (!provider) return res.status(400).json({ error: 'Provider name is required' });
+
+    let query = 'UPDATE system_settings SET updated_at = CURRENT_TIMESTAMP';
+    const params: any[] = [];
+    let paramCount = 1;
+
+    if (provider === 'google') {
+      if (clientId !== undefined) {
+        query += `, google_client_id = $${paramCount++}`;
+        params.push(clientId.trim());
+      }
+      if (clientSecret !== undefined && clientSecret !== '********') {
+        query += `, google_client_secret = $${paramCount++}`;
+        params.push(clientSecret ? encrypt(clientSecret.trim()) : '');
+      }
+    } else if (provider === 'github') {
+      if (clientId !== undefined) {
+        query += `, github_client_id = $${paramCount++}`;
+        params.push(clientId.trim());
+      }
+      if (clientSecret !== undefined && clientSecret !== '********') {
+        query += `, github_client_secret = $${paramCount++}`;
+        params.push(clientSecret ? encrypt(clientSecret.trim()) : '');
+      }
+    } else if (provider === 'apple') {
+      if (clientId !== undefined) {
+        query += `, apple_client_id = $${paramCount++}`;
+        params.push(clientId.trim());
+      }
+      if (teamId !== undefined) {
+        query += `, apple_team_id = $${paramCount++}`;
+        params.push(teamId.trim());
+      }
+      if (keyId !== undefined) {
+        query += `, apple_key_id = $${paramCount++}`;
+        params.push(keyId.trim());
+      }
+      if (privateKey !== undefined && privateKey !== '********') {
+        query += `, apple_private_key = $${paramCount++}`;
+        params.push(privateKey ? encrypt(privateKey.trim()) : '');
+      }
+    } else if (provider === 'microsoft') {
+      if (clientId !== undefined) {
+        query += `, microsoft_client_id = $${paramCount++}`;
+        params.push(clientId.trim());
+      }
+      if (clientSecret !== undefined && clientSecret !== '********') {
+        query += `, microsoft_client_secret = $${paramCount++}`;
+        params.push(clientSecret ? encrypt(clientSecret.trim()) : '');
+      }
+    }
+
+    if (extraConfig !== undefined) {
+      query += `, oauth_providers_config = $${paramCount++}`;
+      params.push(typeof extraConfig === 'string' ? extraConfig : JSON.stringify(extraConfig));
+    }
+
+    if (params.length > 0) {
+      await pool.query(query, params);
+      invalidateSystemSettingsCache();
+    }
+    
+    await auditLog((req as any).user?.id, `Update Auth Provider Settings: ${provider}`, 'system', { provider, clientId });
+    res.json({ success: true, message: `${provider} auth settings updated successfully` });
+  } catch (error) {
+    console.error('[Admin] Auth provider settings update failed:', error);
+    res.status(500).json({ error: 'Failed to update auth provider credentials' });
   }
 });
 
@@ -2918,7 +3279,6 @@ router.post("/settings/firebase", authenticateAdmin, async (req, res) => {
 
     await pool.query(query, params);
     invalidateSystemSettingsCache();
-    invalidateFirebaseApp();
     
     await auditLog((req as any).user?.id, 'Update Firebase Settings', 'system', { projectId: firebaseProjectId });
     res.json({ success: true, message: 'Firebase Admin settings updated successfully' });
@@ -3114,8 +3474,9 @@ router.post("/api-keys/:id/test", authenticateAdmin, async (req, res) => {
 
 router.get("/financial-requests", authenticateAdmin, async (req, res) => {
   try {
-    const depositRes = await ledgerPool.query('SELECT * FROM deposit_requests ORDER BY created_at DESC');
-    const withdrawRes = await ledgerPool.query('SELECT * FROM withdrawal_requests ORDER BY created_at DESC');
+    const targetLedger = ledgerPool || pool;
+    const depositRes = await targetLedger.query('SELECT * FROM deposit_requests ORDER BY created_at DESC');
+    const withdrawRes = await targetLedger.query('SELECT * FROM withdrawal_requests ORDER BY created_at DESC');
     
     const userIds = [
       ...depositRes.rows.map((r: any) => r.user_id),
@@ -3161,7 +3522,7 @@ router.post("/deposit-requests/:id/action", authenticateAdmin, async (req: any, 
     return res.status(400).json({ error: 'Invalid action' });
   }
 
-  const client = await ledgerPool.connect();
+  const client = await (ledgerPool || pool).connect();
   try {
     await client.query('BEGIN');
 
@@ -3178,23 +3539,28 @@ router.post("/deposit-requests/:id/action", authenticateAdmin, async (req: any, 
     const adminId = req.user.id;
 
     if (action === 'approve') {
-      let walletRes = await client.query('SELECT id, balance FROM wallets WHERE user_id = $1 FOR UPDATE', [request.user_id]);
+      const depositAmount = Number(request.amount);
+      let walletRes = await client.query('SELECT id, balance, points FROM wallets WHERE user_id = $1 FOR UPDATE', [request.user_id]);
       let walletId;
       
       if (walletRes.rows.length === 0) {
         const insertWallet = await client.query(
-          'INSERT INTO wallets (user_id, balance, points) VALUES ($1, $2, 0) RETURNING id',
-          [request.user_id, 0]
+          'INSERT INTO wallets (user_id, balance, usd_balance, points, total_deposited) VALUES ($1, $2, $2, 0, $2) RETURNING id',
+          [request.user_id, depositAmount]
         );
         walletId = insertWallet.rows[0].id;
       } else {
         walletId = walletRes.rows[0].id;
+        await client.query(
+          `UPDATE wallets 
+           SET balance = balance + $1, 
+               usd_balance = balance + $1, 
+               total_deposited = total_deposited + $1, 
+               updated_at = CURRENT_TIMESTAMP 
+           WHERE id = $2`,
+          [depositAmount, walletId]
+        );
       }
-
-      await client.query(
-        'UPDATE wallets SET balance = balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        [request.amount, walletId]
-      );
 
       let refText = 'None';
       try {
@@ -3205,16 +3571,14 @@ router.post("/deposit-requests/:id/action", authenticateAdmin, async (req: any, 
       }
 
       await client.query(`
-        INSERT INTO ledger_transactions (wallet_id, user_id, amount, transaction_type, status, reference_id, description)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO ledger_transactions (wallet_id, user_id, amount, points, transaction_type, status, reference_id, description)
+        VALUES ($1, $2, $3, 0, 'deposit', 'success', $4, $5)
       `, [
         walletId,
         request.user_id,
-        request.amount,
-        'deposit',
-        'success',
+        depositAmount,
         id.toString(),
-        `Approved manual deposit of $${request.amount} via ${request.method} (Ref: ${refText})`
+        `Approved manual deposit of $${depositAmount.toFixed(2)} USD via ${request.method} (Ref: ${refText})`
       ]);
 
       await client.query(
@@ -3236,10 +3600,19 @@ router.post("/deposit-requests/:id/action", authenticateAdmin, async (req: any, 
         request.user_id,
         'deposit_approved',
         'Deposit Approved',
-        'تم قبول الإيداع',
-        `Success! Your manual deposit request of $${request.amount} has been approved and credited.`,
-        `تهانينا! تم تأكيد وقبول طلب الإيداع بمبلغ $${request.amount} وشحن الرصيد بمحفظتك.`
+        'تم قبول الإيداع وشحن الرصيد',
+        `Success! Your manual deposit of $${depositAmount.toFixed(2)} USD has been approved and credited to your wallet.`,
+        `تهانينا! تم تأكيد وقبول طلب الإيداع بمبلغ $${depositAmount.toFixed(2)} دولار وشحن رصيد محفظتك بنجاح.`
       );
+
+      try {
+        const { io } = await import('../config/socket.js');
+        io?.emit(`wallet_update_${request.user_id}`, {
+          type: 'deposit_approved',
+          amount: depositAmount,
+          depositId: id
+        });
+      } catch {}
 
     } else {
       await client.query(
@@ -3277,7 +3650,7 @@ router.post("/withdrawal-requests/:id/action", authenticateAdmin, async (req: an
     return res.status(400).json({ error: 'Invalid action' });
   }
 
-  const client = await ledgerPool.connect();
+  const client = await (ledgerPool || pool).connect();
   try {
     await client.query('BEGIN');
 
@@ -3292,7 +3665,7 @@ router.post("/withdrawal-requests/:id/action", authenticateAdmin, async (req: an
     }
 
     const adminId = req.user.id;
-    const amountUSD = Number(request.amount_cents) / 100;
+    const amountUSD = Number(request.amount || (Number(request.amount_cents) / 100));
 
     if (action === 'approve') {
       await client.query(
@@ -3305,17 +3678,31 @@ router.post("/withdrawal-requests/:id/action", authenticateAdmin, async (req: an
         [id.toString()]
       );
 
+      await client.query(
+        'UPDATE wallets SET total_withdrawn = total_withdrawn + $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
+        [amountUSD, request.user_id]
+      );
+
       await client.query('COMMIT');
 
       const { createNotification } = await import('../services/notifications.js');
       await createNotification(
         request.user_id,
         'withdrawal_approved',
-        'Withdrawal Approved',
-        'تمت الموافقة على طلب السحب',
-        `Hooray! Your disbursement of $${amountUSD.toFixed(2)} has been completed successfully via ${request.method}.`,
-        `تم تحويل مبلغ السحب بنجاح بقيمة $${amountUSD.toFixed(2)} شيكل/دولار عبر ${request.method}.`
+        'Withdrawal Approved & Transferred',
+        'تمت الموافقة على السحب وتحويل المبلغ',
+        `Hooray! Your disbursement of $${amountUSD.toFixed(2)} USD has been approved and completed successfully via ${request.method}.`,
+        `تم تحويل مبلغ السحب بنجاح بقيمة $${amountUSD.toFixed(2)} دولار عبر ${request.method}.`
       );
+
+      try {
+        const { io } = await import('../config/socket.js');
+        io?.emit(`wallet_update_${request.user_id}`, {
+          type: 'withdrawal_approved',
+          amount: amountUSD,
+          withdrawalId: id
+        });
+      } catch {}
 
     } else {
       let walletRes = await client.query('SELECT id, balance FROM wallets WHERE user_id = $1 FOR UPDATE', [request.user_id]);
@@ -3325,7 +3712,7 @@ router.post("/withdrawal-requests/:id/action", authenticateAdmin, async (req: an
       const wallet = walletRes.rows[0];
 
       await client.query(
-        'UPDATE wallets SET balance = balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        'UPDATE wallets SET balance = balance + $1, usd_balance = balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
         [amountUSD, wallet.id]
       );
 
@@ -3339,16 +3726,14 @@ router.post("/withdrawal-requests/:id/action", authenticateAdmin, async (req: an
       `, [rejectionReason || 'Details invalid', id.toString()]);
 
       await client.query(`
-        INSERT INTO ledger_transactions (wallet_id, user_id, amount, transaction_type, status, reference_id, description)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO ledger_transactions (wallet_id, user_id, amount, points, transaction_type, status, reference_id, description)
+        VALUES ($1, $2, $3, 0, 'refund', 'success', $4, $5)
       `, [
         wallet.id,
         request.user_id,
         amountUSD,
-        'refund',
-        'success',
         id.toString(),
-        `Refunded $${amountUSD.toFixed(2)} to wallet for rejected withdrawal request id #${id}`
+        `Refunded $${amountUSD.toFixed(2)} USD to wallet for rejected withdrawal request id #${id}`
       ]);
 
       await client.query(
@@ -3362,11 +3747,21 @@ router.post("/withdrawal-requests/:id/action", authenticateAdmin, async (req: an
       await createNotification(
         request.user_id,
         'withdrawal_rejected',
-        'Withdrawal Rejected',
-        'تم رفض طلب السحب',
-        `Notice: Your withdrawal request of $${amountUSD.toFixed(2)} was rejected and refunded. Reason: ${rejectionReason || 'Info invalid'}`,
-        `تنبيه: تم رفض طلب السحب بمبلغ $${amountUSD.toFixed(2)} وإعادة الرصيد بالكامل لمحفظتك. السبب: ${rejectionReason || 'بيانات خاطئة'}`
+        'Withdrawal Rejected & Refunded',
+        'تم رفض طلب السحب واسترداد الرصيد',
+        `Notice: Your withdrawal request of $${amountUSD.toFixed(2)} USD was rejected and refunded to your wallet. Reason: ${rejectionReason || 'Info invalid'}`,
+        `تنبيه: تم رفض طلب السحب بمبلغ $${amountUSD.toFixed(2)} دولار وإعادة الرصيد بالكامل لمحفظتك. السبب: ${rejectionReason || 'عدم تطابق بيانات التحويل'}`
       );
+
+      try {
+        const { io } = await import('../config/socket.js');
+        io?.emit(`wallet_update_${request.user_id}`, {
+          type: 'withdrawal_rejected',
+          amount: amountUSD,
+          withdrawalId: id,
+          refunded: true
+        });
+      } catch {}
     }
 
     res.json({ success: true });
@@ -3382,7 +3777,8 @@ router.post("/withdrawal-requests/:id/action", authenticateAdmin, async (req: an
 router.delete("/deposit-requests/:id", authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const checkRes = await ledgerPool.query('SELECT status FROM deposit_requests WHERE id = $1', [id]);
+    const targetLedger = ledgerPool || pool;
+    const checkRes = await targetLedger.query('SELECT status FROM deposit_requests WHERE id = $1', [id]);
     if (checkRes.rows.length === 0) {
       return res.status(404).json({ error: 'Request not found' });
     }
@@ -3390,7 +3786,7 @@ router.delete("/deposit-requests/:id", authenticateAdmin, async (req, res) => {
     if (status === 'pending') {
       return res.status(400).json({ error: 'Cannot delete a pending request. Approve or Reject it first.' });
     }
-    await ledgerPool.query('DELETE FROM deposit_requests WHERE id = $1', [id]);
+    await targetLedger.query('DELETE FROM deposit_requests WHERE id = $1', [id]);
     res.json({ success: true });
   } catch (error: any) {
     console.error('[Admin] Delete Deposit Request Error:', error);
@@ -3401,7 +3797,8 @@ router.delete("/deposit-requests/:id", authenticateAdmin, async (req, res) => {
 router.delete("/withdrawal-requests/:id", authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const checkRes = await ledgerPool.query('SELECT status FROM withdrawal_requests WHERE id = $1', [id]);
+    const targetLedger = ledgerPool || pool;
+    const checkRes = await targetLedger.query('SELECT status FROM withdrawal_requests WHERE id = $1', [id]);
     if (checkRes.rows.length === 0) {
       return res.status(404).json({ error: 'Request not found' });
     }
@@ -3409,7 +3806,7 @@ router.delete("/withdrawal-requests/:id", authenticateAdmin, async (req, res) =>
     if (status === 'pending') {
       return res.status(400).json({ error: 'Cannot delete a pending request. Approve or Reject it first.' });
     }
-    await ledgerPool.query('DELETE FROM withdrawal_requests WHERE id = $1', [id]);
+    await targetLedger.query('DELETE FROM withdrawal_requests WHERE id = $1', [id]);
     res.json({ success: true });
   } catch (error: any) {
     console.error('[Admin] Delete Withdrawal Request Error:', error);
@@ -3460,6 +3857,24 @@ router.post("/memories/consolidate", authenticateAdmin, async (req, res) => {
   }
 });
 
+router.post("/memories/migrate", authenticateAdmin, async (req, res) => {
+  try {
+    const migrationResult = await runMemoryContextMigration();
+    
+    await auditLog(
+      (req as any).user?.id,
+      'Triggered Memory Context Migration',
+      'system',
+      migrationResult
+    );
+    
+    res.json({ success: true, result: migrationResult });
+  } catch (err: any) {
+    console.error('[Admin] Memory Migration Error:', err);
+    res.status(500).json({ error: err.message || 'Failed to execute memory migration' });
+  }
+});
+
 router.get("/maintenance/cleanup", authenticateAdmin, async (req, res) => {
   try {
     if (!pool || !ledgerPool) {
@@ -3480,7 +3895,8 @@ router.get("/maintenance/cleanup", authenticateAdmin, async (req, res) => {
       ORDER BY created_at DESC
     `);
 
-    const reqUsersRes = await ledgerPool.query('SELECT DISTINCT user_id FROM deposit_requests');
+    const targetLedger = ledgerPool || pool;
+    const reqUsersRes = await targetLedger.query('SELECT DISTINCT user_id FROM deposit_requests');
     const distinctRequestUserIds = reqUsersRes.rows.map((row: any) => row.user_id);
 
     let orphanedDepositRequestsCount = 0;
@@ -3495,7 +3911,7 @@ router.get("/maintenance/cleanup", authenticateAdmin, async (req, res) => {
       const orphanedUserIds = distinctRequestUserIds.filter((id: number) => !existingUserIds.has(id));
 
       if (orphanedUserIds.length > 0) {
-        const orphanedDepRes = await ledgerPool.query(
+        const orphanedDepRes = await targetLedger.query(
           `SELECT id, user_id, amount, status, created_at 
            FROM deposit_requests 
            WHERE user_id = ANY($1::int[]) 
@@ -3552,7 +3968,8 @@ router.post("/maintenance/cleanup", authenticateAdmin, async (req, res) => {
       WHERE chat_id IS NOT NULL AND chat_id NOT IN (SELECT id FROM chats)
     `);
 
-    const reqUsersRes = await ledgerPool.query('SELECT DISTINCT user_id FROM deposit_requests');
+    const targetLedger = ledgerPool || pool;
+    const reqUsersRes = await targetLedger.query('SELECT DISTINCT user_id FROM deposit_requests');
     const distinctRequestUserIds = reqUsersRes.rows.map((row: any) => row.user_id);
 
     let orphanedDepositRequests: any[] = [];
@@ -3567,7 +3984,7 @@ router.post("/maintenance/cleanup", authenticateAdmin, async (req, res) => {
       orphanedUserIds = distinctRequestUserIds.filter((id: number) => !existingUserIds.has(id));
 
       if (orphanedUserIds.length > 0) {
-        const orphanedDepRes = await ledgerPool.query(
+        const orphanedDepRes = await targetLedger.query(
           `SELECT id, user_id, amount, status FROM deposit_requests WHERE user_id = ANY($1::int[])`,
           [orphanedUserIds]
         );
@@ -3614,14 +4031,19 @@ router.post("/maintenance/cleanup", authenticateAdmin, async (req, res) => {
         [idsToDelete]
       );
 
-      const uploadDir = path.join(process.cwd(), 'uploads');
+      const uploadDir = path.resolve(process.cwd(), 'uploads');
       for (const fileRow of orphanedFilesRes.rows) {
         if (fileRow.file_url) {
           try {
             if (!fileRow.file_url.startsWith('http://') && !fileRow.file_url.startsWith('https://')) {
-              const filePath = path.join(uploadDir, fileRow.file_url);
-              await fs.unlink(filePath).catch(() => {});
-              physicalFilesDeleted++;
+              const safeFilename = path.basename(fileRow.file_url);
+              if (safeFilename && !safeFilename.includes('..')) {
+                const filePath = path.resolve(uploadDir, safeFilename);
+                if (filePath.startsWith(uploadDir + path.sep)) {
+                  await fs.unlink(filePath).catch(() => {});
+                  physicalFilesDeleted++;
+                }
+              }
             }
           } catch (itemErr: any) {
             console.error(`[Admin Cleanup] Failed physical unlinking for ${fileRow.file_url}:`, itemErr.message);
@@ -3634,12 +4056,19 @@ router.post("/maintenance/cleanup", authenticateAdmin, async (req, res) => {
     let orphanedMediaDeletedCount = 0;
     if (orphanedMediaAssets.length > 0) {
       const mediaIds = orphanedMediaAssets.map((m: any) => m.id);
-      await pool.query('DELETE FROM media_assets WHERE id = ANY($1::uuid[])', [mediaIds]);
+      const targetMediaPool = mediaPool || pool;
+      await targetMediaPool.query('DELETE FROM media_assets WHERE id = ANY($1::uuid[])', [mediaIds]);
+      const uploadDir = path.resolve(process.cwd(), 'uploads');
       for (const m of orphanedMediaAssets) {
         if (m.stored_path) {
-          const absPath = path.join(process.cwd(), m.stored_path);
-          await fs.unlink(absPath).catch(() => {});
-          physicalFilesDeleted++;
+          const safeFilename = path.basename(m.stored_path);
+          if (safeFilename && !safeFilename.includes('..')) {
+            const absPath = path.resolve(uploadDir, safeFilename);
+            if (absPath.startsWith(uploadDir + path.sep)) {
+              await fs.unlink(absPath).catch(() => {});
+              physicalFilesDeleted++;
+            }
+          }
         }
         orphanedMediaDeletedCount++;
       }
@@ -3657,7 +4086,8 @@ router.post("/maintenance/cleanup", authenticateAdmin, async (req, res) => {
 
     let prunedDepositRequestsCount = 0;
     if (orphanedUserIds.length > 0) {
-      const pruneRes = await ledgerPool.query(
+      const targetLedger = ledgerPool || pool;
+      const pruneRes = await targetLedger.query(
         'DELETE FROM deposit_requests WHERE user_id = ANY($1::int[])',
         [orphanedUserIds]
       );
@@ -3755,29 +4185,59 @@ router.post("/settings/upload-asset", authenticateAdmin, checkDiskSpace, (upload
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded or file invalid' });
     }
-    const optResult = await optimizeUploadedImage(req.file.path, req.file.originalname);
+    const assetType = req.body?.assetType || req.query?.assetType;
+    const context = assetType === 'seo_image' || assetType === 'seo' ? 'seo' : 'general';
+    const optResult = await optimizeUploadedImage(req.file.path, req.file.originalname, context);
     
     // Read the optimized file into a base64 string to persist across container reboots
-    const optimizedPath = path.join(process.cwd(), optResult.fileUrl.replace(/^\//, ''));
+    const relFile = optResult.fileUrl.replace(/^\//, '');
+    if (relFile.includes('..') || relFile.includes('\0')) {
+      throw new Error('Invalid file path from optimization.');
+    }
+    const uploadsDir = path.resolve(process.cwd(), 'uploads');
+    const optimizedPath = path.resolve(process.cwd(), relFile);
+    if (!optimizedPath.startsWith(uploadsDir + path.sep) && !optimizedPath.startsWith(path.resolve(process.cwd(), 'public') + path.sep)) {
+      throw new Error('Path traversal detected in optimized path.');
+    }
     const fileBuffer = await fs.readFile(optimizedPath);
     const base64Str = `data:image/${optResult.format || 'webp'};base64,${fileBuffer.toString('base64')}`;
     
+    // Copy the optimized file into uploads/brand to separate admin brand/SEO assets from user-generated content
+    const filename = path.basename(optimizedPath);
+    const brandDir = path.join(uploadsDir, 'brand');
+    await fs.mkdir(brandDir, { recursive: true });
+    const brandPath = path.join(brandDir, filename);
+    await fs.writeFile(brandPath, fileBuffer);
+    
+    // Delete the original copy in root uploads directory to avoid cluttering
+    if (optimizedPath !== brandPath) {
+      await fs.unlink(optimizedPath).catch(() => {});
+    }
+    
+    const brandFileUrl = `/uploads/brand/${filename}`;
+
     // Clean up temporary raw upload file if distinct from the optimized output file
-    if (req.file.path && path.resolve(req.file.path) !== path.resolve(optimizedPath)) {
-      await fs.unlink(req.file.path).catch(() => {});
+    if (req.file.path) {
+      const resolvedReqPath = path.resolve(req.file.path);
+      if (
+        (resolvedReqPath.startsWith(uploadsDir + path.sep) || resolvedReqPath.startsWith(path.resolve(process.cwd()) + path.sep)) &&
+        resolvedReqPath !== path.resolve(optimizedPath) &&
+        resolvedReqPath !== path.resolve(brandPath)
+      ) {
+        await fs.unlink(resolvedReqPath).catch(() => {});
+      }
     }
 
-    const assetType = req.body?.assetType || req.query?.assetType;
     // Auto-generate the platform icon suite ONLY if the uploaded asset is explicitly the main brand logo
     if (assetType === 'logo') {
       invalidateSystemSettingsCache();
       invalidateSystemAssetCache();
-      generateAppIconsFromSource(optimizedPath, { force: true }).catch((genErr: any) => {
+      generateAppIconsFromSource(brandPath, { force: true }).catch((genErr: any) => {
         console.warn('[AssetUpload] Background icon suite generation warning:', genErr.message);
       });
     }
 
-    res.json({ success: true, imageUrl: base64Str, fileUrl: optResult.fileUrl });
+    res.json({ success: true, imageUrl: brandFileUrl, base64Url: base64Str, fileUrl: brandFileUrl });
   } catch (error: any) {
     console.error('[AssetUpload] Upload failed:', error);
     res.status(500).json({ error: error.message || 'Image upload failed' });
@@ -3813,19 +4273,48 @@ router.post("/settings/upload-seo-image", authenticateAdmin, checkDiskSpace, (up
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded or file invalid' });
     }
-    const optResult = await optimizeUploadedImage(req.file.path, req.file.originalname);
+    const optResult = await optimizeUploadedImage(req.file.path, req.file.originalname, 'seo');
     
     // Read the optimized file into a base64 string to persist across container reboots
-    const optimizedPath = path.join(process.cwd(), optResult.fileUrl.replace(/^\//, ''));
+    const relFile = optResult.fileUrl.replace(/^\//, '');
+    if (relFile.includes('..') || relFile.includes('\0')) {
+      throw new Error('Invalid file path from optimization.');
+    }
+    const uploadsDir = path.resolve(process.cwd(), 'uploads');
+    const optimizedPath = path.resolve(process.cwd(), relFile);
+    if (!optimizedPath.startsWith(uploadsDir + path.sep) && !optimizedPath.startsWith(path.resolve(process.cwd(), 'public') + path.sep)) {
+      throw new Error('Path traversal detected in optimized path.');
+    }
     const fileBuffer = await fs.readFile(optimizedPath);
     const base64Str = `data:image/${optResult.format || 'webp'};base64,${fileBuffer.toString('base64')}`;
     
-    // Clean up temporary raw upload file if distinct from the optimized output file
-    if (req.file.path && path.resolve(req.file.path) !== path.resolve(optimizedPath)) {
-      await fs.unlink(req.file.path).catch(() => {});
+    // Copy the optimized file into uploads/brand to separate admin brand/SEO assets from user-generated content
+    const filename = path.basename(optimizedPath);
+    const brandDir = path.join(uploadsDir, 'brand');
+    await fs.mkdir(brandDir, { recursive: true });
+    const brandPath = path.join(brandDir, filename);
+    await fs.writeFile(brandPath, fileBuffer);
+    
+    // Delete original copy in root uploads directory to avoid cluttering
+    if (optimizedPath !== brandPath) {
+      await fs.unlink(optimizedPath).catch(() => {});
     }
 
-    res.json({ success: true, imageUrl: base64Str, fileUrl: optResult.fileUrl });
+    const brandFileUrl = `/uploads/brand/${filename}`;
+
+    // Clean up temporary raw upload file if distinct from the optimized output file
+    if (req.file.path) {
+      const resolvedReqPath = path.resolve(req.file.path);
+      if (
+        (resolvedReqPath.startsWith(uploadsDir + path.sep) || resolvedReqPath.startsWith(path.resolve(process.cwd()) + path.sep)) &&
+        resolvedReqPath !== path.resolve(optimizedPath) &&
+        resolvedReqPath !== path.resolve(brandPath)
+      ) {
+        await fs.unlink(resolvedReqPath).catch(() => {});
+      }
+    }
+
+    res.json({ success: true, imageUrl: brandFileUrl, base64Url: base64Str, fileUrl: brandFileUrl });
   } catch (error: any) {
     console.error('[SEOImageUpload] Upload failed:', error);
     res.status(500).json({ error: error.message || 'Image upload failed' });
@@ -3975,7 +4464,6 @@ router.get("/seo-audit", authenticateAdmin, async (req, res) => {
     const stripeConfigured = !!settings?.stripe_secret_key || !!process.env.STRIPE_SECRET_KEY;
     const paypalConfigured = !!(settings?.paypal_client_id && settings?.paypal_client_secret) || !!(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
     const googleOauthConfigured = !!settings?.google_client_id || !!process.env.GOOGLE_CLIENT_ID;
-    const firebaseConfigured = !!settings?.firebase_project_id || !!process.env.FIREBASE_PROJECT_ID;
 
     let complianceScore = 100;
     if (!jwtSafe) complianceScore -= 20;
@@ -4049,34 +4537,70 @@ router.post("/seo-routes", authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Route path is required' });
     }
 
-    const trimmed = route.trim();
-    const normalizedRoute = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    let inputRoute = route.trim();
+    if (inputRoute.startsWith('http://') || inputRoute.startsWith('https://')) {
+      try {
+        const urlObj = new URL(inputRoute);
+        inputRoute = urlObj.pathname;
+      } catch (e) {}
+    } else {
+      // If it contains a domain (e.g. perplexta.com/viralbook) without http prefix
+      const domainMatch = inputRoute.match(/^(?:https?:\/\/)?(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:\/|$)/i);
+      if (domainMatch) {
+        inputRoute = inputRoute.substring(domainMatch[0].length);
+      }
+    }
+
+    // Clean trailing and leading slashes and ensure exactly one leading slash (e.g. "viralbook/" becomes "/viralbook")
+    let normalizedRoute = inputRoute.replace(/^\/+|\/+$/g, '');
+    normalizedRoute = normalizedRoute ? `/${normalizedRoute}` : '/';
+
+    const resolvedOgImage = og_image_url ? resolvePersistentSystemAssetUrl(og_image_url, 'generic') : null;
+
+    let savedItem: any = null;
 
     if (id) {
       const updateRes = await pool.query(`
         UPDATE route_seo_settings
-        SET route = $1, title_ar = $2, title_en = $3, description_ar = $4, description_en = $5,
-            keywords_ar = $6, keywords_en = $7, og_image_url = $8, is_active = $9, updated_at = CURRENT_TIMESTAMP
+        SET route = $1, route_path = $1, title_ar = $2, title_en = $3, description_ar = $4, description_en = $5,
+            keywords_ar = $6, keywords_en = $7, og_image_url = $8, og_image = $8, is_active = $9, updated_at = CURRENT_TIMESTAMP
         WHERE id = $10
         RETURNING *
-      `, [normalizedRoute, title_ar || null, title_en || null, description_ar || null, description_en || null, keywords_ar || null, keywords_en || null, og_image_url || null, is_active !== false, id]);
-      invalidateRouteSeoCache();
-      return res.json({ success: true, item: updateRes.rows[0] });
+      `, [normalizedRoute, title_ar || null, title_en || null, description_ar || null, description_en || null, keywords_ar || null, keywords_en || null, resolvedOgImage, is_active !== false, id]);
+      savedItem = updateRes.rows[0];
     } else {
       const insertRes = await pool.query(`
-        INSERT INTO route_seo_settings (route, title_ar, title_en, description_ar, description_en, keywords_ar, keywords_en, og_image_url, is_active)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        INSERT INTO route_seo_settings (route, route_path, title_ar, title_en, description_ar, description_en, keywords_ar, keywords_en, og_image_url, og_image, is_active)
+        VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $8, $9)
         ON CONFLICT (route) DO UPDATE
-        SET title_ar = EXCLUDED.title_ar, title_en = EXCLUDED.title_en,
+        SET route_path = EXCLUDED.route,
+            title_ar = EXCLUDED.title_ar, title_en = EXCLUDED.title_en,
             description_ar = EXCLUDED.description_ar, description_en = EXCLUDED.description_en,
             keywords_ar = EXCLUDED.keywords_ar, keywords_en = EXCLUDED.keywords_en,
-            og_image_url = EXCLUDED.og_image_url, is_active = EXCLUDED.is_active,
+            og_image_url = EXCLUDED.og_image_url, og_image = EXCLUDED.og_image,
+            is_active = EXCLUDED.is_active,
             updated_at = CURRENT_TIMESTAMP
         RETURNING *
-      `, [normalizedRoute, title_ar || null, title_en || null, description_ar || null, description_en || null, keywords_ar || null, keywords_en || null, og_image_url || null, is_active !== false]);
-      invalidateRouteSeoCache();
-      return res.json({ success: true, item: insertRes.rows[0] });
+      `, [normalizedRoute, title_ar || null, title_en || null, description_ar || null, description_en || null, keywords_ar || null, keywords_en || null, resolvedOgImage, is_active !== false]);
+      savedItem = insertRes.rows[0];
     }
+
+    invalidateRouteSeoCache();
+
+    upsertSeoMetadata({
+      route_path: normalizedRoute,
+      entity_type: 'route',
+      title_en: title_en || null,
+      title_ar: title_ar || null,
+      description_en: description_en || null,
+      description_ar: description_ar || null,
+      keywords_en: keywords_en || null,
+      keywords_ar: keywords_ar || null,
+      og_image_url: resolvedOgImage || undefined,
+      is_active: is_active !== false
+    }).catch(() => {});
+
+    return res.json({ success: true, item: savedItem });
   } catch (err: any) {
     console.error('[RouteSEO] Error saving route SEO setting:', err);
     res.status(500).json({ error: err.message || 'Failed to save route SEO setting' });
@@ -4187,6 +4711,20 @@ router.post("/seo-routes/bulk", authenticateAdmin, async (req, res) => {
   } catch (err: any) {
     console.error('[RouteSEO] Error bulk saving route SEO settings:', err);
     res.status(500).json({ error: err.message || 'Failed to bulk save route SEO settings' });
+  }
+});
+
+/**
+ * POST /api/admin/seo-routes/clear-cache
+ * Clear all route SEO cache on the server
+ */
+router.post("/seo-routes/clear-cache", authenticateAdmin, async (req, res) => {
+  try {
+    invalidateRouteSeoCache();
+    res.json({ success: true, message: 'All route SEO cache has been purged successfully' });
+  } catch (err: any) {
+    console.error('[RouteSEO] Error clearing cache:', err);
+    res.status(500).json({ error: err.message || 'Failed to clear cache' });
   }
 });
 
@@ -4441,12 +4979,18 @@ router.put("/economy/settings", authenticateAdmin, async (req, res) => {
  */
 router.get("/theme-customizations", authenticateAdmin, async (req, res) => {
   try {
-    const result = await pool.query('SELECT theme_mode, tokens FROM admin_theme_customizations');
+    const result = await pool.query('SELECT theme_mode, tokens, updated_at FROM admin_theme_customizations');
     const customizations: Record<string, any> = { light: {}, dark: {} };
+    let latestUpdate: string | null = null;
     for (const row of result.rows) {
       customizations[row.theme_mode] = row.tokens || {};
+      if (row.updated_at) {
+        if (!latestUpdate || new Date(row.updated_at) > new Date(latestUpdate)) {
+          latestUpdate = new Date(row.updated_at).toISOString();
+        }
+      }
     }
-    res.json({ success: true, customizations });
+    res.json({ success: true, customizations, updated_at: latestUpdate });
   } catch (err: any) {
     console.error('[Theme] Get error:', err);
     res.status(500).json({ error: 'Failed to fetch theme customizations' });
@@ -4464,14 +5008,16 @@ router.post("/theme-customizations", authenticateAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Invalid theme_mode. Must be light or dark.' });
     }
     const tokenJson = typeof tokens === 'string' ? tokens : JSON.stringify(tokens || {});
-    await pool.query(
+    const result = await pool.query(
       `INSERT INTO admin_theme_customizations (theme_mode, tokens, updated_at)
        VALUES ($1, $2::jsonb, CURRENT_TIMESTAMP)
        ON CONFLICT (theme_mode)
-       DO UPDATE SET tokens = EXCLUDED.tokens, updated_at = CURRENT_TIMESTAMP`,
+       DO UPDATE SET tokens = EXCLUDED.tokens, updated_at = CURRENT_TIMESTAMP
+       RETURNING updated_at`,
       [theme_mode, tokenJson]
     );
-    res.json({ success: true, message: 'Theme customizations saved successfully' });
+    const updated_at = result.rows[0]?.updated_at ? new Date(result.rows[0].updated_at).toISOString() : new Date().toISOString();
+    res.json({ success: true, message: 'Theme customizations saved successfully', updated_at });
   } catch (err: any) {
     console.error('[Theme] Save error:', err);
     res.status(500).json({ error: err.message || 'Failed to save theme customizations' });
@@ -4489,6 +5035,256 @@ router.delete("/theme-customizations", authenticateAdmin, async (req, res) => {
   } catch (err: any) {
     console.error('[Theme] Clear error:', err);
     res.status(500).json({ error: err.message || 'Failed to clear theme customizations' });
+  }
+});
+
+router.get("/forms", authenticateAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT f.*, COUNT(s.id)::int AS actual_submissions_count
+      FROM forms f
+      LEFT JOIN form_submissions s ON s.form_id = f.id
+      GROUP BY f.id
+      ORDER BY f.created_at DESC
+    `);
+    res.json({ success: true, forms: result.rows });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch forms' });
+  }
+});
+
+router.get("/forms/:id", authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const isNum = /^\d+$/.test(id);
+    const result = isNum
+      ? await pool.query('SELECT * FROM forms WHERE id = $1', [parseInt(id, 10)])
+      : await pool.query('SELECT * FROM forms WHERE slug = $1', [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Form not found' });
+    }
+    res.json({ success: true, form: result.rows[0] });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch form' });
+  }
+});
+
+router.post("/forms", authenticateAdmin, async (req, res) => {
+  try {
+    const { title, slug, description, fields, settings, status } = req.body;
+    if (!title || typeof title !== 'string') {
+      return res.status(400).json({ success: false, error: 'Title is required' });
+    }
+    const adminId = (req as any).user?.id || null;
+    const generatedSlug = (slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')) + '-' + Date.now().toString(36);
+    const resolvedFields = typeof fields === 'string' ? fields : JSON.stringify(fields || []);
+    const resolvedSettings = typeof settings === 'string' ? settings : JSON.stringify(settings || {});
+    const resolvedStatus = status || 'published';
+
+    const result = await pool.query(
+      `INSERT INTO forms (title, slug, description, fields, settings, status, created_by, created_at, updated_at)
+       VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       RETURNING *`,
+      [title.trim(), generatedSlug, description || '', resolvedFields, resolvedSettings, resolvedStatus, adminId]
+    );
+
+    await auditLog(adminId, 'Create Form', 'system', { formId: result.rows[0].id, title });
+    res.json({ success: true, form: result.rows[0] });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to create form' });
+  }
+});
+
+router.put("/forms/:id", authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const formId = parseInt(id, 10);
+    if (isNaN(formId)) return res.status(400).json({ success: false, error: 'Invalid form ID' });
+
+    const { title, slug, description, fields, settings, status } = req.body;
+    const existing = await pool.query('SELECT * FROM forms WHERE id = $1', [formId]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Form not found' });
+    }
+
+    const resolvedFields = fields !== undefined ? (typeof fields === 'string' ? fields : JSON.stringify(fields)) : JSON.stringify(existing.rows[0].fields);
+    const resolvedSettings = settings !== undefined ? (typeof settings === 'string' ? settings : JSON.stringify(settings)) : JSON.stringify(existing.rows[0].settings);
+
+    const result = await pool.query(
+      `UPDATE forms
+       SET title = COALESCE($1, title),
+           slug = COALESCE($2, slug),
+           description = COALESCE($3, description),
+           fields = $4::jsonb,
+           settings = $5::jsonb,
+           status = COALESCE($6, status),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $7
+       RETURNING *`,
+      [title, slug, description, resolvedFields, resolvedSettings, status, formId]
+    );
+
+    const adminId = (req as any).user?.id || null;
+    await auditLog(adminId, 'Update Form', 'system', { formId, title: result.rows[0].title });
+    res.json({ success: true, form: result.rows[0] });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to update form' });
+  }
+});
+
+router.delete("/forms/:id", authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const formId = parseInt(id, 10);
+    if (isNaN(formId)) return res.status(400).json({ success: false, error: 'Invalid form ID' });
+
+    const existing = await pool.query('SELECT id, title FROM forms WHERE id = $1', [formId]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Form not found' });
+    }
+
+    const formTitle = existing.rows[0].title;
+    await pool.query('DELETE FROM form_submissions WHERE form_id = $1', [formId]);
+    await pool.query('DELETE FROM forms WHERE id = $1', [formId]);
+
+    const adminId = (req as any).user?.id || null;
+    await auditLog(adminId, 'Delete Form', 'system', { formId, title: formTitle });
+    res.json({ success: true, message: 'Form permanently removed from database', deleted_id: formId });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to delete form' });
+  }
+});
+
+router.get("/forms/:id/submissions", authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const formId = parseInt(id, 10);
+    if (isNaN(formId)) return res.status(400).json({ success: false, error: 'Invalid form ID' });
+
+    const result = await pool.query(
+      `SELECT s.*, u.name AS user_name, u.email AS user_email
+       FROM form_submissions s
+       LEFT JOIN users u ON s.user_id = u.id
+       WHERE s.form_id = $1
+       ORDER BY s.created_at DESC`,
+      [formId]
+    );
+    res.json({ success: true, submissions: result.rows });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch form submissions' });
+  }
+});
+
+router.delete("/forms/:id/submissions/:submissionId", authenticateAdmin, async (req, res) => {
+  try {
+    const { id, submissionId } = req.params;
+    const formId = parseInt(id, 10);
+    const subId = parseInt(submissionId, 10);
+    if (isNaN(formId) || isNaN(subId)) return res.status(400).json({ success: false, error: 'Invalid parameters' });
+
+    await pool.query('DELETE FROM form_submissions WHERE id = $1 AND form_id = $2', [subId, formId]);
+    await pool.query('UPDATE forms SET submissions_count = (SELECT COUNT(*) FROM form_submissions WHERE form_id = $1) WHERE id = $1', [formId]);
+
+    res.json({ success: true, message: 'Submission removed from database' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to delete submission' });
+  }
+});
+
+/**
+ * MAPS & GEOCODING PROVIDERS INFRASTRUCTURE ROUTES
+ */
+
+// GET /api/admin/maps/providers - List all map providers with status & masked keys
+router.get("/maps/providers", authenticateAdmin, async (req, res) => {
+  try {
+    await ensureMapProvidersTable();
+    const providers = await getAllMapProviders();
+    res.json({ success: true, providers });
+  } catch (error: any) {
+    console.error('[Admin Maps API] Error fetching providers:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch map providers' });
+  }
+});
+
+// POST /api/admin/maps/providers - Save or update map provider credentials & toggles
+router.post("/maps/providers", authenticateAdmin, async (req, res) => {
+  try {
+    const { provider_key, name, api_key, is_enabled, is_primary, priority, config } = req.body;
+    if (!provider_key) {
+      return res.status(400).json({ success: false, error: 'provider_key is required' });
+    }
+
+    const updated = await saveMapProvider({
+      provider_key,
+      name,
+      api_key,
+      is_enabled,
+      is_primary,
+      priority,
+      config
+    });
+
+    const adminId = (req as any).user?.id || null;
+    await auditLog(adminId, 'Update Map Provider', 'map_providers', {
+      provider_key,
+      is_enabled,
+      is_primary
+    });
+
+    res.json({ success: true, message: 'Map provider configuration updated successfully', provider: updated });
+  } catch (error: any) {
+    console.error('[Admin Maps API] Error saving provider:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to save map provider' });
+  }
+});
+
+// POST /api/admin/maps/providers/test - Pre-flight test connection (Ping & latency)
+router.post("/maps/providers/test", authenticateAdmin, async (req, res) => {
+  try {
+    const { provider_key, api_key } = req.body;
+    if (!provider_key) {
+      return res.status(400).json({ success: false, error: 'provider_key is required' });
+    }
+
+    const testResult = await testMapProviderConnection(provider_key, api_key);
+    
+    // Update provider health in DB
+    await updateProviderHealthStatus(
+      provider_key,
+      testResult.success ? 'healthy' : 'error',
+      testResult.latencyMs,
+      testResult.success ? null : testResult.message
+    );
+
+    res.json({
+      success: testResult.success,
+      latency_ms: testResult.latencyMs,
+      message: testResult.message,
+      message_ar: testResult.message_ar,
+      details: testResult.details
+    });
+  } catch (error: any) {
+    console.error('[Admin Maps API] Error testing provider:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to test map provider connection' });
+  }
+});
+
+// DELETE /api/admin/maps/providers/:key - Reset / clear provider key
+router.delete("/maps/providers/:key", authenticateAdmin, async (req, res) => {
+  try {
+    const { key } = req.params;
+    if (!key) return res.status(400).json({ success: false, error: 'Provider key is required' });
+
+    await resetMapProviderKey(key);
+    const adminId = (req as any).user?.id || null;
+    await auditLog(adminId, 'Reset Map Provider Key', 'map_providers', { provider_key: key });
+
+    res.json({ success: true, message: `Key for ${key} was reset successfully` });
+  } catch (error: any) {
+    console.error('[Admin Maps API] Error resetting provider key:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to reset map provider key' });
   }
 });
 

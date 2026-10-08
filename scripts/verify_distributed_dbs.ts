@@ -1,3 +1,4 @@
+import '../server/bootstrapEnv.js';
 import { config } from 'dotenv';
 config();
 import pkg from 'pg';
@@ -83,22 +84,24 @@ async function verifyDatabase(db: DbConfig) {
 }
 
 async function run() {
-  console.log('🚀 Starting Perplexta Distributed 4-Database Architecture Verification CLI...');
+  console.log('🚀 Starting Perplexta Distributed 5-Database Architecture Verification CLI...');
 
   // Initialize/migrate all databases first
   try {
-    console.log('🔄 Running automated database initialization and migrations across all pools...');
+    console.log('🔄 Running automated database initialization and migrations across all 5 pools...');
     const corePool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: getSslConfig(process.env.DATABASE_URL) });
     const ledgerPool = new Pool({ connectionString: process.env.LEDGER_DATABASE_URL || process.env.DATABASE_URL, ssl: getSslConfig(process.env.LEDGER_DATABASE_URL || process.env.DATABASE_URL) });
     const externalPool = new Pool({ connectionString: process.env.EXTERNAL_DATABASE_URL || process.env.DATABASE_URL, ssl: getSslConfig(process.env.EXTERNAL_DATABASE_URL || process.env.DATABASE_URL) });
     const securityPool = new Pool({ connectionString: process.env.SECURITY_DATABASE_URL || process.env.DATABASE_URL, ssl: getSslConfig(process.env.SECURITY_DATABASE_URL || process.env.DATABASE_URL) });
+    const mediaPool = new Pool({ connectionString: process.env.MEDIA_DATABASE_URL || process.env.DATABASE_URL, ssl: getSslConfig(process.env.MEDIA_DATABASE_URL || process.env.DATABASE_URL) });
 
-    await initDb('additive', corePool, ledgerPool, externalPool, securityPool);
+    await initDb('additive', corePool, ledgerPool, externalPool, securityPool, mediaPool);
     await corePool.end();
     await ledgerPool.end();
     await externalPool.end();
     await securityPool.end();
-    console.log('✅ Database initialization & migrations completed successfully.');
+    await mediaPool.end();
+    console.log('✅ 5-Database initialization & migrations completed successfully.');
   } catch (initErr: any) {
     console.warn('⚠️ Notice during database initialization:', initErr?.message || initErr);
   }
@@ -107,13 +110,14 @@ async function run() {
   const ledgerUrl = process.env.LEDGER_DATABASE_URL || coreUrl;
   const securityUrl = process.env.SECURITY_DATABASE_URL || coreUrl;
   const externalUrl = process.env.EXTERNAL_DATABASE_URL || coreUrl;
+  const mediaUrl = process.env.MEDIA_DATABASE_URL || coreUrl;
 
   const databases: DbConfig[] = [
     {
       name: 'Core Database',
       key: 'core',
       url: coreUrl,
-      expectedTables: ['users', 'user_sessions', 'chats', 'messages', 'api_keys_vault', 'tool_orchestrator', 'subscriptions', 'plans', 'user_usage', 'notifications', 'media_assets', 'bulletin_ads', 'bulletin_pages']
+      expectedTables: ['users', 'user_sessions', 'chats', 'messages', 'api_keys_vault', 'tool_orchestrator', 'subscriptions', 'plans', 'user_usage', 'notifications', 'bulletin_ads', 'bulletin_pages']
     },
     {
       name: 'Ledger Database',
@@ -131,7 +135,13 @@ async function run() {
       name: 'External Database',
       key: 'external',
       url: externalUrl,
-      expectedTables: ['external_articles', 'external_categories', 'external_sync_logs']
+      expectedTables: [] // Decommissioned ghost tables per Migration v117 - active as isolated integration sandbox
+    },
+    {
+      name: 'Media Database',
+      key: 'media',
+      url: mediaUrl,
+      expectedTables: ['media_assets', 'canvas_sessions', 'canvas_history', 'user_audio_library']
     }
   ];
 

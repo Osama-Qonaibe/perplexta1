@@ -184,7 +184,7 @@ export const OrchestratorView = ({
       labelAr: "البحث والمعرفة",
       labelEn: "Search & Knowledge",
       icon: Search,
-      filter: (id: string) => ["sovereign_search", "sovereign_memory", "perplexta_analysis"].includes(id)
+      filter: (id: string) => ["sovereign_search", "perplexta_analysis"].includes(id)
     },
     {
       id: "dev",
@@ -300,9 +300,6 @@ export const OrchestratorView = ({
             fallback3Provider: "",
             fallback3Model: "",
             isActive: true,
-            costPerUsage: t.cost_per_usage !== undefined && t.cost_per_usage !== null ? t.cost_per_usage : 10,
-            costPer1kInputTokens: t.cost_per_1k_input_tokens !== undefined ? t.cost_per_1k_input_tokens : 5,
-            costPer1kOutputTokens: t.cost_per_1k_output_tokens !== undefined ? t.cost_per_1k_output_tokens : 15,
             isSaving: false,
           }));
 
@@ -328,7 +325,6 @@ export const OrchestratorView = ({
                 tts: Volume2,
                 code: Code2,
                 canvas: Music,
-                sovereign_memory: Database,
                 sovereign_search: BookOpen,
                 x402_api: Cpu,
               };
@@ -346,9 +342,6 @@ export const OrchestratorView = ({
                   fallback3Provider: savedRoute.fallback_3_provider || "",
                   fallback3Model: savedRoute.fallback_3_model || "",
                   isActive: savedRoute.is_active ?? true,
-                  costPerUsage: savedRoute.cost_per_usage !== undefined && savedRoute.cost_per_usage !== null ? savedRoute.cost_per_usage : tool.costPerUsage,
-                  costPer1kInputTokens: savedRoute.cost_per_1k_input_tokens !== undefined ? savedRoute.cost_per_1k_input_tokens : tool.costPer1kInputTokens,
-                  costPer1kOutputTokens: savedRoute.cost_per_1k_output_tokens !== undefined ? savedRoute.cost_per_1k_output_tokens : tool.costPer1kOutputTokens,
                 };
               }
               return { ...tool, icon: iconMap[tool.id] || LayoutGrid };
@@ -406,9 +399,6 @@ export const OrchestratorView = ({
               fallback_3_provider: toolToSave.fallback3Provider,
               fallback_3_model: toolToSave.fallback3Model,
               is_active: toolToSave.isActive,
-              cost_per_usage: toolToSave.costPerUsage,
-              cost_per_1k_input_tokens: toolToSave.costPer1kInputTokens !== undefined ? toolToSave.costPer1kInputTokens : 5,
-              cost_per_1k_output_tokens: toolToSave.costPer1kOutputTokens !== undefined ? toolToSave.costPer1kOutputTokens : 15,
             },
           ],
         }),
@@ -706,7 +696,7 @@ export const OrchestratorView = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto pb-2.5 pt-1 no-scrollbar scroll-smooth border-b border-[var(--border-default)]">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2.5 pt-1 custom-scrollbar scroll-smooth border-b border-[var(--border-default)]">
             {categories.map((cat) => {
               const CatIcon = cat.icon;
               const count = tools.filter((t) => cat.filter(t.id)).length;
@@ -858,92 +848,6 @@ export const OrchestratorView = ({
                 })()}
 
                 <div className="space-y-6 relative z-10">
-                  <div className="space-y-2.5 p-4 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)]">
-                    <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest px-1 block">
-                      {language === "ar" ? "رسم تشغيل الخدمة الثابت (Flat Execution Base)" : "Flat Execution Base Cost"}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={tool.costPerUsage ?? 0}
-                        onChange={(e) =>
-                          handleChange(tool.id, "costPerUsage", e.target.value)
-                        }
-                        className="w-full h-11 px-9 rounded-[var(--radius-xs)] border text-sm font-bold focus:outline-none transition-theme bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--fg-accent)] focus:border-[var(--border-accent)]"
-                      />
-                      <div
-                        className={`absolute top-1/2 -translate-y-1/2 px-3 text-[var(--fg-accent)] ${dir === "rtl" ? "right-0" : "left-0"}`}
-                      >
-                        <Coins
-                          size={16}
-                        />
-                      </div>
-                      <div
-                        className={`absolute top-1/2 -translate-y-1/2 px-3 text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest pointer-events-none ${dir === "rtl" ? "left-0" : "right-0"}`}
-                      >
-                        {t("points")}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2.5 p-4 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)]">
-                      <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest px-1 block">
-                        {language === "ar" ? "سعر مدخلات /1K توكن" : "Input /1k Token Cost"}
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          value={tool.costPer1kInputTokens ?? 0}
-                          onChange={(e) =>
-                            handleChange(tool.id, "costPer1kInputTokens", e.target.value)
-                          }
-                          className="w-full h-11 px-9 rounded-[var(--radius-xs)] border text-sm font-bold focus:outline-none transition-theme bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--fg-accent)] focus:border-[var(--border-accent)]"
-                        />
-                        <div
-                          className={`absolute top-1/2 -translate-y-1/2 px-3 text-[var(--fg-accent)] ${dir === "rtl" ? "right-0" : "left-0"}`}
-                        >
-                          <Coins
-                            size={16}
-                          />
-                        </div>
-                        <div
-                          className={`absolute top-1/2 -translate-y-1/2 px-3 text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest pointer-events-none ${dir === "rtl" ? "left-0" : "right-0"}`}
-                        >
-                          {t("points")}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2.5 p-4 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)]">
-                      <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest px-1 block">
-                        {language === "ar" ? "سعر مخرجات /1K توكن" : "Output /1k Token Cost"}
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          value={tool.costPer1kOutputTokens ?? 0}
-                          onChange={(e) =>
-                            handleChange(tool.id, "costPer1kOutputTokens", e.target.value)
-                          }
-                          className="w-full h-11 px-9 rounded-[var(--radius-xs)] border text-sm font-bold focus:outline-none transition-theme bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--fg-accent)] focus:border-[var(--border-accent)]"
-                        />
-                        <div
-                          className={`absolute top-1/2 -translate-y-1/2 px-3 text-[var(--fg-accent)] ${dir === "rtl" ? "right-0" : "left-0"}`}
-                        >
-                          <Coins
-                            size={16}
-                          />
-                        </div>
-                        <div
-                          className={`absolute top-1/2 -translate-y-1/2 px-3 text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest pointer-events-none ${dir === "rtl" ? "left-0" : "right-0"}`}
-                        >
-                          {t("points")}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 px-1">
@@ -976,7 +880,7 @@ export const OrchestratorView = ({
 
                     <div className="space-y-3 pt-2 border-t border-[var(--border-default)]/50">
                       <div className="flex items-center gap-2 px-1 opacity-60">
-                        <Shield size={14} className="text-amber-500" />
+                        <Shield size={14} className="text-[var(--fg-warning)]" />
                         <span className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em]">
                           {t("fallbackProtocol")}
                         </span>

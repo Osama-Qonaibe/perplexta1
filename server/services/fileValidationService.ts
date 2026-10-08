@@ -31,6 +31,21 @@ export interface FileAuditReport {
 }
 
 /**
+ * Sanitizes SVG file buffer to protect against Stored XSS attacks (script tags, inline event handlers)
+ */
+export function sanitizeSvgContent(buffer: Buffer): Buffer {
+  let content = buffer.toString('utf-8');
+  
+  // Strip script tags and dangerous event handlers / links
+  content = content.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  content = content.replace(/on\w+\s*=\s*(['"]).*?\1/gi, '');
+  content = content.replace(/on\w+\s*=\s*[^>\s]+/gi, '');
+  content = content.replace(/href\s*=\s*(['"])\s*javascript:.*?\1/gi, 'href="#"');
+  
+  return Buffer.from(content, 'utf-8');
+}
+
+/**
  * Cache invalidation hook to be called after file database commits or updates
  */
 export function triggerFileCacheInvalidation(fileUrlOrName?: string) {

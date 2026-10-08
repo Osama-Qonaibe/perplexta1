@@ -65,7 +65,7 @@ export const StoryArchive: React.FC<StoryArchiveProps> = ({ dir, token, showToas
     if (!token) return;
     const isConfirmed = await confirmDialog({
       title: dir === 'rtl' ? 'حذف القصة' : 'Delete Story',
-      description: dir === 'rtl' ? 'هل أنت متأكد من حذف هذه القصة نهائياً؟' : 'Are you sure you want to permanently delete this story?',
+      description: dir === 'rtl' ? 'هل أنت متأكد من حذف هذه القصة؟' : 'Are you sure you want to delete this story?',
       variant: 'danger',
       confirmLabel: dir === 'rtl' ? 'حذف' : 'Delete'
     });
@@ -97,14 +97,14 @@ export const StoryArchive: React.FC<StoryArchiveProps> = ({ dir, token, showToas
 
   if (archivedStories.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-10 px-4 bg-[var(--pub-surface-subtle)] rounded-[var(--pub-radius-control)] border border-[var(--pub-border-default)] text-center">
-        <div className="w-12 h-12 rounded-full bg-[var(--pub-surface-panel)] flex items-center justify-center mb-3 text-[var(--pub-text-muted)] border border-[var(--pub-border-default)]">
+      <div className="flex flex-col items-center justify-center py-10 px-4 bg-[var(--surface-subtle)] rounded-[var(--radius-sm)] border border-[var(--border-default)] text-center">
+        <div className="w-12 h-12 rounded-full bg-[var(--surface-card)] flex items-center justify-center mb-3 text-[var(--text-muted)] border border-[var(--border-default)]">
           <Archive size={20} />
         </div>
-        <h3 className="text-xs sm:text-sm font-bold text-[var(--pub-text-primary)] mb-1">
+        <h3 className="text-xs sm:text-sm font-bold text-[var(--text-primary)] mb-1">
           {dir === 'rtl' ? 'لا توجد قصص مؤرشفة' : 'No Archived Stories'}
         </h3>
-        <p className="text-[11px] text-[var(--pub-text-muted)] max-w-sm leading-relaxed">
+        <p className="text-[11px] text-[var(--text-muted)] max-w-sm leading-relaxed">
           {dir === 'rtl' 
             ? 'ستظهر هنا القصص التي انتهت مدة عرضها (24 ساعة)، لتتمكن من إعادة نشرها أو حذفها.' 
             : 'Stories that have expired (after 24 hours) will appear here for you to reshare or delete.'}
@@ -116,7 +116,7 @@ export const StoryArchive: React.FC<StoryArchiveProps> = ({ dir, token, showToas
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
       {archivedStories.map((story, sIdx) => (
-        <div key={`archived-story-${story.id || sIdx}-${sIdx}`} className="relative aspect-[9/16] rounded-[var(--pub-radius-control)] overflow-hidden bg-black group border border-[var(--pub-border-default)] shadow-xs">
+        <div key={`archived-story-${story.id || sIdx}-${sIdx}`} className="relative aspect-[9/16] rounded-[var(--radius-sm)] overflow-hidden bg-black group border border-[var(--border-default)] shadow-xs">
           {story.video_url ? (
             <video 
               src={getMediaUrl(story.video_url)} 
@@ -143,14 +143,14 @@ export const StoryArchive: React.FC<StoryArchiveProps> = ({ dir, token, showToas
             <div className="flex gap-1 w-full">
               <button 
                 onClick={() => handleReshare(story.id)}
-                className="flex-1 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-[var(--pub-radius-micro)] text-[10px] font-bold flex justify-center items-center gap-1 transition-all cursor-pointer"
+                className="flex-1 py-1.5 bg-[var(--accent)] hover:opacity-90 text-[var(--fg-on-emphasis)] rounded-[var(--radius-xs)] text-[10px] font-bold flex justify-center items-center gap-1 transition-all cursor-pointer"
                 title={dir === 'rtl' ? 'إعادة نشر' : 'Reshare'}
               >
                 <RotateCcw size={12} />
               </button>
               <button 
                 onClick={() => handleDelete(story.id)}
-                className="flex-1 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-[var(--pub-radius-micro)] text-[10px] font-bold flex justify-center items-center gap-1 transition-all cursor-pointer"
+                className="flex-1 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-[var(--radius-xs)] text-[10px] font-bold flex justify-center items-center gap-1 transition-all cursor-pointer"
                 title={dir === 'rtl' ? 'حذف نهائي' : 'Delete'}
               >
                 <Trash2 size={12} />

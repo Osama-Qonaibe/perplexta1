@@ -7,22 +7,34 @@
   "scope": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
-  "background_color": "#faf9f5",
-  "theme_color": "#181715",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
   "orientation": "any",
   "categories": ["productivity", "utilities", "artificial intelligence", "finance", "business"],
   "icons": [
     {
-      "src": "/uploads/system_logo.png",
+      "src": "/uploads/brand/pwa-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/uploads/system_logo.png",
+      "src": "/uploads/brand/pwa-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/uploads/brand/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/uploads/brand/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "shortcuts": [
@@ -30,15 +42,29 @@
       "name": "New Chat",
       "short_name": "Chat",
       "description": "Start a fresh AI session",
-      "url": "/",
-      "icons": [{ "src": "/uploads/system_logo.png", "sizes": "192x192" }]
+      "url": "/chat",
+      "icons": [{ "src": "/uploads/brand/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Bulletin Board",
+      "short_name": "Bulletin",
+      "description": "Explore ads, reels & community posts",
+      "url": "/bulletin",
+      "icons": [{ "src": "/uploads/brand/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Explore",
+      "short_name": "Explore",
+      "description": "Discover categories and recommendations",
+      "url": "/discover",
+      "icons": [{ "src": "/uploads/brand/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Rewards Center",
       "short_name": "Rewards",
       "description": "Manage points & rewards",
       "url": "/rewards",
-      "icons": [{ "src": "/uploads/system_logo.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/uploads/brand/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }

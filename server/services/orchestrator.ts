@@ -2,7 +2,7 @@ import express from 'express';
 import { pool } from '../db/index.js';
 import { io } from '../config/socket.js';
 import { callAIProvider, getProviderKey, getProviderUrlKey, invalidateVaultCache } from './ai.js';
-import { checkAndIncrementQuota, incrementUserUsage } from './quota.js';
+import { checkAndIncrementQuota, incrementUserUsage, getToolFriendlyName } from './quota.js';
 import { logSecurityAlert, logSystemActivity } from './notifications.js';
 import { forensicScanPDF } from './extractor.js';
 import { perplextaTTS } from './tts.js';
@@ -16,8 +16,9 @@ import { getEconomySettings } from './wallet.js';
 import { OrchestratorRegistry } from './orchestratorRegistry.js';
 import { withTimeout, safeDecrementOnFailure, safeParseResponse, AI_CALL_TIMEOUT_MS, TTS_TIMEOUT_MS, STT_TIMEOUT_MS } from './tasks/utils.js';
 import { sanitizeHTMLAndXSS, validatePromptLength, MAX_CUMULATIVE_HISTORY_CHARS, MAX_DOC_EXTRACT_SIZE } from '../utils/security.js';
-import { userLoader, getCachedOrchestratorConfig, getCachedSystemSettings, getCachedApiKeysVault, invalidateApiKeysVaultCache } from '../db/queries.js';
-import { extractDirectUserMemories, updateChatContextSummary, consolidateAllUserMemories } from './memory.js';
+import { userLoader, getCachedOrchestratorConfig, getCachedSystemSettings, getCachedApiKeysVault, invalidateApiKeysVaultCache, invalidateOrchestratorConfigCache } from '../db/queries.js';
+import { acquireInFlightLock, releaseInFlightLock } from '../utils/inFlightLock.js';
+import { extractDirectUserMemories, updateChatContextSummary, consolidateAllUserMemories, addMemory } from './memory.js';
 import { scanForPromptInjection, redactInternalArtifacts } from './securitySanitizer.js';
 
 export { extractDirectUserMemories, updateChatContextSummary };
@@ -35,9 +36,7 @@ const UPDATE_SUMMARY_TIMEOUT_MS = 30000;
 
 async function recordProviderUsage(provider: string, route: any) {
   try {
-    const settings = await getEconomySettings();
-    const pointsPerDollar = parseFloat(settings.points_per_dollar || '1000');
-    const estimatedCost = (route.cost_per_usage || 0) / pointsPerDollar;
+    const estimatedCost = 0.01;
     if (estimatedCost > 0) {
       await pool.query(
         'UPDATE api_keys_vault SET used_today = used_today + $1, updated_at = CURRENT_TIMESTAMP WHERE provider = $2',
@@ -232,15 +231,81 @@ Instruction: You MUST explicitly disclose this forensic audit to the user. Descr
 
   const memoryLimit = systemSettings?.memory_limit_per_user || 48;
 
-  if (activeKeys.length === 0) {
-    throw new Error(JSON.stringify({
-      error: "The intelligence core is currently undergoing a scheduled synchronization. Operations will resume momentarily.",
-      error_ar: "نظام الذكاء الاصطناعي يخضع حالياً لمزامنة مبرمجة. ستستأنف العمليات خلال لحظات.",
-      type: "SYSTEM_INACTIVE"
-    }));
-  }
+  const isGpuComputeTool = ['vision', 'perplexta_vision', 'image', 'video'].includes(toolIdStr);
+  const isAudioTool = ['tts', 'stt', 'perplexta_music'].includes(toolIdStr);
 
-  const route = rawRouteConfig;
+  let route = rawRouteConfig;
+
+  if (isGpuComputeTool) {
+    if (!route || !route.primary_provider || !route.primary_model || !route.is_active) {
+      await logSystemActivity(userId, 'INACTIVE_GPU_TOOL_ACCESS', `User attempted to access GPU tool "${toolIdStr}" but it is currently unconfigured or inactive in the Tool Orchestrator.`, { toolId: toolIdStr });
+      throw new Error(JSON.stringify({
+        error: `Specialized GPU tool "${toolIdStr}" is currently unconfigured or inactive. Please configure a designated GPU node and model in the Orchestrator via GPU Infrastructure.`,
+        error_ar: `أداة الـ GPU المتخصصة "${toolIdStr}" غير مهيأة أو معطلة حالياً. يرجى تعيين خادم GPU ونموذج مناسب في موجه النماذج (الأوركسترا) من لوحة التحكم.`,
+        type: "SYSTEM_INACTIVE"
+      }));
+    }
+  } else if (isAudioTool) {
+    if (!route || !route.primary_provider || !route.primary_model || !route.is_active) {
+      throw new Error(JSON.stringify({
+        error: `Specialized audio tool "${toolIdStr}" is currently unconfigured or inactive in the Tool Orchestrator. Please configure a designated audio provider and model in the Orchestrator.`,
+        error_ar: `أداة الصوتيات المتخصصة "${toolIdStr}" غير مهيأة أو معطلة حالياً في الأوركسترا. يرجى تعيين المزود والنموذج المخصص من لوحة التحكم.`,
+        type: "SYSTEM_INACTIVE"
+      }));
+    }
+  } else {
+    if (activeKeys.length === 0) {
+      throw new Error(JSON.stringify({
+        error: "The intelligence core is currently undergoing a scheduled synchronization. Operations will resume momentarily.",
+        error_ar: "نظام الذكاء الاصطناعي يخضع حالياً لمزامنة مبرمجة. ستستأنف العمليات خلال لحظات.",
+        type: "SYSTEM_INACTIVE"
+      }));
+    }
+
+    if (!route || !route.primary_provider || !route.primary_model) {
+      if (activeKeys.length > 0) {
+        const activeProvider = activeKeys.find((k: any) => k.models && k.models.length > 0) || activeKeys[0];
+        if (activeProvider && activeProvider.models && activeProvider.models.length > 0) {
+          const textModel = activeProvider.models.find((m: any) => {
+            const id = (m.id || m.name || (typeof m === 'string' ? m : '')).toLowerCase();
+            const methods = m.supportedMethods || m.supportedGenerationMethods || [];
+            const supportsText = methods.length === 0 || methods.includes('generateContent');
+            return supportsText && !id.includes('tts') && !id.includes('image') && !id.includes('embedding') && !id.includes('transcribe') && !id.includes('robotics') && !id.includes('computer-use') && !id.includes('antigravity') && !id.includes('deep-research');
+          }) || activeProvider.models[0];
+
+          const modelId = textModel.id || textModel.name || (typeof textModel === 'string' ? textModel : '');
+          const providerName = activeProvider.provider;
+
+        if (modelId && providerName) {
+          route = {
+            tool_id: toolIdStr,
+            primary_provider: providerName,
+            primary_model: modelId,
+            is_active: true,
+            max_history_depth: 16,
+            system_prompt: '',
+            temperature: 0.7,
+            top_p: 0.95
+          };
+
+          // Dynamically persist to tool_orchestrator table in PostgreSQL
+          pool.query(`
+            INSERT INTO tool_orchestrator (tool_id, primary_provider, primary_model, is_active, updated_at)
+            VALUES ($1, $2, $3, true, CURRENT_TIMESTAMP)
+            ON CONFLICT (tool_id) DO UPDATE
+            SET primary_provider = CASE WHEN tool_orchestrator.primary_provider IS NULL OR tool_orchestrator.primary_provider = '' THEN EXCLUDED.primary_provider ELSE tool_orchestrator.primary_provider END,
+                primary_model = CASE WHEN tool_orchestrator.primary_model IS NULL OR tool_orchestrator.primary_model = '' THEN EXCLUDED.primary_model ELSE tool_orchestrator.primary_model END,
+                is_active = true,
+                updated_at = CURRENT_TIMESTAMP
+          `, [toolIdStr, providerName, modelId]).catch((dbErr: any) => {
+            console.warn('[Orchestrator] Dynamic route persistence notice:', dbErr?.message || dbErr);
+          });
+          invalidateOrchestratorConfigCache(toolIdStr);
+        }
+      }
+    }
+  }
+}
 
   if (!route || !route.primary_provider || !route.primary_model) {
     await logSystemActivity(userId, 'INACTIVE_TOOL_ACCESS', `User attempted to access tool "${toolIdStr}" but it is currently inactive or undergoing maintenance.`, { toolId: toolIdStr });
@@ -271,7 +336,58 @@ Instruction: You MUST explicitly disclose this forensic audit to the user. Descr
     };
   }
 
-  const quotaCheck = await checkAndIncrementQuota(userId, toolIdStr);
+  // In-Flight Request Deduplication Check
+  const lockAcquired = acquireInFlightLock(userId, toolIdStr, finalPrompt);
+  if (!lockAcquired) {
+    const userRes = await pool.query('SELECT language FROM users WHERE id = $1', [userId]).catch(() => ({ rows: [] }));
+    const isAr = (userRes.rows[0]?.language || 'ar') === 'ar';
+    throw new Error(JSON.stringify({
+      error: `An identical '${toolIdStr}' generation request is already in progress. Please wait for it to finish.`,
+      error_ar: `هناك طلب توليد متطابق قيد المعالجة حالياً لنفس النص بنفس الأداة ('${toolIdStr}'). يرجى الانتظار لحين اكتمال الطلب الأول.`,
+      type: "DUPLICATE_REQUEST_IN_FLIGHT"
+    }));
+  }
+
+  try {
+    const quotaCheck = await checkAndIncrementQuota(userId, toolIdStr);
+
+    if (!quotaCheck.allowed) {
+      const userRes = await pool.query('SELECT language FROM users WHERE id = $1', [userId]).catch(() => ({ rows: [] }));
+      const isAr = (userRes.rows[0]?.language || 'ar') === 'ar';
+      const friendlyNameAr = getToolFriendlyName(toolIdStr, 'ar');
+      const friendlyNameEn = getToolFriendlyName(toolIdStr, 'en');
+
+      if (quotaCheck.period === 'plan_required') {
+        throw new Error(JSON.stringify({
+          error: `Please select a subscription plan to start using "${friendlyNameEn}".`,
+          error_ar: `يرجى اختيار باقة اشتراك لبدء استخدام أداة "${friendlyNameAr}".`,
+          type: "PLAN_REQUIRED",
+          limit: 0,
+          currentUsage: 0,
+          period: "plan_required",
+          tool: toolIdStr,
+          toolName: isAr ? friendlyNameAr : friendlyNameEn,
+          redirect: '/subscription'
+        }));
+      }
+
+      const periodLabelAr = quotaCheck.period === 'monthly' ? 'الشهري' : 'اليومي';
+      const periodLabelEn = quotaCheck.period === 'monthly' ? 'monthly' : 'daily';
+      const limitVal = quotaCheck.limit !== undefined ? quotaCheck.limit : 0;
+      const currentVal = quotaCheck.currentUsage !== undefined ? quotaCheck.currentUsage : limitVal;
+
+      throw new Error(JSON.stringify({
+        error: `You have reached the ${periodLabelEn} limit for "${friendlyNameEn}"`,
+        error_ar: `لقد استنفدت الحد ${periodLabelAr} المتاح لأداة "${friendlyNameAr}"`,
+        type: "QUOTA_EXCEEDED",
+        limit: limitVal,
+        currentUsage: currentVal,
+        period: quotaCheck.period,
+        tool: toolIdStr,
+        toolName: isAr ? friendlyNameAr : friendlyNameEn,
+        redirect: '/subscription'
+      }));
+    }
 
   return await executeWithBillingMiddleware(
     userId,
@@ -317,9 +433,51 @@ Instruction: You MUST explicitly disclose this forensic audit to the user. Descr
     }
   }
 
-  const userLang = user?.language || 'en';
+  let userLang: 'ar' | 'en' = 'ar';
+  let userContext: any = undefined;
+
+  // Detect language dynamically from the current user prompt
+  const arabicChars = (cleanUserPrompt.match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g) || []).length;
+  const latinChars = (cleanUserPrompt.match(/[a-zA-Z]/g) || []).length;
+  const promptIsArabic = arabicChars > 0 && arabicChars >= latinChars * 0.25;
+
+  try {
+    const userRes = await pool.query(
+      `SELECT u.id, u.name, u.email, u.language,
+              bp.id AS page_id, bp.name AS page_name, bp.slug AS page_slug
+       FROM users u
+       LEFT JOIN bulletin_pages bp ON bp.user_id = u.id
+       WHERE u.id = $1
+       ORDER BY bp.id ASC
+       LIMIT 1`,
+      [userId]
+    );
+    const uRow = userRes.rows[0];
+    if (uRow) {
+      if (promptIsArabic) {
+        userLang = 'ar';
+      } else if (latinChars > arabicChars * 2) {
+        userLang = 'en';
+      } else {
+        userLang = uRow.language === 'ar' ? 'ar' : 'en';
+      }
+      const cleanName = uRow.name || uRow.email?.split('@')[0] || '';
+      userContext = {
+        userName: cleanName,
+        viralbookProfileUrl: uRow.id ? `https://perplexta.com/viralbook/u/${uRow.id}` : 'https://perplexta.com/viralbook',
+        viralbookPageUrl: uRow.page_slug ? `https://perplexta.com/viralbook/p/${uRow.page_slug}` : (uRow.page_id ? `https://perplexta.com/viralbook/p/${uRow.page_id}` : undefined),
+        viralbookPageName: uRow.page_name || undefined
+      };
+    } else {
+      userLang = promptIsArabic ? 'ar' : 'en';
+    }
+  } catch (userQueryErr) {
+    console.warn('[Orchestrator] User context query fallback:', userQueryErr);
+    userLang = promptIsArabic ? 'ar' : 'en';
+  }
+
   const appName = getAppName(userLang);
-  const protocol = buildSystemPrompt(appName, toolIdStr, userLang);
+  const protocol = buildSystemPrompt(appName, toolIdStr, userLang, userContext);
 
   const chatWantsSearch = (isDedicatedSearchTool || (isChatOnly && isExplicitSearchRequested(cleanUserPrompt, toolIdStr))) && !isSocialGreeting(cleanUserPrompt);
 
@@ -500,9 +658,7 @@ Instruction: You MUST explicitly disclose this forensic audit to the user. Descr
 
   let refinedSystemPromptSegment = '';
 
-  if (toolIdStr === 'sovereign_memory') {
-    refinedSystemPromptSegment = '[MEMORY_MODE]: Inspect and manage user memories.';
-  } else if (toolIdStr === 'canvas') {
+  if (toolIdStr === 'canvas') {
     const audioSet = audio_settings || {};
     let moodLabel = audioSet.mood || 'Epic';
     let durationCount = Number(audioSet.duration || 30);
@@ -518,6 +674,13 @@ Instruction: You MUST explicitly disclose this forensic audit to the user. Descr
 Structure: [I. Cover & Mood Art], [II. Audio Suite Environment], [III. Sonic Orchestration].`.trim();
   } else if (toolIdStr === 'perplexta_analysis') {
     refinedSystemPromptSegment = '[ANALYSIS_MODE]: Perform elite file audit and deep analysis.';
+  } else if (toolIdStr === 'code') {
+    refinedSystemPromptSegment = `
+[DEDICATED CODE & SOFTWARE ENGINEERING DIRECTIVE - MANDATORY COMPLETENESS & ACCURACY]:
+1. 100% EXHAUSTIVE IMPLEMENTATION: Deliver complete, production-grade code without any placeholders. NEVER omit code blocks with comments like "// TODO", "// ...", "// implement here", or "// remaining logic".
+2. METICULOUS ACCURACY TO REQUEST: Strictly implement every feature, data model, state variable, calculation, edge case, and constraint explicitly or implicitly requested by the user.
+3. PRODUCTION STANDARDS: Provide full TypeScript types, robust error handling, edge-case guards, and complete import/export statements.
+4. EXPLICIT FILE PATHS & LTR CODE: Every code block MUST have an explicit language fence (\`\`\`typescript, \`\`\`tsx, \`\`\`python, etc.) and begin with the exact file path on line 1 as a comment.`.trim();
   }
 
   if (chatWantsSearch && searchCitations.length > 0) {
@@ -536,12 +699,21 @@ Real-time verified web sources have been retrieved for this request and supplied
 ${contextSummary}${userMemoriesStr}
 ${refinedSystemPromptSegment}`.trim();
 
-  const modelsToTry = [
+  const rawModelsToTry = [
     { provider: route.primary_provider, model: route.primary_model },
     { provider: route.fallback_1_provider, model: route.fallback_1_model },
     { provider: route.fallback_2_provider, model: route.fallback_2_model },
     { provider: route.fallback_3_provider, model: route.fallback_3_model }
   ].filter(m => m.provider && m.model);
+
+  // Deduplicate sequential targets to prevent retrying the exact same failed model
+  const seenTargets = new Set<string>();
+  const modelsToTry = rawModelsToTry.filter(m => {
+    const key = `${(m.provider || '').toLowerCase().trim()}:${(m.model || '').toLowerCase().trim()}`;
+    if (seenTargets.has(key)) return false;
+    seenTargets.add(key);
+    return true;
+  });
 
   const vaultMap = new Map<string, any>();
   if (activeKeys && activeKeys.length > 0) {
@@ -580,11 +752,46 @@ ${refinedSystemPromptSegment}`.trim();
         }
 
         const apiKey = await getProviderKey(providerId);
-        if (!apiKey) continue;
+        if (!apiKey) {
+          console.warn(`[Orchestrator] No active API key found for provider "${target.provider}". Skipping.`);
+          continue;
+        }
 
         if (dailyBudget > 0 && usedToday >= dailyBudget) {
           await logSecurityAlert(userId, 'BUDGET_EXCEEDED', 'medium', `Vault Budget Hit: Provider "${target.provider}" reached its daily budget limit (${usedToday}/${dailyBudget}). Attempting fallback.`, { provider: target.provider, dailyBudget, usedToday });
           continue;
+        }
+
+        // Zero-Query Shield: Pre-validate that target.model exists in registered provider models to guarantee zero queries for non-existent models
+        if (cachedRow && cachedRow.models) {
+          let registeredModels: any[] = [];
+          try {
+            registeredModels = typeof cachedRow.models === 'string' ? JSON.parse(cachedRow.models) : cachedRow.models;
+          } catch {
+            registeredModels = [];
+          }
+          if (Array.isArray(registeredModels) && registeredModels.length > 0) {
+            const knownSet = new Set<string>();
+            for (const item of registeredModels) {
+              const raw = typeof item === 'string' ? item : (item?.id || item?.name || '');
+              if (raw) {
+                const lower = raw.toLowerCase().trim();
+                knownSet.add(lower);
+                if (lower.startsWith('models/')) knownSet.add(lower.replace('models/', ''));
+                if (lower.includes('/')) knownSet.add(lower.split('/').pop()!);
+              }
+            }
+
+            const targetLower = target.model.toLowerCase().trim();
+            const displayLower = displayModel.toLowerCase().trim();
+            const targetNoPrefix = targetLower.replace('models/', '');
+
+            const modelExists = knownSet.has(targetLower) || knownSet.has(displayLower) || knownSet.has(targetNoPrefix);
+            if (!modelExists) {
+              console.warn(`[Orchestrator Shield] Model "${target.model}" not found in registered models for provider "${target.provider}". Skipping query to prevent 404 error.`);
+              continue;
+            }
+          }
         }
 
         let isInsideThinkingBlock = false;
@@ -628,9 +835,21 @@ ${refinedSystemPromptSegment}`.trim();
           if (onChunk) onChunk(sanitizedChunk);
         };
 
+        const customTimeoutMs = route.timeout_seconds ? route.timeout_seconds * 1000 : (toolIdStr === 'code' ? 180000 : AI_CALL_TIMEOUT_MS);
+        const effectiveTimeoutMs = Math.max(customTimeoutMs, toolIdStr === 'code' ? 180000 : 45000);
+
+        const routeProtoConfig = (route.protocol_config && typeof route.protocol_config === 'object') ? route.protocol_config : {};
+        const callOptions = {
+          fileData: file_data,
+          temperature: typeof routeProtoConfig.temperature === 'number' ? routeProtoConfig.temperature : (toolIdStr === 'code' ? 0.15 : (route.temperature ?? 0.7)),
+          topP: typeof routeProtoConfig.top_p === 'number' ? routeProtoConfig.top_p : (route.top_p ?? 0.95),
+          maxOutputTokens: typeof routeProtoConfig.max_tokens === 'number' ? routeProtoConfig.max_tokens : (toolIdStr === 'code' ? 16384 : 8192),
+          toolId: toolIdStr
+        };
+
         generatedText = await withTimeout(
-          callAIProvider(target.provider, target.model, apiKey, finalPrompt, finalSystemPrompt, wrappedOnChunk, history, { fileData: file_data }, urlKey ?? undefined),
-          AI_CALL_TIMEOUT_MS,
+          callAIProvider(target.provider, target.model, apiKey, finalPrompt, finalSystemPrompt, wrappedOnChunk, history, callOptions, urlKey ?? undefined),
+          effectiveTimeoutMs,
           `${target.provider}/${displayModel}`
         );
         successfulModel = target;
@@ -643,49 +862,51 @@ ${refinedSystemPromptSegment}`.trim();
         }
 
         try {
-          // Extract direct user facts from user prompt deterministically (Zero AI / Full Sovereign Local Engine)
+          // 1. Extract direct user facts from user prompt via Autonomous Local Engine
           const directUserFacts = extractDirectUserMemories(cleanUserPrompt);
 
-          if (directUserFacts.length > 0) {
-            const countRes = await pool.query('SELECT count(*) FROM chat_memories WHERE user_id = $1', [userId]);
-            const currentCount = parseInt(countRes.rows[0].count);
+          // 2. Extract any tags generated in model output (<extracted_memory>)
+          const tagMatches: { fact: string; category: string }[] = [];
+          let tagMatch;
+          const memTagRegex = new RegExp(MEMORY_TAG_REGEX.source, 'gi');
+          while ((tagMatch = memTagRegex.exec(generatedText)) !== null) {
+            const category = (tagMatch[1] || 'general').trim().toLowerCase();
+            const factText = tagMatch[2]?.trim();
+            if (factText && factText.length >= 3) {
+              tagMatches.push({ fact: factText, category });
+            }
+          }
 
-            let newInsertedCount = 0;
-            for (const item of directUserFacts) {
-              // Deduplication check: only insert if not already recorded
-              const existing = await pool.query(
-                'SELECT id FROM chat_memories WHERE user_id = $1 AND LOWER(fact) = LOWER($2) LIMIT 1',
-                [userId, item.fact]
-              );
-              if (existing.rows.length === 0) {
-                const insertRes = await pool.query(
-                  "INSERT INTO chat_memories (user_id, chat_id, fact, category, source) VALUES ($1, $2, $3, $4, 'user') RETURNING *",
-                  [userId, chatIdNum || null, item.fact, item.category]
-                );
-                newInsertedCount++;
-                if (io) {
+          const allFactsToProcess = [...directUserFacts, ...tagMatches];
+
+          if (allFactsToProcess.length > 0) {
+            for (const item of allFactsToProcess) {
+              try {
+                const savedFact = await addMemory(userId, item.fact, item.category, 'user', chatIdNum || undefined);
+                if (savedFact && io) {
                   io.to(`user_${userId}`).emit('memory_extracted', {
-                    fact: item.fact,
-                    category: item.category,
-                    id: insertRes.rows[0].id
+                    fact: savedFact.fact,
+                    category: savedFact.category,
+                    id: savedFact.id
                   });
                 }
-              }
-            }
-
-            const totalNow = currentCount + newInsertedCount;
-            if (totalNow >= memoryLimit) {
-              scheduleMemoryConsolidation(userId);
-              if (io) {
-                io.to(`user_${userId}`).emit('memory_warning', { currentCount: totalNow });
+              } catch (addErr: any) {
+                if (addErr.message?.includes('limit reached')) {
+                  scheduleMemoryConsolidation(userId);
+                  if (io) io.to(`user_${userId}`).emit('memory_warning', { userId });
+                }
               }
             }
           }
 
-          const memRegex = new RegExp(MEMORY_TAG_REGEX.source, 'gi');
-          generatedText = generatedText.replace(memRegex, '').trim();
+          generatedText = generatedText.replace(memTagRegex, '').trim();
+
+          // 3. Trigger progressive context summary update for active chat
+          if (chatIdNum > 0) {
+            scheduleChatSummaryUpdate(chatIdNum, userId);
+          }
         } catch (memProcErr) {
-          console.error('[Orchestrator] Error during deterministic memory extraction:', memProcErr);
+          console.error('[Orchestrator] Error during local memory engine extraction:', memProcErr);
         }
 
         break; // exit trials on model execution success
@@ -696,10 +917,22 @@ ${refinedSystemPromptSegment}`.trim();
         console.error(`[Orchestrator] Failure on ${target.provider}/${displayModel}:`, innerErr);
 
         const errMessage = innerErr.message || '';
-        const isTemporaryRateLimit = errMessage.includes('429') || errMessage.toLowerCase().includes('rate limit') || errMessage.toLowerCase().includes('too many requests') || errMessage.toLowerCase().includes('resource_exhausted') || errMessage.toLowerCase().includes('quota') || errMessage.toLowerCase().includes('generativelanguage');
+        const isTemporaryRateLimit = 
+          errMessage.includes('429') || 
+          errMessage.includes('503') ||
+          errMessage.toLowerCase().includes('rate limit') || 
+          errMessage.toLowerCase().includes('too many requests') || 
+          errMessage.toLowerCase().includes('resource_exhausted') || 
+          errMessage.toLowerCase().includes('quota') || 
+          errMessage.toLowerCase().includes('high demand') ||
+          errMessage.toLowerCase().includes('unavailable') ||
+          errMessage.toLowerCase().includes('spikes in demand') ||
+          errMessage.toLowerCase().includes('overloaded') ||
+          errMessage.toLowerCase().includes('generativelanguage');
 
         if (isTemporaryRateLimit) {
-          console.warn(`[Orchestrator] Temporary 429 rate limit hit on provider "${target.provider}" / model "${target.model}". Proceeding to fallback if available.`);
+          const statusLabel = errMessage.includes('503') ? '503 high demand' : '429 rate limit / temporary overload';
+          console.warn(`[Orchestrator] Temporary ${statusLabel} on provider "${target.provider}" / model "${target.model}". Silently transitioning to next fallback in chain.`);
         }
 
         const isQuotaOrAuthExhausted =
@@ -759,4 +992,7 @@ ${refinedSystemPromptSegment}`.trim();
       apiKey: successfulApiKey
     };
   });
+  } finally {
+    releaseInFlightLock(userId, toolIdStr, finalPrompt);
+  }
 };

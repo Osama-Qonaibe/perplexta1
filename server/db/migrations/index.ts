@@ -36,7 +36,8 @@ import {
 import {
   MEDIA_SCHEMA_TABLES,
   applyMediaColumnEnforcements,
-  MEDIA_INDEXES
+  MEDIA_INDEXES,
+  applyMediaRelations
 } from './media.schema.js';
 
 import { runVersionedMigrations } from './versioned.js';
@@ -54,6 +55,14 @@ export * from './media.schema.js';
 export * from './versioned.js';
 export * from './integrity.js';
 export * from './maintenance.js';
+
+// ===== PRODUCTION SAFETY: FORBID DROPS =====
+export function assertNoDropInProduction(sql: string) {
+  if (process.env.NODE_ENV === 'production' && /DROP\s+TABLE/i.test(sql)) {
+    throw new Error('[Migrations] DROP TABLE is FORBIDDEN in production migrations');
+  }
+}
+// ===========================================
 
 /**
  * Checks if two pool objects connect to the same physical database.
@@ -177,50 +186,41 @@ export async function initDb(
   await seedCoreDatabase(targetPool, targetLedgerPool);
   await seedLedgerDatabase(targetLedgerPool);
 
-  // 7. Apply Indexes across all pools (parallelized)
-  await Promise.all([
-    ...CORE_INDEXES.map(idxQuery =>
-      targetPool.query(idxQuery).catch((idxErr: any) => {
-        console.warn('[initDb Core Index] Notice:', idxErr?.message || idxErr);
-      })
-    ),
-    ...LEDGER_INDEXES.map(idxQuery =>
-      targetLedgerPool.query(idxQuery).catch((idxErr: any) => {
-        console.warn('[initDb Ledger Index] Notice:', idxErr?.message || idxErr);
-      })
-    ),
-    ...EXTERNAL_INDEXES.map(idxQuery =>
-      targetExternalPool.query(idxQuery).catch((idxErr: any) => {
-        console.warn('[initDb External Index] Notice:', idxErr?.message || idxErr);
-      })
-    ),
-    ...SECURITY_INDEXES.map(idxQuery =>
-      targetSecurityPool.query(idxQuery).catch((idxErr: any) => {
-        console.warn('[initDb Security Index] Notice:', idxErr?.message || idxErr);
-      })
-    ),
-    ...MEDIA_INDEXES.map(idxQuery =>
-      targetMediaPool.query(idxQuery).catch((idxErr: any) => {
-        console.warn('[initDb Media Index] Notice:', idxErr?.message || idxErr);
-      })
-    )
-  ]);
+  // 7. Apply Indexes across all pools (sequential per pool to prevent deadlocks)
+  for (const idxQuery of CORE_INDEXES) {
+    await targetPool.query(idxQuery).catch((idxErr: any) => {
+      console.warn('[initDb Core Index] Notice:', idxErr?.message || idxErr);
+    });
+  }
+
+  for (const idxQuery of LEDGER_INDEXES) {
+    await targetLedgerPool.query(idxQuery).catch((idxErr: any) => {
+      console.warn('[initDb Ledger Index] Notice:', idxErr?.message || idxErr);
+    });
+  }
+
+  for (const idxQuery of EXTERNAL_INDEXES) {
+    await targetExternalPool.query(idxQuery).catch((idxErr: any) => {
+      console.warn('[initDb External Index] Notice:', idxErr?.message || idxErr);
+    });
+  }
+
+  for (const idxQuery of SECURITY_INDEXES) {
+    await targetSecurityPool.query(idxQuery).catch((idxErr: any) => {
+      console.warn('[initDb Security Index] Notice:', idxErr?.message || idxErr);
+    });
+  }
+
+  for (const idxQuery of MEDIA_INDEXES) {
+    await targetMediaPool.query(idxQuery).catch((idxErr: any) => {
+      console.warn('[initDb Media Index] Notice:', idxErr?.message || idxErr);
+    });
+  }
 
   // 8. Apply Relations
   await applyCoreRelations(targetPool);
   await applyLedgerRelations(targetLedgerPool);
-
-  // 9. In scratch mode, seed migration_history with baseline versioned names so runVersionedMigrations completes in zero latency
-  if (mode === 'scratch') {
-    const allMigrationNames = [
-      "v1_core_schema","v2_additive_columns","v3_ledger_schema_v1","v4_registry_seed","v5_orchestrator_cleanup","v6_coupon_system_expansion","v7_finance_expansion","v9_route_seo_metadata_table","v8_security_hardening","v9_filler_reconciliation","v10_economy_refactor","v11_ensure_baseline_tables","v12_token_blacklist_security_hardening","v13_payment_gateways_expansion","v14_paypal_settings","v15_transaction_hide_column","v16_user_referral_code","v17_messages_schema_update","v18_user_sessions_schema","v19_seo_upgrade","v20_seo_image","v21_google_site_verification","v22_forum_and_blog_schema","v23_blog_ratings_and_sharing","v24_seed_blog_platform_data","v25_marketplace_schema","v26_marketplace_seed_extension_v2","v27_update_forum_categories_for_pioneers_and_developers","v28_refine_forum_categories_names","v30_forum_category_colors_differentiation","v31_marketplace_purchases_and_referrals","v32_marketplace_referral_percent","v33_marketplace_highlights_and_licenses","v34_default_language_en","v35_logo_light_theme","v36_agent_auth","v37_agent_auth_user_id","v38_admin_audit_logs","v39_ensure_plan_type_column","v40_video_resources_table","v41_hash_existing_tokens","v42_missing_indexes","v43_forum_fk_integrity","v44_encrypt_registry_passwords","v45_orchestrator_max_history_depth","v46_protocol_config","v47_image_prompt_pref_threshold","v48_marketplace_reviews_and_ratings","v49_forum_categories_control","v50_forum_images_and_ratings","v51_dynamic_seo_blocking","v52_token_based_billing","v53_referral_invitations","v54_referral_invitations_fields_v2","v55_seo_site_name_fields","v56_shared_snapshots","v57_permanently_drop_forum_tables","v58_gifts_and_ads_pricing","v59_admin_approval_queue","v60_ad_pricing_audit","v61_ad_performance_stats","v62_bulletin_social_features","v63_bulletin_ad_features","v64_bulletin_quick_questions","v65_route_seo_settings","v66_asset_metadata_and_seo_integrity","v67_recommendation_engine","v68_ensure_chat_memories_and_shortcuts","v69_add_user_shortcuts_fk","v70_encrypt_smtp_password","v71_add_fks","v72_registered_agents_schema_fix","v73_add_file_url_indexes","v74_google_tool_connections","v75_language_font_config","v76_ensure_email_notifications","v77_custom_thresholds","v78_drop_system_settings_logo_indexes","v79_sync_content_seo_metadata","v81_advertisements_format_column","v80_sidebar_ads_columns","v82_update_blog_article_images","v83_media_assets_table_and_constraints","v84_media_player_mute_defaults","v85_bulletin_ads_nullable_image_url","v86_bulletin_post_options_features","v87_create_seo_metadata_table","v88_create_gpu_providers_infrastructure","v89_create_gpu_execution_jobs","v90_add_pages_and_marketplace_owner_id","v91_create_og_preview_cache","v92_add_meta_tags_updated_at","v93_purge_mock_gpu_providers","v94_purge_preprogrammed_tool_models","v95_reconcile_admin_seeded_wallet","v84_add_file_data_columns_to_user_files_and_media_assets","v85_safely_remove_marketplace_ecosystem","v99_clean_slate_and_deep_architecture_purge","v100_restore_registry_database_connections","v101_add_bulletin_pages_managers","v102_control_panel_unified_keys_schema","v105_canonical_theme_bootstrap","v106_bulk_route_seo_metadata","v107_perplexta_unified_ai_tokens","v108_allow_null_user_id_in_media_assets"
-    ];
-    await Promise.all(
-      allMigrationNames.map(name =>
-        targetPool.query(`INSERT INTO migration_history (migration_name, applied_at) VALUES ($1, CURRENT_TIMESTAMP) ON CONFLICT (migration_name) DO NOTHING`, [name]).catch(() => {})
-      )
-    );
-  }
+  await applyMediaRelations(targetMediaPool);
 }
 
 /**
@@ -244,6 +244,7 @@ export async function runDatabaseMigrations(targetId?: string, type: 'additive' 
   let ledgerClient: any = null;
   let externalClient: any = null;
   let securityClient: any = null;
+  let mediaClient: any = null;
 
   const connectToPool = async (p: any, poolName: string) => {
     if (!p || p === pool || isSameDb(pool, p)) return null;
@@ -264,6 +265,7 @@ export async function runDatabaseMigrations(targetId?: string, type: 'additive' 
   };
 
   const safeQueryClient = async (targetClient: any, fallbackClient: any, queryStr: string, params?: unknown[]) => {
+    assertNoDropInProduction(queryStr);
     const activeClient = targetClient || fallbackClient;
     try {
       return await activeClient.query(queryStr, params);
@@ -280,20 +282,52 @@ export async function runDatabaseMigrations(targetId?: string, type: 'additive' 
   ledgerClient = await connectToPool(ledgerPool, 'Ledger');
   externalClient = await connectToPool(externalPool, 'External');
   securityClient = await connectToPool(securityPool, 'Security');
+  mediaClient = await connectToPool(mediaPool, 'Media');
+
+  let lockAcquired = false;
 
   try {
-    // Acquire non-blocking advisory lock to prevent concurrent migration execution race conditions
-    await client.query('SELECT pg_try_advisory_lock(74635291)').catch((err: any) => {
-      console.warn('[Migrations] Advisory lock acquisition warning:', err.message);
-    });
+    // Attempt non-blocking advisory lock with retry polling to handle transient restart overlaps
+    const maxLockRetries = 10;
+    for (let attempt = 1; attempt <= maxLockRetries; attempt++) {
+      const lockRes = await client.query('SELECT pg_try_advisory_lock(74635291)').catch((err: any) => {
+        console.warn('[Migrations] Advisory lock acquisition attempt error:', err.message);
+        return { rows: [{ pg_try_advisory_lock: false }] };
+      });
+
+      if (lockRes.rows?.[0]?.pg_try_advisory_lock === true) {
+        lockAcquired = true;
+        break;
+      }
+
+      if (attempt < maxLockRetries) {
+        await new Promise((res) => setTimeout(res, 400));
+      }
+    }
+
+    if (!lockAcquired) {
+      console.warn('[Migrations] Global advisory lock (74635291) is currently held by another active process. Skipping redundant concurrent run.');
+      return {
+        success: true,
+        target: targetId || 'all',
+        type,
+        totalMigrations: 0,
+        skipped: true,
+        reason: 'Concurrent migration execution in progress'
+      };
+    }
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS migration_history (
         id SERIAL PRIMARY KEY,
         migration_name VARCHAR(255) UNIQUE NOT NULL,
-        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        checksum VARCHAR(64),
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    await client.query(`ALTER TABLE migration_history ADD COLUMN IF NOT EXISTS checksum VARCHAR(64)`).catch(() => {});
+    await client.query(`ALTER TABLE migration_history ADD COLUMN IF NOT EXISTS executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS migration_security_audit (
@@ -367,6 +401,26 @@ export async function runDatabaseMigrations(targetId?: string, type: 'additive' 
 
       if (securityClient && securityClient !== client) {
         try {
+          // Safe transition (F-05): Transfer existing compliance and audit records before cleaning duplicates
+          for (const tbl of ['token_blacklist', 'security_alerts', 'admin_audit_logs', 'registered_agents']) {
+            const hasCoreTable = await client.query(`SELECT 1 FROM information_schema.tables WHERE table_name = $1 AND table_schema = 'public'`, [tbl]).catch(() => ({ rowCount: 0 }));
+            if (hasCoreTable.rowCount > 0) {
+              const countCore = await client.query(`SELECT COUNT(*) FROM "${tbl}"`).catch(() => ({ rows: [{ count: '0' }] }));
+              const total = parseInt(countCore.rows[0]?.count || '0', 10);
+              if (total > 0) {
+                console.log(`[Migrations] Transferring ${total} legacy records for ${tbl} from Core DB to Security DB...`);
+                const rows = await client.query(`SELECT * FROM "${tbl}"`);
+                for (const row of rows.rows) {
+                  const cols = Object.keys(row).map(c => `"${c}"`).join(', ');
+                  const placeholders = Object.keys(row).map((_, i) => `$${i + 1}`).join(', ');
+                  const values = Object.values(row);
+                  await securityClient.query(`INSERT INTO "${tbl}" (${cols}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`, values).catch(() => {});
+                }
+                const countSec = await securityClient.query(`SELECT COUNT(*) FROM "${tbl}"`).catch(() => ({ rows: [{ count: '0' }] }));
+                console.log(`[Migrations] Transferred ${tbl}. Security DB now has ${countSec.rows[0]?.count} records.`);
+              }
+            }
+          }
           await client.query(`DROP TABLE IF EXISTS token_blacklist, security_alerts, admin_audit_logs, registered_agents CASCADE;`);
           console.log('[Migrations] Successfully cleaned up 4 legacy duplicate security tables from Core DB.');
         } catch (dropErr: any) {
@@ -386,6 +440,7 @@ export async function runDatabaseMigrations(targetId?: string, type: 'additive' 
       const ledgerTables = LEDGER_SCHEMA_TABLES.map(t => t.name);
       const externalTables = EXTERNAL_SCHEMA_TABLES.map(t => t.name);
       const securityTables = SECURITY_SCHEMA_TABLES.map(t => t.name);
+      const mediaTables = MEDIA_SCHEMA_TABLES.map(t => t.name);
 
       if (!targetId || targetId === 'all' || targetId === 'core') {
         if (coreTables.length > 0) {
@@ -427,6 +482,16 @@ export async function runDatabaseMigrations(targetId?: string, type: 'additive' 
           console.log('[Migrations] Scratch: Security tables dropped.');
         }
       }
+      if (!targetId || targetId === 'all' || targetId === 'media') {
+        if (mediaTables.length > 0) {
+          console.log('[Migrations] Scratch: Dropping Media tables...');
+          const dropList = mediaTables.map(t => `"${t}"`).join(', ');
+          await safeQueryClient(mediaClient, client, `DROP TABLE IF EXISTS ${dropList} CASCADE`).catch((err: any) => {
+            console.warn('[Migrations] Notice dropping Media tables:', err?.message || err);
+          });
+          console.log('[Migrations] Scratch: Media tables dropped.');
+        }
+      }
       if (!targetId || targetId === 'all' || targetId === 'core') {
         await client.query('DELETE FROM migration_history').catch(() => {});
       } else if (targetId === 'ledger') {
@@ -435,10 +500,12 @@ export async function runDatabaseMigrations(targetId?: string, type: 'additive' 
         await client.query("DELETE FROM migration_history WHERE migration_name ~* 'blog|article'").catch(() => {});
       } else if (targetId === 'security') {
         await client.query("DELETE FROM migration_history WHERE migration_name ~* 'security|token_blacklist|audit|agent'").catch(() => {});
+      } else if (targetId === 'media') {
+        await client.query("DELETE FROM migration_history WHERE migration_name ~* 'media|canvas|audio'").catch(() => {});
       }
 
       console.log('[Migrations] Scratch: Re-initializing schemas via initDb...');
-      await initDb('scratch', pool, ledgerPool || pool, externalPool || pool, securityPool || pool);
+      await initDb('scratch', pool, ledgerPool || pool, externalPool || pool, securityPool || pool, mediaPool || pool);
       console.log('[Migrations] Scratch: Schema re-initialization completed.');
     }
 
@@ -465,19 +532,21 @@ export async function runDatabaseMigrations(targetId?: string, type: 'additive' 
 
     if (type !== 'scratch') {
       console.log('[Migrations] Running dynamic schema auto-repair...');
-      await initDb('additive', pool, ledgerPool, externalPool, securityPool);
+      await initDb('additive', pool, ledgerPool, externalPool, securityPool, mediaPool);
     }
 
-    // Run all versioned migrations (v1 - v83)
+    // Run all versioned migrations (v1 - v117)
     await runVersionedMigrations(
       client,
       externalClient,
       ledgerClient,
       securityClient,
+      mediaClient,
       pool,
       ledgerPool || pool,
       externalPool || pool,
       securityPool || pool,
+      mediaPool || pool,
       migrationMetrics
     );
 
@@ -509,10 +578,13 @@ export async function runDatabaseMigrations(targetId?: string, type: 'additive' 
     console.error('[CRITICAL] Database Migration failed:', err.message);
     if (process.env.NODE_ENV === 'production') throw err;
   } finally {
-    await client.query('SELECT pg_advisory_unlock(74635291)').catch(() => {});
+    if (lockAcquired) {
+      await client.query('SELECT pg_advisory_unlock(74635291)').catch(() => {});
+    }
     client.release();
     if (ledgerClient) ledgerClient.release();
     if (externalClient) externalClient.release();
     if (securityClient) securityClient.release();
+    if (mediaClient) mediaClient.release();
   }
 }

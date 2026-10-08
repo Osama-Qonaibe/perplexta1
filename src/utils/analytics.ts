@@ -58,7 +58,7 @@ export const trackPremiumSubscriptionEvent = (
   planName: string,
   price: number,
   currency: string = 'USD',
-  billingCycle: 'monthly' | 'yearly' | 'annual' = 'monthly'
+  billingCycle: 'monthly' | 'yearly' | 'annual' | 'daily' = 'monthly'
 ) => {
   const normalizedCycle = billingCycle === 'annual' ? 'yearly' : billingCycle;
   pushToDataLayer({

@@ -1,32 +1,35 @@
-/**
- * 🎨 PERPLEXTA BRAND TOKENS
- * 
- * Re-exports tokens originating from src/design-system/tokens/colors.ts
- */
-
 import { PERPLEXTA_PALETTE } from '../design-system/tokens/colors';
 
 export const PRIMITIVE_TOKENS = {
   gray: PERPLEXTA_PALETTE.slate,
+  brand: PERPLEXTA_PALETTE.brand,
   accent: {
-    cyan: {
-      light: PERPLEXTA_PALETTE.cyan[400],
-      default: PERPLEXTA_PALETTE.cyan[500],
-      dark: PERPLEXTA_PALETTE.cyan[600],
-      hover: PERPLEXTA_PALETTE.cyan[400],
-      active: PERPLEXTA_PALETTE.cyan[600],
-      glow: PERPLEXTA_PALETTE.cyan.glow,
+    green: {
+      light: '#1a7f37',
+      default: '#1a7f37',
+      dark: '#238636',
+      hover: '#2ea043',
     },
-    slate: {
-      light: PERPLEXTA_PALETTE.slate[300],
-      default: PERPLEXTA_PALETTE.slate[700],
-      hover: PERPLEXTA_PALETTE.slate[800],
-      active: PERPLEXTA_PALETTE.slate[850],
+    blue: {
+      light: '#0969da',
+      default: '#0969da',
+      dark: '#58a6ff',
+      hover: '#0550ae',
     },
-    emerald: {
-      light: PERPLEXTA_PALETTE.status.success.light,
-      default: PERPLEXTA_PALETTE.status.success.default,
-      dark: PERPLEXTA_PALETTE.status.success.dark,
+    purple: {
+      light: '#8250df',
+      default: '#8250df',
+      dark: '#a371f7',
+    },
+    orange: {
+      light: '#bc4c00',
+      default: '#bc4c00',
+      dark: '#db6d28',
+    },
+    pink: {
+      light: '#bf3989',
+      default: '#bf3989',
+      dark: '#db61a2',
     },
   },
   status: {
@@ -57,54 +60,54 @@ export type PrimitiveTokenType = typeof PRIMITIVE_TOKENS;
 
 export const LIGHT_MODE = {
   surface: {
-    page: PERPLEXTA_PALETTE.slate[50],
-    card: PERPLEXTA_PALETTE.slate[0],
-    subtle: PERPLEXTA_PALETTE.slate[100],
-    inset: PERPLEXTA_PALETTE.slate[100],
-    sidebar: PERPLEXTA_PALETTE.slate[0],
-    code: PERPLEXTA_PALETTE.slate[990],
+    page: '#ffffff',
+    card: '#ffffff',
+    subtle: '#f6f8fa',
+    inset: '#f6f8fa',
+    sidebar: '#ffffff',
+    code: '#161b22',
   },
   fg: {
-    default: PERPLEXTA_PALETTE.slate[850],
-    muted: PERPLEXTA_PALETTE.slate[500],
-    disabled: PERPLEXTA_PALETTE.slate[300],
-    onEmphasis: '#020617',
-    accent: PERPLEXTA_PALETTE.cyan[500],
+    default: '#1f2328',
+    muted: '#656d76',
+    disabled: '#afb8c1',
+    onEmphasis: '#ffffff',
+    accent: '#0969da',
   },
   bg: {
-    accent: PERPLEXTA_PALETTE.cyan[500],
-    accentMuted: 'rgba(6, 182, 212, 0.12)',
+    accent: '#1a7f37',
+    accentMuted: 'rgba(9, 105, 218, 0.12)',
   },
   border: {
-    default: PERPLEXTA_PALETTE.slate[200],
-    accent: PERPLEXTA_PALETTE.cyan[500],
-    subtle: 'rgba(226, 232, 240, 0.8)',
+    default: '#d0d7de',
+    accent: '#0969da',
+    subtle: 'rgba(208, 215, 222, 0.8)',
   },
 } as const;
 
 export const DARK_MODE = {
   surface: {
-    page: PERPLEXTA_PALETTE.slate[950],
-    card: PERPLEXTA_PALETTE.slate[900],
-    subtle: PERPLEXTA_PALETTE.slate[920],
-    inset: PERPLEXTA_PALETTE.slate[990],
-    sidebar: PERPLEXTA_PALETTE.slate[920],
-    code: PERPLEXTA_PALETTE.slate[990],
+    page: '#0d1117',
+    card: '#161b22',
+    subtle: '#161b22',
+    inset: '#010409',
+    sidebar: '#0d1117',
+    code: '#010409',
   },
   fg: {
-    default: PERPLEXTA_PALETTE.slate[50],
-    muted: PERPLEXTA_PALETTE.slate[400],
-    disabled: PERPLEXTA_PALETTE.slate[600],
-    onEmphasis: '#020617',
-    accent: PERPLEXTA_PALETTE.cyan[400],
+    default: '#e6edf3',
+    muted: '#8b949e',
+    disabled: '#484f58',
+    onEmphasis: '#ffffff',
+    accent: '#58a6ff',
   },
   bg: {
-    accent: PERPLEXTA_PALETTE.cyan[500],
-    accentMuted: 'rgba(34, 211, 238, 0.15)',
+    accent: '#238636',
+    accentMuted: 'rgba(88, 166, 255, 0.15)',
   },
   border: {
-    default: PERPLEXTA_PALETTE.slate[800],
-    accent: PERPLEXTA_PALETTE.cyan[500],
-    subtle: 'rgba(30, 41, 59, 0.8)',
+    default: '#3d444d',
+    accent: '#58a6ff',
+    subtle: 'rgba(61, 68, 77, 0.6)',
   },
 } as const;

@@ -40,9 +40,38 @@ This identity serves as our compass. Every engineering decision—from the "Sile
 
 ## 0.1. Current Architectural Achievements (State of the Union)
 - **Dynamic Local SSL Handshake**: Automated context-aware Postgres SSL management (disables SSL on localhost to prevent handshake errors, while enforcing full secure SSL on cloud platforms like AWS and Neon).
-- **Synchronous Session Lifecycle**: Smooth, instantaneous auth-state updates with zero layout flickering, utilizing synchronous front-end cache flushes and graceful transition animations (1.1s Slow-Motion duration).
+- **Synchronous Session Lifecycle & Page Refresh Resilience**: Smooth, instantaneous auth-state updates with zero layout flickering, client-side token revalidation on page refresh, and synchronous cache flushes across mobile and desktop browsers.
+- **Client-Side Smart Image Optimization Pipeline**: Real-time HTML5 canvas aspect-ratio cropping (3:1 cover/banner ratio, 1:1 avatar/logo ratio) with lightweight WebP compression (`imageOptimizer.ts`) ensuring zero layout shift and lightweight server storage.
+- **Server & Client Image Deduplication & Query Optimization**: Memoized client-side URL normalization in `mediaUtils.ts` preventing redundant HTTP fetches across components, fast-tracked public media permissions in `app.ts`, dual-state permission caching, and a 10-minute 404 `missingFileCache` preventing duplicate database queries for non-existent files.
+- **Role-Gated Post Options & Professional Moderation**: Strict role isolation in `PostOptionsMenu.tsx` (owners receive full post controls while non-owners receive interactive controls and professional 7-category moderation reporting).
+- **Categorized Moderation & Automated Alert System**: Backend duplicate-protected reporting pipeline (`/api/bulletin/ads/:id/report`) with real-time in-app admin notifications and formatted HTML email dispatches with post content previews.
+- **Reverse Proxy Upload Liberation (Nginx Upload Resolution)**: Cleared all infrastructure bottlenecks on VPS/Nginx environments by successfully mapping `client_max_body_size` up to 100MB+, unlocking unrestricted, ultra-resilient video and reels uploading.
+- **Sovereign Multi-Tier Video Processing and Fast-Stream Copy**: Re-engineered the backend video processor (`videoProcessor.ts`) to support a lightweight, sub-second Fast-Stream Copy route for compliant formats (`MP4`, `MOV`, `WebM`), safely bypassing intensive synchronous ffmpeg transcoding on files larger than 4MB, preventing server-gateway timeouts (504).
+- **HTTP/1.1 Range Requests & 206 Partial Content Verification**: Established standard compliance for video seekability and adaptive streaming with perfect headers (`Accept-Ranges: bytes`, `Content-Range`, `Content-Length`) to prevent connection resets and ensure smooth mobile/PWA reels performance.
+- **Visual Asset System Cleansing**: Purged old, unused assets (like ipad-touch-icon-167, mstile) from the frontend settings view, matching asset configurations perfectly with backend specifications and eliminating unnecessary 404 browser logs.
 - **File Upload & Ingestion Pipeline**: Full 100MB capacity support with strict multi-layer file size validations and resilient PDF parser integrations.
 - **Audited Wallet Ledger & API Credits**: Append-only transaction logging with instant credit check and 402 Insufficient Balance rejection workflows.
+- **Dynamic Event Listener Race-Condition Polyfill**: Integrated a global EventTarget proxy in the preview compiler head. This completely eliminates iframe race conditions where dynamic scripts miss `DOMContentLoaded` or `load` events because they are parsed after the DOM loads. It instantly executes listeners if the document is already in `interactive` or `complete` state, reviving all popups and click behaviors.
+- **Sovereign Evolutionary Continuity Protocol (`THE "NEVER DESTROY, ONLY EVOLVE" SUPREME RULE`)**: Embedded a strict instruction in the server-side system prompt forcing the AI to strictly preserve layout structures, typography, grids, background colors, and navigation elements on subsequent turns. All updates must be additive and incremental, modifying only what's necessary (like injecting modals) without destroying the existing beautiful design.
+- **Deduplicated Progressive Suggestions State Machine**: Built a client-side filter (`uniqueMapped` Builder) inside `AppStudioPage.tsx` that maps and traverses `PROGRESSIVE_SUGGESTIONS_MAP` without creating duplicates or showing previously clicked options. It keeps suggestion chips 100% unique, non-repetitive, and dynamically evolving.
+- **Uncapped Code Generation Capacity**: Lifted all implicit code limits, declaring unlimited bandwidth and tokens in the system prompt. The model can now generate full-blown, robust, highly advanced applications with unlimited files, subdirectories, and comprehensive lines of code.
+- **Core Database Schema & Studio Migrations Unification**: Formally registered `studio_workspaces` and `studio_snapshots` into `CORE_SCHEMA_TABLES`, high-speed B-Tree indexes in `CORE_INDEXES` (`idx_studio_workspaces_user_id`, `idx_studio_workspaces_updated_at`, `idx_studio_snapshots_workspace_id`), and cascading relational integrity rules in `CORE_RELATIONS`, guaranteeing flawless 1-click schema generation and automated disaster recovery.
+- **Collision-Protected Cloud Workspaces & AI Chat Memory Persistence**: Hardened the backend workspace upsert pipeline against cross-user ID overwrites (`WHERE studio_workspaces.user_id = EXCLUDED.user_id`), expanded the schema with persistent multi-turn AI conversation memory (`chat_history JSONB`), and equipped the studio header with a real-time Cloud Sync Radar (`☁️ محفوظ سحابياً`, `⏳ جاري الحفظ...`, `💾 مسودة محلية`) alongside an in-studio Cloud Projects & Version Snapshots Modal.
+- **Immersive Foreground Creator Profiles & Full-Viewport Decoupling**: Completely decoupled creator profile routes (`/creator/:username`) from global platform header and sidebar elements across desktop and mobile, implementing a full-screen, high-priority foreground layer. Added a precise, context-aware back navigation handler (`navigate(-1)`) to maintain cohesive flow across routes.
+- **Responsive Edge-to-Edge 3-Column Creator Portfolio Layout**: Refactored the creator interface into an edge-to-edge 3-column layout (`max-w-[100vw] px-4 md:px-8 xl:px-12`) that positions the creator bio card and partner creators directory on opposite margins of the viewport (handling RTL and LTR automatically via CSS order classes), surrounding a center-aligned template showcase.
+- **Inspiring Creator Milestones, Philosophy, & Partner Hubs**: Built high-fidelity motivating items such as verified achievement tags, design philosophy blockquotes, and a quiet, non-obtrusive partners directory to boost engagement and drive high-conversion template usage.
+- **High-Precision Creator Registration & Application Protocol (`CreatorRegistrationModal.tsx`)**: Built a multi-step, certified creator registration modal allowing designers to define their handle (`@username`), specialization role, bio, portfolio links, and monetization preferences with instant verification and a $50 welcome bonus.
+- **Interactive Marketplace Template Preview & Direct Studio Ingestion (`TemplatePreviewModal.tsx`)**: Engineered an interactive template preview modal with high-res thumbnails, dimensional metadata, rating/views metrics, creator attribution links, and a direct 1-click "Edit & Open Template in Studio" handler that passes template payloads seamlessly into `/image-studio` while calculating creator usage royalties (`recordTemplateUse`).
+- **Sovereign Visitor Registration Gate & Data Security Architecture (`PublicGuestLanding.tsx`)**: Reaffirmed and solidified the mandatory registration policy before entering the Studio canvas, safeguarding user intellectual property, encrypting workspaces, and blocking unauthorized usage, while adding high-trust security banners and seamless post-registration template ingestion (`pending_studio_template`).
+- **In-Studio Dynamic Creator Activation & Seamless Ingestion (`ImageStudioPage.tsx`)**: Added dynamic creator detection for logged-in users, displaying either the Creator Dashboard link or a high-visibility "$50 Welcome Bonus" Creator Registration CTA directly inside the Studio header, mounting `CreatorRegistrationModal` seamlessly without leaving the workspace.
+- **Creator Social Motivation Suite (`CreatorProfilePage.tsx`)**: Deployed interactive 5-star rating widget, follow/like toggle with real-time counters, favorite template bookmarking, and purged redundant join buttons from the top navigation bar header.
+- **Hexa-Precision Creator Analytics Radar (`CreatorDashboardPage.tsx`)**: Upgraded creator dashboard with 6 discrete real-time counters (Available Balance, Total Views, Profile Visits, Likes, Followers, and Verified Actual Uses) dynamically matching the logged-in user.
+
+---
+
+## 0.2. Evolution-Only Absolute Command & Tomorrow's Milestone
+- **Sovereign Mandate (أمر حتمي صارم)**: Any future developer, agent, or AI coding engine is **STRICTLY PROHIBITED** from rewriting, simplifying, or downgrading any existing features, layouts, or visual standards. Every single update MUST be an evolutionary addition, building carefully *on top* of the established codebase.
+- **Tomorrow's Milestone (خطوة الغد)**: المتابعة في تحسين وتوسيع محتوى القوالب التسويقية وربط لوحة تحكم المبدعين بمحفظة الدفع المباشرة، مع استمرار الحفاظ التام على أمان البيانات والسياسة السيادية للمنصة.
 
 ---
 
@@ -140,7 +169,7 @@ The Admin Panel is engineered as a comprehensive Enterprise Resource Planning (E
 - **Customization:** Admins can edit, save, and preview templates directly in the UI.
 - **Broadcast & Marketing:** A dedicated interface to create custom promotional campaigns or update announcements, with the ability to send to all users, specific segments, or individual emails.
 
-### 7.4. ViralBook Architecture & Sovereign Identity (نظام فايرال بوك والمجتمع التفاعلي)
+### 7.4. ViralBook Architecture & Sovereign Identity (نظام فيرال بوك والمجتمع التفاعلي)
 ViralBook (`/viralbook`, `/bulletin`, `BulletinBoardPage.tsx`) is Perplexta's social, commercial, and rich media communication hub. Engineered according to the Facebook-standard interactive design system and reinforced by military-grade backend pipelines, it unites sovereign community engagement, commercial business discovery, verified reels, and interactive real-time communications into a unified, high-performance ecosystem.
 
 #### 1. Core Identity & Architectural Philosophy (الهوية المعمارية والرسالة)
@@ -183,9 +212,29 @@ All operations strictly interface with the Core Database schema across 10 dedica
 10. `bulletin_reports` & `bulletin_ad_muted_notifications`: Safety moderation and user notification filtering.
 - **Server Routing Pillar (`server/routes/bulletin.ts`)**: 40+ audited RESTful endpoints supporting media streaming, automated moderation cron cleanups (`server/jobs/cron.ts`), wallet debit/refund integrations on rejection or stopping, and WebSocket-driven updates.
 
-#### 4. Strict Adherence & Evolution Directive (أمر صارم وملزم للتطوير المستقبلي)
+#### 4. The Sovereign Ads & Classifieds Platform Revolution - Roadmap (خطة عمل ثورة منصة الإعلانات والتبويبات السيادية لتصبح الأفضل عالمياً)
+To establish Perplexta's ViralBook classified and advertising ecosystem as the absolute global leader, our development roadmap is systematically categorized into five sovereign phases:
+1. **Premium AI Ad Copywriter & Multimedia Assistant (مساعد الذكاء الاصطناعي لكتابة وتصميم الإعلانات)**:
+   - Integrate an in-composer AI copywriter that crafts highly engaging, sales-optimized ad descriptions in Arabic and English based on the item type and target city.
+   - Deploy automated image quality checks and AI-driven background replacement for product photos to make them look studio-grade instantly.
+2. **Hyper-Localized Interactive Mapping & Routing (الاستهداف الجغرافي الذكي والخرائط التفاعلية)**:
+   - Introduce visual map pins for ads utilizing our high-performance Google Maps Platform Integration.
+   - Empower buyers to filter local ads by exact distance radius (e.g., "within 5km of my current location") and view dynamic route directions directly to the seller or store.
+3. **Advanced Interactive Marketplace Suite (مجموعة أدوات المتجر التفاعلي المتقدم للبيع والشراء)**:
+   - **Bidding & Live Auctions (نظام المزايدات والمزادات الحية)**: Enable sellers to mark an ad as an "Auction" with a starting price, bid increment, and automated countdown timers.
+   - **Offer Engine (محرك تقديم العروض)**: Implement a native, secure "Make an Offer" modal allowing buyers to propose alternative pricing, with instant real-time notification to the seller.
+4. **Sovereign Ad Boosting Engine & Merchant Portal (بوابة التجار ونظام تمويل وترقية الإعلانات)**:
+   - Develop a comprehensive Merchant Dashboard (`/merchant-portal`) where business owners can monitor their active ad campaigns, tracking deep analytics: Impression Funnels, Clicks, Conversion CTR, and WhatsApp chat opens.
+   - Introduce customizable promotional badges ("Hot Deal", "Certified Seller", "Price Drop") funded directly from the user's Ledger Wallet balance with append-only auditing.
+5. **Real-time Live Chat & Video Showrooms (المحادثات المباشرة وغرف العرض المرئية)**:
+   - Upgrade the customer-to-business messenger with live audio call support and instant image/video previews directly inside the chat window.
+   - Support short vertical video reels associated with ads (Shoppable Reels), allowing buyers to purchase or inquire with 1-click while watching the video.
+
+#### 5. Strict Adherence & Evolution Directive (أمر صارم وملزم للتطوير المستقبلي)
 - **MANDATORY PRESERVATION OF APPROVED IDENTITY**: Any future developer or AI assistant working on the Bulletin Board is **STRICTLY PROHIBITED** from altering, stripping, or replacing the Facebook-standard layout, the approved color tokens (`SOCIAL_COLORS`), the verified page structure, or the multi-tab navigation model.
 - **ZERO MOCK / SIMULATION ENFORCEMENT**: Never re-introduce simulated response questions, fake metrics, or client-side placeholder counters. Every element must be directly connected to the PostgreSQL schema and the real-time notification engine.
+- **ROLE-ISOLATED OPTIONS MENU**: Post option dropdowns (`PostOptionsMenu.tsx`) MUST strictly distinguish between post owners/admins (full management, audience, comment controls, archive/trash) and guests/non-owners (save, mute notifications, embed, hide, 7-category moderation reporting).
+- **CLIENT-SIDE IMAGE OPTIMIZATION**: All page cover photos (3:1 aspect ratio), profile/avatar images (1:1 ratio), and post media MUST be processed through `imageOptimizer.ts` prior to upload to enforce light file sizes, fast WebP compression, and consistent card dimensions without button distortion.
 - **UNIFIED NOTIFICATION & DEEP LINKING INTEGRATION**: All content state mutations (publishing, boosting, deleting, reporting) must dispatch through the server-authoritative WebSocket notification engine and deep-link directly to the live post route (`/bulletin/:ad_id`).
 - **EXTENSION-ONLY EXPANSION**: Any enhancements—such as advanced sentiment analytics, enhanced video transcoding, or commercial checkout links—must build *on top* of the existing 10 relational tables and current React component architecture without breaking backward compatibility or database segregation.
 

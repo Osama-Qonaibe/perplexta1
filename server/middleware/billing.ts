@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { pool } from '../db/index.js';
-import { checkUserQuota } from '../services/quota.js';
+import { checkUserQuota, getToolFriendlyName } from '../services/quota.js';
 import { checkUserAffordability } from '../services/billing.js';
 
 interface AuthenticatedRequest extends Request {
@@ -30,46 +30,66 @@ export const verifyBillingFunds = async (req: AuthenticatedRequest, res: Respons
     }
 
     const toolId = req.body?.tool_id || req.body?.tool || 'chat_fast';
-    const prompt = req.body?.prompt || req.body?.message || req.body?.content || '';
-    const estimatedInputTokens = Math.ceil(prompt.length / 4);
 
     const quotaCheck = await checkUserQuota(userId, toolId);
 
     if (!quotaCheck.allowed) {
-      const affordability = await checkUserAffordability(userId, toolId, estimatedInputTokens);
+      let userLang = req.user?.language;
+      if (!userLang) {
+        const uRes = await pool.query('SELECT language FROM users WHERE id = $1', [userId]);
+        userLang = uRes.rows[0]?.language || 'ar';
+      }
 
-      if (!affordability.allowed) {
-        let userLang = req.user?.language;
-        if (!userLang) {
-          const uRes = await pool.query('SELECT language FROM users WHERE id = $1', [userId]);
-          userLang = uRes.rows[0]?.language || 'en';
-        }
+      const toolNameAr = getToolFriendlyName(toolId, 'ar');
+      const toolNameEn = getToolFriendlyName(toolId, 'en');
 
-        const periodStrEn = quotaCheck.period === 'daily' ? 'Daily' : 'Monthly';
-        const periodStrAr = quotaCheck.period === 'daily' ? 'يومي' : 'شهري';
-        const cost = affordability.requiredPoints;
+      if (quotaCheck.period === 'plan_required') {
+        const msgEn = `Please select a subscription plan to use "${toolNameEn}".`;
+        const msgAr = `يرجى اختيار باقة اشتراك لبدء استخدام "${toolNameAr}".`;
 
-        const msgEn = `Premium Membership Required: You have reached your complimentary ${periodStrEn} capacity for this tool. Please upgrade your plan or recharge your digital wallet (Pay-per-Request: ${cost} Points required, but you have ${affordability.availablePoints} points + $${affordability.availableBalanceUSD} balance).`;
-        const msgAr = `تتطلب هذه العملية رصيداً أو عضوية ممتازة: لقد تجاوزت الحد ال${periodStrAr} المسموح به لأداة مخصصة. يرجى شحن محفظتك الرقمية أو ترقية باقتك للاستمرار بالاستفادة بالدفع لكل معاملة (${cost} نقاط مطلوبة، ورصيدك الحالي ${affordability.availablePoints} نقاط + $${affordability.availableBalanceUSD} دولار).`;
-
-        return res.status(402).json({
+        return res.status(403).json({
           error: userLang === 'ar' ? msgAr : msgEn,
           error_ar: msgAr,
-          type: 'QUOTA_EXCEEDED',
-          limit: quotaCheck.limit,
-          current: quotaCheck.currentUsage,
-          period: quotaCheck.period,
+          type: 'PLAN_REQUIRED',
+          limit: 0,
+          current: 0,
+          period: 'plan_required',
+          tool: toolId,
+          toolName: userLang === 'ar' ? toolNameAr : toolNameEn,
           cta: {
             upgrade: true,
-            referral: true
+            referral: false,
+            link: '/subscription'
           }
         });
       }
+
+      const periodStrEn = quotaCheck.period === 'monthly' ? 'monthly' : 'daily';
+      const periodStrAr = quotaCheck.period === 'monthly' ? 'الشهري' : 'اليومي';
+
+      const msgEn = `You have reached the ${periodStrEn} limit for "${toolNameEn}"`;
+      const msgAr = `لقد استنفدت الحد ${periodStrAr} المتاح لأداة "${toolNameAr}"`;
+
+      return res.status(402).json({
+        error: userLang === 'ar' ? msgAr : msgEn,
+        error_ar: msgAr,
+        type: 'QUOTA_EXCEEDED',
+        limit: quotaCheck.limit,
+        current: quotaCheck.currentUsage,
+        period: quotaCheck.period,
+        tool: toolId,
+        toolName: userLang === 'ar' ? toolNameAr : toolNameEn,
+        cta: {
+          upgrade: true,
+          referral: true,
+          link: '/subscription'
+        }
+      });
     }
 
     return next();
   } catch (error: any) {
-    console.error('[Billing Funds Middleware] Fault during billing/ledger verification:', error);
+    console.info('[Billing Funds Middleware] Notice:', error?.message || error);
     return res.status(500).json({
       error: 'Billing verification failed due to a system error. Please try again.',
       error_ar: 'فشل التحقق من الفوترة بسبب خطأ في النظام. يرجى المحاولة مرة أخرى.',

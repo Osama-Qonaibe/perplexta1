@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import { motion } from 'motion/react';
 import { TrendingUp, Activity, BarChart2, Sparkles, Zap, ChevronDown } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { resolveToken } from '@/utils/tokenResolver';
 
 export interface TrendDataPoint {
   date: Date;
@@ -22,7 +23,7 @@ interface EngagementTrendsChartProps {
 export const EngagementTrendsChart: React.FC<EngagementTrendsChartProps> = ({
   initialTimeframe = '30d',
 }) => {
-  const { language, resolvedTheme } = useAppContext();
+  const { language } = useAppContext();
   const isRtl = language === 'ar';
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -91,10 +92,10 @@ export const EngagementTrendsChart: React.FC<EngagementTrendsChartProps> = ({
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-    const isDark = resolvedTheme === 'dark';
-    const strokeColor = '#06b6d4'; // Cyan 500
-    const gridColor = isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.06)';
-    const textColor = isDark ? '#94a3b8' : '#64748b';
+    const strokeColor = resolveToken('--accent', '#06b6d4');
+    const gridColor = resolveToken('--border-default', 'rgba(255, 255, 255, 0.07)');
+    const textColor = resolveToken('--text-secondary', '#94a3b8');
+    const dotStrokeColor = resolveToken('--surface-page', '#0f172a');
 
     const defs = svg.append('defs');
 
@@ -109,13 +110,13 @@ export const EngagementTrendsChart: React.FC<EngagementTrendsChartProps> = ({
     gradient
       .append('stop')
       .attr('offset', '0%')
-      .attr('stop-color', '#06b6d4')
-      .attr('stop-opacity', isDark ? 0.35 : 0.20);
+      .attr('stop-color', strokeColor)
+      .attr('stop-opacity', 0.35);
 
     gradient
       .append('stop')
       .attr('offset', '100%')
-      .attr('stop-color', '#06b6d4')
+      .attr('stop-color', strokeColor)
       .attr('stop-opacity', 0.0);
 
     const filter = defs.append('filter').attr('id', 'accent-glow').attr('height', '130%');
@@ -221,8 +222,8 @@ export const EngagementTrendsChart: React.FC<EngagementTrendsChartProps> = ({
     const focusDot = g
       .append('circle')
       .attr('r', 5)
-      .attr('fill', '#06b6d4')
-      .attr('stroke', isDark ? '#0f172a' : '#ffffff')
+      .attr('fill', strokeColor)
+      .attr('stroke', dotStrokeColor)
       .attr('stroke-width', 2.5)
       .style('opacity', 0);
 
@@ -259,7 +260,7 @@ export const EngagementTrendsChart: React.FC<EngagementTrendsChartProps> = ({
         setHoveredPoint(null);
         setTooltipPos(null);
       });
-  }, [data, activeMetric, resolvedTheme, language, isMobileChartExpanded]);
+  }, [data, activeMetric, language, isMobileChartExpanded]);
 
   const totalClicks = data.reduce((acc, curr) => acc + curr.clicks, 0);
   const avgMatch = data.length ? (data.reduce((acc, curr) => acc + curr.matchScore, 0) / data.length).toFixed(1) : '94.5';
@@ -269,34 +270,34 @@ export const EngagementTrendsChart: React.FC<EngagementTrendsChartProps> = ({
   return (
     <div className="w-full space-y-3 sm:space-y-4">
       {/* Header Controls & Metric Tabs */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-[var(--pub-border-default)]">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border-default)]">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-[var(--pub-radius-control)] bg-[var(--pub-accent-muted)] border border-[var(--pub-accent-primary)]/30 flex items-center justify-center text-[var(--pub-accent-primary)]">
+          <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-[var(--bg-accent-muted)] border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)]">
             <TrendingUp size={16} />
           </div>
           <div>
-            <h3 className="text-xs sm:text-sm font-extrabold text-[var(--pub-text-primary)] flex items-center gap-1">
+            <h3 className="text-xs sm:text-sm font-extrabold text-[var(--text-primary)] flex items-center gap-1">
               <span>{isRtl ? 'تحليلات اتجاهات التفاعل والدقة' : 'Engagement & Accuracy Trends'}</span>
               <span className="ide-badge-info shrink-0">
                 D3 Visualizer
               </span>
             </h3>
-            <p className="text-[10px] sm:text-xs text-[var(--pub-text-muted)]">
+            <p className="text-[10px] sm:text-xs text-[var(--text-muted)]">
               {isRtl ? 'مخطط بياني زمني يوضح سرعة التفاعل ودقة مطابقة التوصيات الحقيقية' : 'Real-time timeline tracking recommendation velocity and match precision'}
             </p>
           </div>
         </div>
 
         {/* Timeframe selector */}
-        <div className="flex items-center gap-1 bg-[var(--pub-surface-subtle)] p-1 rounded-[var(--pub-radius-control)] border border-[var(--pub-border-default)] self-end sm:self-auto">
+        <div className="flex items-center gap-1 bg-[var(--surface-subtle)] p-1 rounded-[var(--radius-sm)] border border-[var(--border-default)] self-end sm:self-auto">
           {(['7d', '30d', '90d'] as const).map(tf => (
             <button
               key={tf}
               onClick={() => setTimeframe(tf)}
-              className={`px-2.5 py-1 rounded-[var(--pub-radius-micro)] text-xs font-bold transition-colors cursor-pointer ${
+              className={`px-2.5 py-1 rounded-[var(--radius-xs)] text-xs font-bold transition-colors cursor-pointer ${
                 timeframe === tf
-                  ? 'bg-[var(--pub-accent-primary)] text-white shadow-2xs font-extrabold'
-                  : 'text-[var(--pub-text-muted)] hover:text-[var(--pub-text-primary)]'
+                  ? 'bg-[var(--accent)] text-white shadow-2xs font-extrabold'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
               }`}
             >
               {tf === '7d' ? (isRtl ? '7 أيام' : '7 Days') : tf === '30d' ? (isRtl ? '30 يوم' : '30 Days') : (isRtl ? '90 يوم' : '90 Days')}
@@ -309,66 +310,66 @@ export const EngagementTrendsChart: React.FC<EngagementTrendsChartProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
         <button
           onClick={() => setActiveMetric('clicks')}
-          className={`p-2.5 sm:p-3 rounded-[var(--pub-radius-control)] border text-start transition-colors cursor-pointer ${
+          className={`p-2.5 sm:p-3 rounded-[var(--radius-sm)] border text-start transition-colors cursor-pointer ${
             activeMetric === 'clicks'
-              ? 'border-[var(--pub-accent-primary)] bg-[var(--pub-accent-muted)] shadow-2xs'
-              : 'border-[var(--pub-border-default)] bg-[var(--pub-surface-container)] hover:border-[var(--pub-border-strong)]'
+              ? 'border-[var(--accent)] bg-[var(--bg-accent-muted)] shadow-2xs'
+              : 'border-[var(--border-default)] bg-[var(--surface-card)] hover:border-[var(--border-strong)]'
           }`}
         >
-          <p className="text-[10px] font-bold text-[var(--pub-text-muted)] flex items-center justify-between">
+          <p className="text-[10px] font-bold text-[var(--text-muted)] flex items-center justify-between">
             <span className="truncate">{isRtl ? 'نقرات التوصيات' : 'Total Recommendation Clicks'}</span>
-            <Activity size={12} className="text-[var(--pub-accent-primary)] shrink-0 ms-1" />
+            <Activity size={12} className="text-[var(--accent)] shrink-0 ms-1" />
           </p>
-          <p className="text-sm sm:text-base font-black text-[var(--pub-text-primary)] mt-1">{totalClicks.toLocaleString()}</p>
-          <p className="text-[10px] font-bold text-[var(--pub-accent-primary)] mt-0.5">+18.4% WoW</p>
+          <p className="text-sm sm:text-base font-black text-[var(--text-primary)] mt-1">{totalClicks.toLocaleString()}</p>
+          <p className="text-[10px] font-bold text-[var(--accent)] mt-0.5">+18.4% WoW</p>
         </button>
 
         <button
           onClick={() => setActiveMetric('matchScore')}
-          className={`p-2.5 sm:p-3 rounded-[var(--pub-radius-control)] border text-start transition-colors cursor-pointer ${
+          className={`p-2.5 sm:p-3 rounded-[var(--radius-sm)] border text-start transition-colors cursor-pointer ${
             activeMetric === 'matchScore'
-              ? 'border-[var(--pub-accent-primary)] bg-[var(--pub-accent-muted)] shadow-2xs'
-              : 'border-[var(--pub-border-default)] bg-[var(--pub-surface-container)] hover:border-[var(--pub-border-strong)]'
+              ? 'border-[var(--accent)] bg-[var(--bg-accent-muted)] shadow-2xs'
+              : 'border-[var(--border-default)] bg-[var(--surface-card)] hover:border-[var(--border-strong)]'
           }`}
         >
-          <p className="text-[10px] font-bold text-[var(--pub-text-muted)] flex items-center justify-between">
+          <p className="text-[10px] font-bold text-[var(--text-muted)] flex items-center justify-between">
             <span className="truncate">{isRtl ? 'متوسط التوافق' : 'Avg Match Precision'}</span>
-            <Sparkles size={12} className="text-[var(--pub-accent-primary)] shrink-0 ms-1" />
+            <Sparkles size={12} className="text-[var(--accent)] shrink-0 ms-1" />
           </p>
-          <p className="text-sm sm:text-base font-black text-[var(--pub-text-primary)] mt-1">{avgMatch}%</p>
-          <p className="text-[10px] font-bold text-[var(--pub-accent-primary)] mt-0.5">{isRtl ? 'دقة فائقة' : 'High Precision'}</p>
+          <p className="text-sm sm:text-base font-black text-[var(--text-primary)] mt-1">{avgMatch}%</p>
+          <p className="text-[10px] font-bold text-[var(--accent)] mt-0.5">{isRtl ? 'دقة فائقة' : 'High Precision'}</p>
         </button>
 
         <button
           onClick={() => setActiveMetric('impressions')}
-          className={`p-2.5 sm:p-3 rounded-[var(--pub-radius-control)] border text-start transition-colors cursor-pointer ${
+          className={`p-2.5 sm:p-3 rounded-[var(--radius-sm)] border text-start transition-colors cursor-pointer ${
             activeMetric === 'impressions'
-              ? 'border-[var(--pub-accent-primary)] bg-[var(--pub-accent-muted)] shadow-2xs'
-              : 'border-[var(--pub-border-default)] bg-[var(--pub-surface-container)] hover:border-[var(--pub-border-strong)]'
+              ? 'border-[var(--accent)] bg-[var(--bg-accent-muted)] shadow-2xs'
+              : 'border-[var(--border-default)] bg-[var(--surface-card)] hover:border-[var(--border-strong)]'
           }`}
         >
-          <p className="text-[10px] font-bold text-[var(--pub-text-muted)] flex items-center justify-between">
+          <p className="text-[10px] font-bold text-[var(--text-muted)] flex items-center justify-between">
             <span className="truncate">{isRtl ? 'الظهور والوصول' : 'Total Impressions'}</span>
-            <BarChart2 size={12} className="text-[var(--pub-accent-primary)] shrink-0 ms-1" />
+            <BarChart2 size={12} className="text-[var(--accent)] shrink-0 ms-1" />
           </p>
-          <p className="text-sm sm:text-base font-black text-[var(--pub-text-primary)] mt-1">{totalImpressions.toLocaleString()}</p>
-          <p className="text-[10px] font-bold text-[var(--pub-accent-primary)] mt-0.5">+24.1% {isRtl ? 'نمو' : 'Growth'}</p>
+          <p className="text-sm sm:text-base font-black text-[var(--text-primary)] mt-1">{totalImpressions.toLocaleString()}</p>
+          <p className="text-[10px] font-bold text-[var(--accent)] mt-0.5">+24.1% {isRtl ? 'نمو' : 'Growth'}</p>
         </button>
 
         <button
           onClick={() => setActiveMetric('conversions')}
-          className={`p-2.5 sm:p-3 rounded-[var(--pub-radius-control)] border text-start transition-colors cursor-pointer ${
+          className={`p-2.5 sm:p-3 rounded-[var(--radius-sm)] border text-start transition-colors cursor-pointer ${
             activeMetric === 'conversions'
-              ? 'border-[var(--pub-accent-primary)] bg-[var(--pub-accent-muted)] shadow-2xs'
-              : 'border-[var(--pub-border-default)] bg-[var(--pub-surface-container)] hover:border-[var(--pub-border-strong)]'
+              ? 'border-[var(--accent)] bg-[var(--bg-accent-muted)] shadow-2xs'
+              : 'border-[var(--border-default)] bg-[var(--surface-card)] hover:border-[var(--border-strong)]'
           }`}
         >
-          <p className="text-[10px] font-bold text-[var(--pub-text-muted)] flex items-center justify-between">
+          <p className="text-[10px] font-bold text-[var(--text-muted)] flex items-center justify-between">
             <span className="truncate">{isRtl ? 'التحويلات الناجحة' : 'Direct Conversions'}</span>
-            <Zap size={12} className="text-[var(--pub-accent-primary)] shrink-0 ms-1" />
+            <Zap size={12} className="text-[var(--accent)] shrink-0 ms-1" />
           </p>
-          <p className="text-sm sm:text-base font-black text-[var(--pub-text-primary)] mt-1">{totalConversions.toLocaleString()}</p>
-          <p className="text-[10px] font-bold text-[var(--pub-accent-primary)] mt-0.5">3.8x {isRtl ? 'معدل تحويل' : 'CVR'}</p>
+          <p className="text-sm sm:text-base font-black text-[var(--text-primary)] mt-1">{totalConversions.toLocaleString()}</p>
+          <p className="text-[10px] font-bold text-[var(--accent)] mt-0.5">3.8x {isRtl ? 'معدل تحويل' : 'CVR'}</p>
         </button>
       </div>
 
@@ -376,23 +377,23 @@ export const EngagementTrendsChart: React.FC<EngagementTrendsChartProps> = ({
       <button
         type="button"
         onClick={() => setIsMobileChartExpanded(prev => !prev)}
-        className="sm:hidden w-full py-2 px-3 rounded-[var(--pub-radius-control)] border border-[var(--pub-border-default)] bg-[var(--pub-surface-subtle)] text-xs font-bold text-[var(--pub-text-primary)] hover:border-[var(--pub-accent-primary)]/40 transition-colors flex items-center justify-between cursor-pointer"
+        className="sm:hidden w-full py-2 px-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] text-xs font-bold text-[var(--text-primary)] hover:border-[var(--border-accent)] transition-colors flex items-center justify-between cursor-pointer"
       >
         <span className="flex items-center gap-2">
-          <BarChart2 size={15} className="text-[var(--pub-accent-primary)] shrink-0" />
+          <BarChart2 size={15} className="text-[var(--accent)] shrink-0" />
           <span>
             {isMobileChartExpanded
               ? (isRtl ? 'إخفاء الرسم البياني التفاعلي' : 'Hide Interactive D3 Chart')
               : (isRtl ? 'عرض الرسم البياني التفاعلي (D3)' : 'Show Interactive D3 Chart')}
           </span>
         </span>
-        <ChevronDown size={15} className={`text-[var(--pub-text-muted)] transition-transform duration-200 ${isMobileChartExpanded ? 'rotate-180 text-[var(--pub-accent-primary)]' : ''}`} />
+        <ChevronDown size={15} className={`text-[var(--text-muted)] transition-transform duration-base ${isMobileChartExpanded ? 'rotate-180 text-[var(--accent)]' : ''}`} />
       </button>
 
       {/* D3 Canvas Container (Always visible on desktop, toggleable on mobile) */}
       <div
         ref={containerRef}
-        className={`relative w-full rounded-[var(--pub-radius-container)] border border-[var(--pub-border-default)] bg-[var(--pub-surface-container)] p-2 sm:p-4 overflow-hidden transition-all duration-300 ${
+        className={`relative w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] p-2 sm:p-4 overflow-hidden transition-all duration-base ${
           isMobileChartExpanded ? 'block' : 'hidden sm:block'
         }`}
       >
@@ -407,15 +408,15 @@ export const EngagementTrendsChart: React.FC<EngagementTrendsChartProps> = ({
               left: `${Math.min(tooltipPos.x, (containerRef.current?.clientWidth || 400) - 180)}px`,
               top: `${Math.max(10, tooltipPos.y - 75)}px`,
             }}
-            className="absolute z-20 pointer-events-none p-2.5 rounded-[var(--pub-radius-control)] bg-slate-900/95 dark:bg-slate-950/95 border border-[var(--pub-accent-primary)]/40 shadow-xl backdrop-blur-md text-white min-w-[160px]"
+            className="absolute z-20 pointer-events-none p-2.5 rounded-shape-sm bg-[var(--surface-overlay)] border border-[var(--border-default)] shadow-xl backdrop-blur-md text-[var(--text-primary)] min-w-[160px]"
           >
-            <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 mb-1 border-b border-slate-800 pb-1">
+            <div className="flex items-center justify-between text-[10px] font-bold text-[var(--text-muted)] mb-1 border-b border-[var(--border-subtle)] pb-1">
               <span>{hoveredPoint.dateStr}</span>
-              <span className="text-[var(--pub-accent-primary)] font-extrabold">{hoveredPoint.matchScore}% {isRtl ? 'توافق' : 'Match'}</span>
+              <span className="text-[var(--accent)] font-extrabold">{hoveredPoint.matchScore}% {isRtl ? 'توافق' : 'Match'}</span>
             </div>
             <div className="space-y-0.5 text-xs">
-              <p className="font-extrabold text-[var(--pub-accent-primary)] flex items-center justify-between gap-3">
-                <span className="text-slate-300">
+              <p className="font-extrabold text-[var(--accent)] flex items-center justify-between gap-3">
+                <span className="text-[var(--text-secondary)]">
                   {activeMetric === 'clicks'
                     ? isRtl ? 'النقرات:' : 'Clicks:'
                     : activeMetric === 'matchScore'
@@ -426,9 +427,9 @@ export const EngagementTrendsChart: React.FC<EngagementTrendsChartProps> = ({
                 </span>
                 <span>{hoveredPoint[activeMetric]}</span>
               </p>
-              <p className="text-[10px] text-slate-400 truncate mt-1">
-                <span className="text-slate-500 me-1">{isRtl ? 'الأكثر تفاعلاً:' : 'Top Category:'}</span>
-                <span className="text-white font-medium">{isRtl ? hoveredPoint.topCategoryAr : hoveredPoint.topCategoryEn}</span>
+              <p className="text-[10px] text-[var(--text-muted)] truncate mt-1">
+                <span className="text-[var(--text-muted)] me-1">{isRtl ? 'الأكثر تفاعلاً:' : 'Top Category:'}</span>
+                <span className="text-[var(--text-primary)] font-medium">{isRtl ? hoveredPoint.topCategoryAr : hoveredPoint.topCategoryEn}</span>
               </p>
             </div>
           </motion.div>
@@ -437,3 +438,5 @@ export const EngagementTrendsChart: React.FC<EngagementTrendsChartProps> = ({
     </div>
   );
 };
+
+export default EngagementTrendsChart;

@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { getMatchingSuggestions } from '../../constants/contextualSuggestions';
 import { useArtifact } from '../../context/ArtifactContext';
+import { useAppContext } from '../../context/AppContext';
+import { SCROLL_STYLES, HOVER_STYLES } from '../../styles/scrollStyles';
 
 interface ChatComposerProps {
   query: string;
@@ -110,14 +112,20 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
     setActiveSuggestionIndex(-1);
   }, [selectedTool]);
 
+  const { isMobile } = useAppContext();
+
   // 🏛️ Pyramid Sorting: Shortest to Longest String Length (1 -> 22 -> 333 -> 4444)
   const sortedModels = React.useMemo(() => {
     return [...models].sort((a, b) => (a.label || '').trim().length - (b.label || '').trim().length);
   }, [models]);
 
   const sortedAdvancedTools = React.useMemo(() => {
-    return [...advancedTools].sort((a, b) => (a.label || '').trim().length - (b.label || '').trim().length);
-  }, [advancedTools]);
+    const sorted = [...advancedTools].sort((a, b) => (a.label || '').trim().length - (b.label || '').trim().length);
+    if (isMobile) {
+      return sorted.filter(t => t.id !== 'code' && t.id !== 'audio_studio');
+    }
+    return sorted;
+  }, [advancedTools, isMobile]);
 
   const shouldShowSuggestions = Boolean(
     isFocused && !isGenerating && !isSuggestionsDismissed && (!messages || messages.length === 0)
@@ -212,7 +220,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                   transition={{ duration: 0.15 }}
                   className="flex items-center gap-1.5 max-w-full overflow-hidden"
                 >
-                  <div className="inline-flex items-stretch h-8 rounded-[8px] border border-[var(--border-default)] bg-transparent divide-x divide-[var(--border-default)] rtl:divide-x-reverse overflow-x-auto scrollbar-none">
+                  <div className="inline-flex items-stretch h-8 rounded-shape-sm border border-[var(--border-default)] bg-transparent divide-x divide-[var(--border-default)] rtl:divide-x-reverse overflow-x-auto scrollbar-none">
                     {['16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '1:1'].map((ratio) => {
                       const currentRatio = selectedTool === 'video'
                         ? (videoSettings?.aspectRatio || '1:1')
@@ -235,10 +243,10 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                           type="button"
                           onClick={() => handleSelectAspectRatio(ratio)}
                           title={dir === 'rtl' ? RATIO_TOOLTIPS[ratio]?.ar : RATIO_TOOLTIPS[ratio]?.en}
-                          className={`px-2.5 sm:px-3 h-full flex items-center justify-center text-[11px] font-mono font-bold transition-theme whitespace-nowrap active:scale-95 ${
+                          className={`px-2.5 sm:px-3 h-full flex items-center justify-center text-[11px] font-mono font-bold transition-all duration-200 whitespace-nowrap active:scale-95 bg-transparent ${
                             isActive
-                              ? 'text-[var(--fg-accent)] font-extrabold bg-transparent hover:bg-[var(--surface-subtle)]'
-                              : 'text-[var(--text-muted)] hover:text-[var(--fg-accent)] bg-transparent hover:bg-[var(--surface-subtle)]'
+                              ? 'text-[var(--fg-accent)] font-extrabold'
+                              : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:brightness-125'
                           }`}
                         >
                           {ratio}
@@ -254,9 +262,9 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                       localStorage.setItem('perplexta_aspect_bar_collapsed', 'true');
                     }}
                     title={dir === 'rtl' ? 'طي شريط الأبعاد' : 'Collapse ratio bar'}
-                    className="w-8 h-8 flex items-center justify-center rounded-shape-sm border border-[var(--border-default)] bg-transparent hover:bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--fg-accent)] transition-theme active:scale-95 shrink-0 cursor-pointer group relative before:absolute before:-inset-1.5 before:content-['']"
+                    className="w-8 h-8 flex items-center justify-center rounded-shape-sm border border-[var(--border-default)] bg-transparent hover:border-[var(--border-accent)]/60 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors duration-200 active:scale-95 shrink-0 cursor-pointer group relative before:absolute before:-inset-1.5 before:content-['']"
                   >
-                    <ChevronUp size={14} className="text-[var(--text-muted)] group-hover:text-[var(--fg-accent)] transition-theme" />
+                    <ChevronUp size={14} className="text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors" />
                   </button>
                 </motion.div>
               ) : (
@@ -272,14 +280,14 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                     localStorage.setItem('perplexta_aspect_bar_collapsed', 'false');
                   }}
                   title={dir === 'rtl' ? 'توسيع شريط الأبعاد' : 'Expand ratio bar'}
-                  className="h-8 px-2.5 flex items-center justify-center gap-1.5 rounded-shape-sm border border-[var(--border-default)] bg-transparent hover:bg-[var(--surface-subtle)] transition-theme active:scale-95 group shrink-0 text-[11px] font-mono font-bold cursor-pointer relative before:absolute before:-inset-1.5 before:content-['']"
+                  className="h-8 px-2.5 flex items-center justify-center gap-1.5 rounded-shape-sm border border-[var(--border-default)] bg-transparent hover:border-[var(--border-accent)]/60 transition-colors duration-200 active:scale-95 group shrink-0 text-[11px] font-mono font-bold cursor-pointer relative before:absolute before:-inset-1.5 before:content-['']"
                 >
                   <span className="text-[var(--fg-accent)] font-extrabold">
                     {selectedTool === 'video'
                       ? (videoSettings?.aspectRatio || '1:1')
                       : (imageSettings?.aspectRatio || '1:1')}
                   </span>
-                  <ChevronDown size={14} className="text-[var(--text-muted)] group-hover:text-[var(--fg-accent)] transition-theme" />
+                  <ChevronDown size={14} className="text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors" />
                 </motion.button>
               )}
             </AnimatePresence>
@@ -291,14 +299,14 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
             className="w-full select-none relative flex flex-col box-border min-w-0 ide-input-box p-3.5 shadow-lg"
           >
           {isRecording && (
-            <div className="px-3.5 py-3.5 bg-red-500/10 border-b border-dashed border-red-500/20 flex flex-col gap-2.5 transition-theme mb-3 rounded-shape-md">
+            <div className="px-3.5 py-3.5 bg-[var(--status-danger)]/10 border-b border-dashed border-[var(--status-danger)]/20 flex flex-col gap-2.5 transition-theme mb-3 rounded-shape-md">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-shape-xs bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-shape-xs h-2.5 w-2.5 bg-red-500"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-shape-xs bg-[var(--status-danger)]/75"></span>
+                    <span className="relative inline-flex rounded-shape-xs h-2.5 w-2.5 bg-[var(--status-danger)]"></span>
                   </span>
-                  <span className="text-xs font-black text-red-500 animate-pulse uppercase tracking-wider font-sans">
+                  <span className="text-xs font-black text-[var(--status-danger)] animate-pulse uppercase tracking-wider font-sans">
                     {dir === 'rtl' ? 'جاري الاستماع وتدوين الصوت...' : 'LISTENING & TRANSCRIBING...'}
                   </span>
                 </div>
@@ -307,7 +315,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                     {[1, 2, 3, 4, 5].map((i) => (
                       <motion.span
                         key={`chat-sound-wave-${i}`}
-                        className="w-0.5 bg-red-500 rounded-shape-xs"
+                        className="w-0.5 bg-[var(--status-danger)] rounded-shape-xs"
                         animate={{
                           height: ["4px", "16px", "4px"]
                         }}
@@ -324,18 +332,18 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                   <button
                     type="button"
                     onClick={toggleRecording}
-                    className="text-[10px] font-black uppercase text-red-400 hover:text-red-500 px-2 py-0.5 rounded-shape-xs border border-red-500/25 hover:bg-red-500/10 transition-theme"
+                    className="text-[10px] font-black uppercase text-[var(--status-danger)] hover:opacity-90 px-2 py-0.5 rounded-shape-xs border border-[var(--status-danger)]/25 hover:bg-[var(--status-danger)]/10 transition-theme"
                   >
                     {dir === 'rtl' ? 'إيقاف' : 'Stop'}
                   </button>
                 </div>
               </div>
-              <div className="text-[14px] text-slate-300 italic min-h-[36px] bg-slate-950/50 rounded-shape-sm px-3 py-2 flex items-center justify-between gap-3 border-0">
+              <div className="text-[14px] text-[var(--text-secondary)] italic min-h-[36px] bg-[var(--surface-subtle)] rounded-shape-sm px-3 py-2 flex items-center justify-between gap-3 border border-[var(--border-subtle)]">
                 <span className="truncate max-w-[80%]">
                   {interimText ? (
-                    <span className="text-slate-100 font-bold not-italic font-sans">{interimText}</span>
+                    <span className="text-[var(--text-primary)] font-bold not-italic font-sans">{interimText}</span>
                   ) : (
-                    <span className="text-slate-500 opacity-60 font-sans">
+                    <span className="text-[var(--text-muted)] opacity-70 font-sans">
                       {dir === 'rtl' ? 'تحدث الآن ليتم تدوين كلامك هنا في الوقت الفعلي...' : 'Speak now to see real-time transcription here...'}
                     </span>
                   )}
@@ -347,7 +355,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                       setQuery(query + ' ' + interimText);
                       setInterimText('');
                     }}
-                    className="text-[10px] font-black uppercase text-cyan-400 hover:text-cyan-300 border border-cyan-500/20 hover:bg-cyan-500/10 px-2 py-1 rounded-shape-xs transition-theme shrink-0"
+                    className="text-[10px] font-black uppercase text-[var(--fg-accent)] hover:opacity-90 border border-[var(--border-accent)]/30 hover:bg-[var(--bg-accent-muted)] px-2 py-1 rounded-shape-xs transition-theme shrink-0 cursor-pointer"
                   >
                     {dir === 'rtl' ? 'إدراج' : 'Insert'}
                   </button>
@@ -358,22 +366,22 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
 
           {selectedFile && (
             <div className="px-2 pb-3 flex items-start gap-2">
-              <div className="relative group p-1.5 rounded-shape-md border border-slate-800 transition-theme bg-slate-900/90 flex-shrink-0 flex items-center gap-2">
+              <div className="relative group p-1.5 rounded-shape-md border border-[var(--border-default)] transition-theme bg-[var(--surface-subtle)] flex-shrink-0 flex items-center gap-2">
                 <div className="flex items-center gap-2 px-1.5 py-1 min-w-[120px]">
                   {previewUrl && selectedFile.type.startsWith('image/') ? (
-                    <div className="w-8 h-8 rounded-shape-sm overflow-hidden border-0 bg-slate-950">
+                    <div className="w-8 h-8 rounded-shape-sm overflow-hidden border border-[var(--border-default)] bg-[var(--surface-card)]">
                       <img src={previewUrl} alt="preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     </div>
                   ) : (
-                    <div className="w-8 h-8 rounded-shape-sm flex items-center justify-center bg-slate-950 text-cyan-400 shadow-sm">
+                    <div className="w-8 h-8 rounded-shape-sm flex items-center justify-center bg-[var(--surface-card)] text-[var(--fg-accent)] border border-[var(--border-default)] shadow-xs">
                       {getFileIcon(selectedFile.type)}
                     </div>
                   )}
                   <div className="flex flex-col min-w-0 pr-6">
-                    <span className="text-[10px] font-bold text-slate-200 truncate max-w-[100px] font-sans">
+                    <span className="text-[10px] font-bold text-[var(--text-primary)] truncate max-w-[100px] font-sans">
                       {selectedFile.name}
                     </span>
-                    <span className="text-[8px] text-slate-500 uppercase font-black tracking-tight font-mono">
+                    <span className="text-[8px] text-[var(--text-muted)] uppercase font-black tracking-tight font-mono">
                       {(Number(selectedFile.size || 0) / 1024).toFixed(1)} KB
                     </span>
                   </div>
@@ -389,7 +397,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                     const input = document.getElementById('unified-upload') as HTMLInputElement;
                     if (input) input.value = '';
                   }}
-                  className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 transition-theme z-10"
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-[var(--status-danger)] text-white rounded-full flex items-center justify-center shadow-lg hover:opacity-90 transition-theme z-10"
                 >
                   <Plus size={10} className="rotate-45" />
                 </button>
@@ -400,13 +408,13 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                   <button
                     type="button"
                     onClick={triggerForensicDiagnostic}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-shape-sm border border-transparent hover:border-cyan-500/30 hover:bg-cyan-500/5 text-xs font-semibold text-cyan-400 transition-theme shadow-none bg-transparent"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-shape-sm border border-transparent hover:border-[var(--border-accent)]/40 hover:bg-[var(--bg-accent-muted)] text-xs font-semibold text-[var(--fg-accent)] transition-theme shadow-none bg-transparent cursor-pointer"
                   >
-                    <Sparkles size={13} className="text-cyan-400 animate-pulse" />
+                    <Sparkles size={13} className="text-[var(--fg-accent)] animate-pulse" />
                     <span>{dir === 'rtl' ? 'فحص جنائي مباشر' : 'Run Forensic Scan'}</span>
                   </button>
 
-                  <div className="w-px h-5 bg-slate-800" />
+                  <div className="w-px h-5 bg-[var(--border-default)]" />
 
                   <label className="flex items-center gap-2 cursor-pointer text-xs font-medium">
                     <div className="relative">
@@ -416,10 +424,10 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                         onChange={(e) => setForensicMode(e.target.checked)}
                         className="sr-only"
                       />
-                      <div className={`w-8 h-4 bg-slate-900 rounded-full transition-theme ${forensicMode ? 'bg-cyan-500/80' : ''}`} />
-                      <div className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white shadow-md transition-transform duration-300 ${forensicMode ? 'transform translate-x-4 bg-cyan-500' : ''}`} />
+                      <div className={`w-8 h-4 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-full transition-theme ${forensicMode ? 'bg-[var(--accent)] border-[var(--border-accent)]' : ''}`} />
+                      <div className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-[var(--surface-card)] shadow-xs transition-transform duration-300 ${forensicMode ? 'transform translate-x-4' : ''}`} />
                     </div>
-                    <span className={`text-[10px] font-bold font-sans ${forensicMode ? 'text-cyan-400' : 'text-slate-400'}`}>
+                    <span className={`text-[10px] font-bold font-sans ${forensicMode ? 'text-[var(--fg-accent)]' : 'text-[var(--text-muted)]'}`}>
                       {dir === 'rtl' ? 'وضع التحقيق الجنائي' : 'Forensic Mode'}
                     </span>
                   </label>
@@ -502,23 +510,23 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                 ? (dir === 'rtl' ? 'يرجى تفعيل باقة اشتراك أو شحن الرصيد للبدء بالاستخدام...' : 'Please activate a subscription plan or top up your balance to start...')
                 : (dir === 'rtl' ? 'اكتب موضوع البحث أو التحليل المطلوب...' : 'Type search topic or required analysis...')
             }
-            className={`w-full bg-transparent text-[16px] sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none resize-none leading-relaxed font-sans min-h-[48px] ${dir === 'rtl' ? 'text-right' : 'text-left'} ${isInputDisabled ? 'cursor-not-allowed text-slate-400' : ''}`}
+            className={`w-full bg-transparent text-[16px] sm:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none resize-none leading-relaxed font-sans min-h-[48px] custom-scrollbar ${dir === 'rtl' ? 'text-right' : 'text-left'} ${isInputDisabled ? 'cursor-not-allowed opacity-60' : ''}`}
             dir={dir || "rtl"}
             rows={2}
             style={{ minHeight: '48px', maxHeight: '200px', height: '48px' }}
           />
 
           {query.length > 500 && (
-            <span className={`absolute bottom-[60px] ${dir === 'rtl' ? 'left-4' : 'right-4'} text-[10px] font-mono select-none pointer-events-none transition-theme ${query.length > 15000 ? 'text-red-500 font-bold drop-shadow-[0_0_4px_rgba(239,68,68,0.5)]' : 'text-slate-500'}`}>
+            <span className={`absolute bottom-[60px] ${dir === 'rtl' ? 'left-4' : 'right-4'} text-[10px] font-mono select-none pointer-events-none transition-theme ${query.length > 15000 ? 'text-[var(--fg-danger)] font-bold' : 'text-[var(--text-muted)]'}`}>
               {query.length.toLocaleString()} / 16,000
             </span>
           )}
 
           {/* Dedicated inset floating divider between the textarea and the bottom toolbar - perfectly centered */}
-          <div className="mx-4 h-px bg-gradient-to-r from-transparent via-slate-800/70 to-transparent -mt-2 mb-2" />
+          <div className="mx-4 h-px bg-gradient-to-r from-transparent via-[var(--border-default)] to-transparent -mt-2 mb-2" />
 
           {/* 2. Bottom Toolbar (Single-Row Baseline & Language Button Visual Identity) */}
-          <div className="flex items-center justify-between px-3.5 py-2.5 flex-nowrap -mx-3.5 -mb-3.5 sm:-mx-3.5 sm:-mb-3.5 bg-[#090d16] rounded-b-[14px]">
+          <div className="flex items-center justify-between px-3.5 py-2.5 flex-nowrap -mx-3.5 -mb-3.5 sm:-mx-3.5 sm:-mb-3.5 bg-[var(--surface-subtle)] border-t border-[var(--border-subtle)] rounded-b-shape-md transition-colors">
             
             {/* Left Action Chips / Tools */}
             <div className="flex items-center gap-2 sm:gap-2 flex-nowrap min-w-0">
@@ -538,29 +546,40 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                                   setIsAdvancedToolsOpen(false);
                                 }
                               }}
-                              className={`w-8 h-8 sm:w-auto sm:px-2.5 sm:h-8 flex items-center justify-center gap-1 sm:gap-1.5 rounded-shape-sm border transition-all text-xs font-mono cursor-pointer shrink-0 ${
+                              className={`w-8 h-8 sm:w-auto sm:px-2.5 sm:h-8 flex items-center justify-center gap-1 sm:gap-1.5 rounded-shape-sm border border-[var(--border-default)] hover:border-[var(--border-accent)]/60 transition-all duration-200 active:scale-95 text-xs font-mono cursor-pointer shrink-0 bg-transparent relative before:absolute before:-inset-1.5 sm:before:hidden before:content-[''] box-border ${
                                 isModelActive 
-                                  ? 'border-cyan-500/40 text-cyan-400 bg-cyan-500/10 font-bold' 
-                                  : 'border-[var(--pub-border-default)] bg-[var(--pub-surface-subtle)] hover:bg-cyan-500/10 hover:border-cyan-500/20 text-[var(--pub-text-muted)] hover:text-cyan-400'
+                                  ? 'text-[var(--text-primary)]' 
+                                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] shadow-2xs'
                               }`}
                             >
-                              <Zap className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 ${
-                                isModelActive 
-                                  ? 'fill-cyan-400 text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.95)]' 
-                                  : 'text-[var(--pub-text-muted)]'
-                              }`} />
+                              <span className="shrink-0 flex items-center justify-center w-3.5 h-3.5">
+                                {React.isValidElement(currentModel?.icon) 
+                                  ? React.cloneElement(currentModel.icon as React.ReactElement<{ size?: number; className?: string }>, { 
+                                      size: 14, 
+                                      className: `w-3.5 h-3.5 transition-all duration-300 ${
+                                        isModelActive 
+                                          ? 'text-[var(--fg-accent)] fill-[var(--fg-accent)]' 
+                                          : 'text-[var(--text-muted)]'
+                                      }` 
+                                    })
+                                  : <Zap className={`w-3.5 h-3.5 transition-all duration-300 ${
+                                      isModelActive 
+                                        ? 'fill-[var(--fg-accent)] text-[var(--fg-accent)]' 
+                                        : 'text-[var(--text-muted)]'
+                                    }`} />}
+                              </span>
                               <span className="hidden sm:inline whitespace-nowrap">{isModelActive ? currentModel?.label : (dir === 'rtl' ? 'سريع' : 'FAST')}</span>
-                              <ChevronDown className={`w-3 h-3 hidden sm:inline ml-0.5 shrink-0 transition-colors ${isModelActive ? 'text-cyan-400' : 'text-slate-500'}`} />
+                              <ChevronDown className="w-3 h-3 hidden sm:inline ml-0.5 shrink-0 text-[var(--text-muted)] transition-colors" />
                             </button>
 
                             {isModelMenuOpen && (
                               <motion.div 
-                                initial={{ opacity: 0, scale: 0.96, y: 4 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.96, y: 4 }}
-                                transition={{ duration: 0.15, ease: "easeOut" }}
+                                initial={{ opacity: 0, scale: 0.98 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.98 }}
+                                transition={{ duration: 0.10, ease: [0.16, 1, 0.3, 1] }}
                                 style={{ transformOrigin: dir === 'rtl' ? 'bottom right' : 'bottom left' }}
-                                className={`absolute bottom-full mb-2 ${dir === 'rtl' ? 'right-0' : 'left-0'} w-36 p-1 rounded-shape-md border border-[var(--border-default)] shadow-2xl flex flex-col gap-0.5 z-[200] bg-[var(--surface-card)] backdrop-blur-xl`}
+                                className={`absolute bottom-full mb-2 ${dir === 'rtl' ? 'right-0' : 'left-0'} w-40 p-1.5 rounded-shape-md border border-[var(--border-default)] shadow-2xl ring-1 ring-black/5 dark:ring-white/10 flex flex-col gap-0.5 z-[200] bg-[var(--surface-card)] backdrop-blur-2xl`}
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {sortedModels.map((model, idx) => {
@@ -581,28 +600,34 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                                         setActiveDropdown('model');
                                         setIsModelMenuOpen(false);
                                       }}
-                                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-shape-sm flex-nowrap transition-theme text-[10.5px] font-bold uppercase tracking-tight bg-transparent hover:bg-[var(--surface-subtle)] ${
+                                      className={`group flex items-center justify-between w-full h-[36px] min-h-[36px] px-3 py-2 rounded-shape-sm flex-nowrap transition-all duration-fast text-xs font-medium cursor-pointer ${
                                         isLocked
                                           ? 'opacity-40 cursor-not-allowed text-[var(--text-disabled)]'
-                                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                          : isSelected
+                                            ? 'bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] font-semibold border border-[var(--border-accent)]/30'
+                                            : HOVER_STYLES.dropdownItem + ' border border-transparent'
                                       }`}
                                     >
-                                      <div className="flex items-center gap-1.5 flex-nowrap">
-                                        <span className={`shrink-0 flex items-center justify-center w-3.5 h-3.5 transition-all duration-200 ${
+                                      <div className="flex items-center gap-2 flex-nowrap">
+                                        <span className={`shrink-0 flex items-center justify-center w-3.5 h-3.5 transition-colors duration-fast ${
                                           isLocked 
                                             ? 'text-[var(--text-disabled)] opacity-60' 
                                             : isSelected 
-                                              ? 'text-cyan-400 fill-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.95)] scale-110' 
-                                              : 'text-[var(--text-muted)]'
+                                              ? 'text-[var(--fg-accent)] fill-[var(--fg-accent)]' 
+                                              : 'text-[var(--text-muted)] group-hover:text-[var(--text-primary)]'
                                         }`}>
                                           {React.isValidElement(model.icon) 
                                             ? React.cloneElement(model.icon as React.ReactElement<{ size?: number; className?: string }>, { 
-                                                size: 13, 
-                                                className: `w-3.5 h-3.5 ${isSelected ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.95)]' : ''}` 
+                                                size: 14, 
+                                                className: `w-3.5 h-3.5 transition-colors duration-fast ${isSelected ? 'text-[var(--fg-accent)]' : ''}` 
                                               })
-                                            : <Zap className={`w-3.5 h-3.5 ${isSelected ? 'fill-cyan-400 text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.95)]' : ''}`} />}
+                                            : <Zap className={`w-3.5 h-3.5 transition-colors duration-fast ${isSelected ? 'fill-[var(--fg-accent)] text-[var(--fg-accent)]' : ''}`} />}
                                         </span>
-                                        <span className={`whitespace-nowrap ${isSelected ? 'text-[var(--text-primary)] font-extrabold' : ''}`}>{model.label}</span>
+                                        <span className={`whitespace-nowrap transition-colors duration-fast ${
+                                          isLocked ? '' : 'group-hover:text-[var(--text-primary)]'
+                                        }`}>
+                                          {model.label}
+                                        </span>
                                       </div>
                                       <div className="flex items-center gap-0.5 shrink-0">
                                         {isLocked && (
@@ -634,33 +659,35 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                                   setIsModelMenuOpen(false);
                                 }
                               }}
-                              className={`w-8 h-8 sm:w-auto sm:px-2.5 sm:h-8 flex items-center justify-center gap-1 sm:gap-1.5 rounded-shape-sm border transition-all text-xs font-medium cursor-pointer shrink-0 ${
+                              className={`w-8 h-8 sm:w-auto sm:px-2.5 sm:h-8 flex items-center justify-center gap-1 sm:gap-1.5 rounded-shape-sm border border-[var(--border-default)] hover:border-[var(--border-accent)]/60 transition-all duration-200 active:scale-95 text-xs font-medium cursor-pointer shrink-0 bg-transparent relative before:absolute before:-inset-1.5 sm:before:hidden before:content-[''] box-border ${
                                 isToolActive 
-                                  ? 'border-cyan-500/40 text-cyan-400 bg-cyan-500/10 font-bold' 
-                                  : 'border-[var(--pub-border-default)] bg-[var(--pub-surface-subtle)] hover:bg-cyan-500/10 hover:border-cyan-500/20 text-[var(--pub-text-muted)] hover:text-cyan-400'
+                                  ? 'text-[var(--text-primary)]' 
+                                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] shadow-2xs'
                               }`}
                             >
-                              {React.isValidElement(currentTool?.icon) 
-                                ? React.cloneElement(currentTool.icon as React.ReactElement<{ size?: number; className?: string }>, { 
-                                    size: 14, 
-                                    className: `w-3.5 h-3.5 shrink-0 ${isToolActive ? 'text-cyan-400' : 'text-[var(--pub-text-muted)]'}` 
-                                  })
-                                : <Search className={`w-3.5 h-3.5 shrink-0 ${isToolActive ? 'text-cyan-400' : 'text-[var(--pub-text-muted)]'}`} />}
+                              <span className="shrink-0 flex items-center justify-center w-3.5 h-3.5">
+                                {React.isValidElement(currentTool?.icon) 
+                                  ? React.cloneElement(currentTool.icon as React.ReactElement<{ size?: number; className?: string }>, { 
+                                      size: 14, 
+                                      className: `w-3.5 h-3.5 shrink-0 transition-all duration-300 ${isToolActive ? 'text-[var(--fg-accent)]' : 'text-[var(--text-muted)]'}` 
+                                    })
+                                  : <Search className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 ${isToolActive ? 'text-[var(--fg-accent)]' : 'text-[var(--text-muted)]'}`} />}
+                              </span>
                               <span className="hidden sm:inline whitespace-nowrap">{currentTool?.label || (dir === 'rtl' ? 'تحليل' : 'Analysis')}</span>
-                              <ChevronDown className={`w-3 h-3 hidden sm:inline ml-0.5 shrink-0 ${isToolActive ? 'text-cyan-400' : 'text-slate-500'}`} />
+                              <ChevronDown className="w-3 h-3 hidden sm:inline ml-0.5 shrink-0 text-[var(--text-muted)] transition-colors" />
                             </button>
 
                             {isAdvancedToolsOpen && (
                               <motion.div 
-                                initial={{ opacity: 0, scale: 0.96, y: 4 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.96, y: 4 }}
-                                transition={{ duration: 0.15, ease: "easeOut" }}
+                                initial={{ opacity: 0, scale: 0.98 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.98 }}
+                                transition={{ duration: 0.10, ease: [0.16, 1, 0.3, 1] }}
                                 style={{ transformOrigin: dir === 'rtl' ? 'bottom right' : 'bottom left' }}
-                                className={`absolute bottom-full mb-2 ${dir === 'rtl' ? 'right-0' : 'left-0'} w-48 max-w-[calc(100vw-2rem)] rounded-shape-md border border-[var(--border-default)] shadow-2xl flex flex-col z-[200] overflow-hidden bg-[var(--surface-card)] backdrop-blur-xl p-1`}
+                                className={`absolute bottom-full mb-2 ${dir === 'rtl' ? 'right-0' : 'left-0'} w-52 max-w-[calc(100vw-2rem)] rounded-shape-md border border-[var(--border-default)] shadow-2xl ring-1 ring-black/5 dark:ring-white/10 flex flex-col z-[200] overflow-hidden bg-[var(--surface-card)] backdrop-blur-2xl p-1.5`}
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                <div className="flex flex-col gap-0.5 max-h-[70vh] sm:max-h-[60vh] overflow-y-auto custom-scrollbar">
+                                <div className={`flex flex-col gap-0.5 ${SCROLL_STYLES.limited('70vh')} sm:max-h-[60vh]`}>
                                   {sortedAdvancedTools.map((tool, tIdx) => {
                                     const limit = currentPlan?.limits?.[tool.id];
                                     const isZeroLimit = limit?.daily === 0 && limit?.monthly === 0;
@@ -673,6 +700,11 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                                         key={`adv-tool-${tool.id}-${tIdx}`} 
                                         onClick={() => {
                                           if (isLocked) return;
+                                          if (tool.id === 'code') {
+                                            navigate('/app');
+                                            setIsAdvancedToolsOpen(false);
+                                            return;
+                                          }
                                           if (tool.id === 'audio_studio' || tool.isRouter) {
                                             navigate('/audio-studio');
                                             setIsAdvancedToolsOpen(false);
@@ -682,37 +714,44 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                                           setActiveDropdown('tool');
                                           setIsAdvancedToolsOpen(false);
                                         }}
-                                        className={`flex items-center justify-between w-full px-2.5 py-1.5 rounded-shape-sm transition-theme text-[11.5px] font-bold bg-transparent hover:bg-[var(--surface-subtle)] cursor-pointer select-none ${
+                                        className={`group flex items-center justify-between w-full h-[36px] min-h-[36px] px-3 py-2 rounded-shape-sm transition-all duration-fast text-xs font-medium cursor-pointer select-none active:scale-98 ${
                                           isLocked 
                                             ? 'opacity-40 cursor-not-allowed text-[var(--text-disabled)]'
-                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                            : isSelected 
+                                              ? 'bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] font-semibold border border-[var(--border-accent)]/30'
+                                              : HOVER_STYLES.dropdownItem + ' border border-transparent'
                                         }`}
                                       >
                                         {/* Tool Label & Icon */}
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          <span className={`shrink-0 flex items-center justify-center w-3.5 h-3.5 ${
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                          <span className={`shrink-0 flex items-center justify-center w-3.5 h-3.5 transition-colors duration-fast ${
                                             isLocked 
                                               ? 'text-[var(--text-disabled)] opacity-70' 
                                               : isSelected 
-                                                ? 'text-[var(--fg-accent)] scale-110 transition-transform' 
-                                                : 'text-[var(--text-muted)]'
+                                                ? 'text-[var(--fg-accent)]' 
+                                                : 'text-[var(--text-muted)] group-hover:text-[var(--text-primary)]'
                                           }`}>
                                             {React.isValidElement(tool.icon) 
-                                              ? React.cloneElement(tool.icon as React.ReactElement<{ size?: number; className?: string }>, { size: 14, className: 'w-3.5 h-3.5' })
-                                              : <Sparkles className="w-3.5 h-3.5" />}
+                                              ? React.cloneElement(tool.icon as React.ReactElement<{ size?: number; className?: string }>, { 
+                                                  size: 14, 
+                                                  className: `w-3.5 h-3.5 transition-colors duration-fast ${isSelected ? 'text-[var(--fg-accent)]' : ''}` 
+                                                })
+                                              : <Sparkles className={`w-3.5 h-3.5 transition-colors duration-fast ${isSelected ? 'text-[var(--fg-accent)]' : ''}`} />}
                                           </span>
-                                          <span className={`truncate ${isSelected ? 'text-[var(--fg-accent)] font-extrabold' : 'text-[var(--text-primary)]'}`}>
+                                          <span className={`truncate transition-colors duration-fast ${
+                                            isLocked ? '' : 'group-hover:text-[var(--text-primary)]'
+                                          }`}>
                                             {tool.label}
                                           </span>
                                         </div>
 
                                         {/* Badges / Router Arrow / Lock */}
-                                        <div className="flex items-center gap-1 shrink-0">
+                                        <div className="flex items-center gap-1 shrink-0 ms-2">
                                           {tool.isRouter && !isLocked && (
                                             <ArrowUpRight size={13} className="text-[var(--fg-accent)] shrink-0" />
                                           )}
                                           {tool.isNew && !isLocked && !isSelected && !tool.isRouter && (
-                                            <span className="px-1.5 py-[1px] rounded-[4px] bg-slate-800/80 border border-slate-700/50 text-slate-400 text-[8px] font-mono font-bold uppercase tracking-wider">
+                                            <span className="px-1.5 py-0.5 rounded-shape-xs bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-secondary)] text-[8.5px] font-mono font-bold uppercase tracking-wider">
                                               NEW
                                             </span>
                                           )}
@@ -736,13 +775,13 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                       type="button"
                       onClick={toggleRecording}
                       disabled={isInputDisabled}
-                      className={`w-8 h-8 sm:w-auto sm:px-2.5 sm:h-8 flex items-center justify-center gap-1 sm:gap-1.5 rounded-shape-sm border transition-all text-xs font-medium disabled:opacity-30 disabled:cursor-not-allowed shrink-0 cursor-pointer ${
+                      className={`w-8 h-8 sm:w-auto sm:px-2.5 sm:h-8 flex items-center justify-center gap-1 sm:gap-1.5 rounded-shape-sm border transition-all duration-200 active:scale-95 text-xs font-medium disabled:opacity-30 disabled:cursor-not-allowed shrink-0 cursor-pointer bg-transparent relative before:absolute before:-inset-1.5 sm:before:hidden before:content-[''] box-border ${
                         isRecording 
-                          ? 'bg-rose-500/10 border-rose-500/40 text-rose-400 animate-pulse font-bold' 
-                          : 'border-[var(--pub-border-default)] bg-[var(--pub-surface-subtle)] hover:bg-cyan-500/10 hover:border-cyan-500/20 text-[var(--pub-text-muted)] hover:text-cyan-400'
+                          ? 'border-[var(--fg-danger)]/60 text-[var(--fg-danger)] animate-pulse' 
+                          : 'border-[var(--border-default)] hover:border-[var(--border-accent)]/60 text-[var(--text-muted)] hover:text-[var(--text-primary)] shadow-2xs'
                       }`}
                     >
-                      <Mic className={`w-3.5 h-3.5 shrink-0 ${isRecording ? 'text-rose-400' : 'text-[var(--pub-text-muted)]'}`} />
+                      <Mic className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 ${isRecording ? 'text-[var(--fg-danger)]' : 'text-[var(--text-muted)]'}`} />
                       <span className="hidden sm:inline whitespace-nowrap">{isRecording ? (dir === 'rtl' ? 'تسجيل...' : 'Recording...') : (dir === 'rtl' ? 'صوت' : 'Voice')}</span>
                     </button>
               </div>
@@ -756,9 +795,9 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                   }
                 }}
                 disabled={isInputDisabled}
-                className="w-8 h-8 sm:w-auto sm:px-2.5 sm:h-8 flex items-center justify-center gap-1 sm:gap-1.5 rounded-shape-sm border border-[var(--pub-border-default)] bg-[var(--pub-surface-subtle)] hover:bg-cyan-500/10 hover:border-cyan-500/20 text-[var(--pub-text-muted)] hover:text-cyan-400 transition-all text-xs font-medium disabled:opacity-30 disabled:cursor-not-allowed shrink-0 cursor-pointer"
+                className="w-8 h-8 sm:w-auto sm:px-2.5 sm:h-8 flex items-center justify-center gap-1 sm:gap-1.5 rounded-shape-sm border border-[var(--border-default)] bg-transparent hover:border-[var(--border-accent)]/60 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all duration-200 active:scale-95 text-xs font-medium disabled:opacity-30 disabled:cursor-not-allowed shrink-0 cursor-pointer shadow-2xs relative before:absolute before:-inset-1.5 sm:before:hidden before:content-[''] box-border"
               >
-                <Paperclip className="w-3.5 h-3.5 text-[var(--pub-text-muted)] shrink-0" />
+                <Paperclip className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
                 <span className="hidden sm:inline whitespace-nowrap">{dir === 'rtl' ? 'إرفاق' : 'Attach'}</span>
               </button>
             </div>
@@ -770,15 +809,17 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                 handleSendOrStop();
               }}
               disabled={!query.trim() && !isGenerating}
-              className={`w-8 h-8 rounded-shape-sm flex items-center justify-center shrink-0 active:scale-[0.98] transition-all duration-150 border ${
+              className={`w-8 h-8 rounded-shape-sm flex items-center justify-center shrink-0 active:scale-95 transition-all duration-fast border cursor-pointer relative before:absolute before:-inset-1.5 before:content-[''] box-border ${
                 isGenerating
-                  ? 'bg-rose-500 text-slate-950 border-rose-500 hover:bg-rose-400 font-bold shadow-md shadow-rose-500/30 cursor-pointer animate-pulse'
-                  : 'bg-cyan-500 text-slate-950 border-cyan-500 hover:bg-cyan-400 font-bold shadow-md shadow-cyan-500/30 cursor-pointer'
+                  ? 'bg-[var(--fg-danger)] text-white border-[var(--fg-danger)] hover:opacity-90 font-bold shadow-md animate-pulse'
+                  : query.trim()
+                    ? 'bg-[var(--accent)] text-[var(--fg-on-emphasis)] border-[var(--border-accent)] hover:opacity-90 font-bold shadow-xs'
+                    : 'bg-[var(--surface-card)] text-[var(--text-muted)] border-[var(--border-default)] opacity-40 cursor-not-allowed'
               }`}
               title={isGenerating ? (dir === 'rtl' ? 'إيقاف التوليد' : 'Stop Generation') : (dir === 'rtl' ? 'إرسال' : 'Send')}
             >
               {isGenerating ? (
-                <Square className="w-3.5 h-3.5 fill-current shrink-0 text-slate-950" />
+                <Square className="w-3.5 h-3.5 fill-current shrink-0 text-white" />
               ) : (
                 <ArrowUp className="w-4 h-4 stroke-[2.5]" />
               )}
@@ -792,13 +833,13 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
           {shouldShowSuggestions && suggestions.length > 0 && (
             <motion.div 
               ref={suggestionsRef}
-              initial={{ opacity: 0, y: 2 }}
-              animate={{ opacity: 1, y: 6 }}
-              exit={{ opacity: 0, y: 2 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-              className="absolute top-full left-0 right-0 z-50 pointer-events-auto box-border overflow-hidden rounded-[14px] border border-[var(--pub-border-default)] bg-[var(--pub-surface-container)] shadow-2xl backdrop-blur-xl p-1.5 space-y-0.5 text-[var(--text-primary)]"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.10, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute top-full mt-2 left-0 right-0 z-50 pointer-events-auto box-border overflow-hidden rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-card)] shadow-2xl backdrop-blur-xl p-1.5 space-y-0.5 text-[var(--text-primary)]"
             >
-              <div className="w-full max-h-[260px] overflow-y-auto custom-scrollbar space-y-0.5">
+              <div className={`w-full ${SCROLL_STYLES.limited('260px')} space-y-0.5`}>
                 {suggestions.map((item, idx) => {
                   const isHighlighted = activeSuggestionIndex === idx;
                   const categoryText = dir === 'rtl' ? item.suggestion.categoryAr : item.suggestion.categoryEn;
@@ -811,30 +852,30 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
                         handleSelectSuggestion(item.suggestion);
                       }}
                       onMouseEnter={() => setActiveSuggestionIndex(idx)}
-                      className={`flex items-center justify-between h-8 w-full px-2.5 rounded-shape-sm text-xs cursor-pointer transition-all duration-150 ${
+                      className={`group flex items-center justify-between h-8 w-full px-2.5 rounded-shape-sm text-xs cursor-pointer transition-colors duration-fast border ${
                         isHighlighted 
-                          ? 'bg-cyan-500/10 text-cyan-400 font-bold' 
-                          : 'text-[var(--pub-text-secondary)] hover:text-[var(--pub-text-primary)] hover:bg-[var(--pub-surface-subtle)]'
+                          ? 'bg-[var(--surface-subtle)] text-[var(--text-primary)] font-medium border-[var(--border-default)]' 
+                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] border-transparent'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0 truncate">
-                        <Search className={`w-3.5 h-3.5 shrink-0 ${isHighlighted ? 'text-cyan-400' : 'text-[var(--pub-text-muted)]'}`} />
+                        <Search className={`w-3.5 h-3.5 shrink-0 transition-colors duration-fast ${isHighlighted ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)] group-hover:text-[var(--text-primary)]'}`} />
                         <span className="inline-flex items-center gap-1.5 text-xs truncate">
                           {item.matchedPrefix ? (
-                            <span className="text-[var(--pub-text-muted)] font-normal shrink-0">
+                            <span className="text-[var(--text-muted)] font-normal shrink-0">
                               {item.matchedPrefix}
                             </span>
                           ) : null}
-                          <span className={`font-semibold truncate ${isHighlighted ? 'text-cyan-400 font-bold' : 'text-[var(--pub-text-primary)]'}`}>
+                          <span className="truncate text-[var(--text-primary)] transition-colors duration-fast">
                             {item.remainingText}
                           </span>
                         </span>
                       </div>
                       {categoryText ? (
-                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border shrink-0 ${
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-shape-xs border shrink-0 transition-colors duration-fast ${
                           isHighlighted 
-                            ? 'text-cyan-300 bg-cyan-500/5 border-cyan-500/20' 
-                            : 'text-[var(--pub-text-muted)] bg-[var(--pub-surface-subtle)] border-[var(--pub-border-default)]'
+                            ? 'text-[var(--text-secondary)] border-[var(--border-default)] bg-[var(--surface-card)]' 
+                            : 'text-[var(--text-muted)] border-[var(--border-default)]/60 bg-transparent'
                         }`}>
                           {categoryText}
                         </span>

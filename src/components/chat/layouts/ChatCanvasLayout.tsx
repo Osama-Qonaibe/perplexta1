@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, Variants } from 'motion/react';
 import { useCanvasLayout } from '../hooks/useCanvasLayout';
 import { useAppContext } from '../../../context/AppContext';
@@ -57,9 +58,20 @@ export function ChatCanvasLayout({ children }: ChatCanvasLayoutProps) {
         />
       )}
 
-      {/* Canvas container - Strictly locked to 1340px without any conflicting motions or animations */}
+      {/* Sovereign Fullscreen Portal: Mounts directly to document.body with ultimate z-index to eliminate any external overlaps */}
+      {isArtifactOpen && isFullscreen && typeof document !== 'undefined' && createPortal(
+        <div 
+          className="fixed inset-0 z-[999999] w-screen h-screen bg-[var(--surface-page)] text-[var(--text-primary)] overflow-hidden flex flex-col select-none pointer-events-auto"
+          style={{ isolation: 'isolate' }}
+        >
+          <ArtifactCanvas />
+        </div>,
+        document.body
+      )}
+
+      {/* Inline Canvas Container (when not fullscreen) */}
       <AnimatePresence initial={false}>
-        {isArtifactOpen && (
+        {isArtifactOpen && !isFullscreen && (
           <motion.aside
             key="canvas-drawer"
             ref={canvasContainerRef}
@@ -69,9 +81,7 @@ export function ChatCanvasLayout({ children }: ChatCanvasLayoutProps) {
             exit="animate-out"
             style={canvasMainStyle}
             className={`flex flex-col h-full bg-[var(--surface-card)] shrink-0 z-20 overflow-hidden ${
-              isFullscreen 
-                ? 'fixed inset-0 z-[9999] w-screen h-screen bg-[var(--surface-page)]' 
-                : !isDesktop
+              !isDesktop
                 ? 'fixed inset-y-0 end-0 z-50 w-full sm:w-[500px] border-s border-[var(--border-default)] shadow-2xl'
                 : 'relative'
             }`}
@@ -80,9 +90,9 @@ export function ChatCanvasLayout({ children }: ChatCanvasLayoutProps) {
             <div 
               className="h-full w-full flex flex-col flex-nowrap"
               style={{
-                width: isFullscreen ? '100%' : isDesktop ? `${effectiveCanvasWidth}px` : '100%',
-                maxWidth: isFullscreen ? '100%' : isDesktop ? `${effectiveCanvasWidth}px` : '100%',
-                minWidth: isFullscreen ? '100%' : isDesktop ? `${effectiveCanvasWidth}px` : '100%',
+                width: isDesktop ? `${effectiveCanvasWidth}px` : '100%',
+                maxWidth: isDesktop ? `${effectiveCanvasWidth}px` : '100%',
+                minWidth: isDesktop ? `${effectiveCanvasWidth}px` : '100%',
               }}
             >
               <ArtifactCanvas />

@@ -233,40 +233,67 @@ export async function runGpuEndpointDiscovery(options?: { forceAll?: boolean }):
       }
     }
 
-    // 2. Invalidate relevant caches across the system
     invalidateGpuCache();
     memoryCache.delete('admin:orchestrator:models');
     memoryCache.delete('admin:orchestrator:routes');
     invalidateOrchestratorConfigCache();
 
-    // 3. Reconcile with Tool Orchestrator routes
-    // Check if any tool configured with a GPU provider is pointing to an offline provider or missing model
     const gpuToolsRes = await pool.query(
-      `SELECT tool_id, primary_provider, primary_model, fallback_1_provider, fallback_1_model 
+      `SELECT id, tool_id, primary_provider, primary_model, fallback_1_provider, fallback_1_model, fallback_2_provider, fallback_2_model 
        FROM tool_orchestrator 
        WHERE tool_id IN ('image', 'video', 'vision', 'perplexta_vision')`
     );
 
-    const activeProviderSlugs = new Set(
-      providerReports.filter((p) => p.status === 'online').map((p) => p.provider_id.toLowerCase())
-    );
-    const activeModelIds = new Set(
-      providerReports
-        .filter((p) => p.status === 'online')
-        .flatMap((p) => p.models.map((m) => m.model_id.toLowerCase()))
-    );
+    const providerModelMap = new Map<string, Array<{ model_id: string; task_type: string }>>();
+    for (const p of providerReports) {
+      if (p.status === 'online' && p.models.length > 0) {
+        providerModelMap.set(p.provider_id.toLowerCase(), p.models);
+      }
+    }
+
+    const getExplicitTaskType = (toolId: string): string => {
+      if (toolId === 'image') return 'image_gen';
+      if (toolId === 'video') return 'video_gen';
+      if (toolId === 'vision' || toolId === 'perplexta_vision') return 'vision_analysis';
+      return toolId;
+    };
 
     for (const tool of gpuToolsRes.rows) {
-      if (tool.primary_provider && !activeProviderSlugs.has(tool.primary_provider.toLowerCase())) {
-        console.warn(
-          `[GPU Discovery Reconcile] Tool '${tool.tool_id}' references provider '${tool.primary_provider}' which is currently offline or unconfirmed.`
+      const targetTaskType = getExplicitTaskType(tool.tool_id);
+
+      if (tool.primary_provider && providerModelMap.has(tool.primary_provider.toLowerCase())) {
+        const availableModels = providerModelMap.get(tool.primary_provider.toLowerCase()) || [];
+        const match = availableModels.find(
+          (m) => m.model_id.toLowerCase() === (tool.primary_model || '').toLowerCase()
         );
+        if (!match) {
+          console.warn(`[GPU Discovery] ⚠️ WARNING: Tool ${tool.tool_id} primary model '${tool.primary_model}' is not registered on active provider '${tool.primary_provider}'. Task type needed: ${targetTaskType}. Available:`, availableModels.map(a => a.model_id));
+        }
       }
-      if (tool.primary_model && !activeModelIds.has(tool.primary_model.toLowerCase())) {
-        console.warn(
-          `[GPU Discovery Reconcile] Tool '${tool.tool_id}' references model '${tool.primary_model}' which was not reported by active endpoints.`
+
+      if (tool.fallback_1_provider && providerModelMap.has(tool.fallback_1_provider.toLowerCase())) {
+        const availableModels = providerModelMap.get(tool.fallback_1_provider.toLowerCase()) || [];
+        const match = availableModels.find(
+          (m) => m.model_id.toLowerCase() === (tool.fallback_1_model || '').toLowerCase()
         );
+        if (!match) {
+          console.warn(`[GPU Discovery] ⚠️ WARNING: Tool ${tool.tool_id} fallback_1 model '${tool.fallback_1_model}' is not registered on active provider '${tool.fallback_1_provider}'. Task type needed: ${targetTaskType}. Available:`, availableModels.map(a => a.model_id));
+        }
       }
+
+      if (tool.fallback_2_provider && providerModelMap.has(tool.fallback_2_provider.toLowerCase())) {
+        const availableModels = providerModelMap.get(tool.fallback_2_provider.toLowerCase()) || [];
+        const match = availableModels.find(
+          (m) => m.model_id.toLowerCase() === (tool.fallback_2_model || '').toLowerCase()
+        );
+        if (!match) {
+          console.warn(`[GPU Discovery] ⚠️ WARNING: Tool ${tool.tool_id} fallback_2 model '${tool.fallback_2_model}' is not registered on active provider '${tool.fallback_2_provider}'. Task type needed: ${targetTaskType}. Available:`, availableModels.map(a => a.model_id));
+        }
+      }
+    }
+
+    if (gpuToolsRes.rows.length > 0) {
+      invalidateOrchestratorConfigCache();
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -307,6 +334,8 @@ export async function runGpuEndpointDiscovery(options?: { forceAll?: boolean }):
 
 /**
  * Starts the automated periodic GPU discovery service
+ * NOTE: Background periodic interval is intentionally disabled by default to protect
+ * serverless GPU worker compute units and prevent idle balance consumption.
  */
 export function startAutomatedGpuDiscovery(intervalMinutes: number = 5) {
   if (discoveryIntervalTimer) {
@@ -315,22 +344,7 @@ export function startAutomatedGpuDiscovery(intervalMinutes: number = 5) {
   }
 
   discoveryIntervalMinutes = intervalMinutes;
-
-  console.log(`[GPU Discovery Service] Initialized with periodic interval of ${intervalMinutes} minutes.`);
-
-  // Initial delayed discovery pass (5 seconds after boot to let DB pools stabilize)
-  setTimeout(() => {
-    runGpuEndpointDiscovery().catch((err) => {
-      console.warn('[GPU Discovery Service] Initial scan warning:', err.message);
-    });
-  }, 5000);
-
-  // Periodic schedule
-  discoveryIntervalTimer = setInterval(() => {
-    runGpuEndpointDiscovery().catch((err) => {
-      console.warn('[GPU Discovery Service] Periodic scan warning:', err.message);
-    });
-  }, intervalMinutes * 60 * 1000);
+  console.log(`[GPU Discovery Service] Periodic background polling is DISABLED to protect serverless GPU worker compute units.`);
 }
 
 /**

@@ -19,57 +19,18 @@ import {
   Save,
   RefreshCw,
   Search,
-  CheckCircle,
+  CheckCircle2,
   AlertTriangle,
   Info,
   Sliders,
-  DollarSign,
-  ChevronDown,
-  CheckCircle2,
-  AlertCircle,
-  XCircle,
-  Clock,
-  Shield,
-  Key,
   Database,
   Users,
-  Settings,
-  Plus,
-  Server,
-  Eye,
-  EyeOff,
-  Copy,
-  ExternalLink,
-  Coins,
-  Wrench,
-  LayoutGrid,
-  Scale,
-  Megaphone,
-  ImageIcon,
-  Video,
-  Mic,
-  Volume2,
-  GraduationCap,
-  Code2,
-  Music,
-  Trash2,
-  X,
-  UserPlus,
-  FastForward,
   Bell,
-  Mail,
-  FileText,
-  ShieldAlert,
-  Settings2,
-  Download,
-  ArrowRight,
-  ArrowLeft,
-  Activity,
-  History as HistoryIcon,
+  AlertCircle,
 } from "lucide-react";
 import { NotificationThresholdsModal } from "../NotificationThresholdsModal";
 import { MemoryCenterViewProps } from "./adminTypes";
-import { toast as globalToast, useConfirm } from '@/design-system';
+import { toast as globalToast } from "@/design-system";
 
 interface MemoryConsolidationReportItem {
   userId: number;
@@ -83,16 +44,16 @@ interface MemoryConsolidationReportItem {
   error?: string;
 }
 
-export const MemoryCenterView = ({
-  theme,
-  t,
-  dir,
-  language,
-}: {
+export const MemoryCenterView: React.FC<{
   theme: string;
   t: (key: string, replacements?: any) => string;
   dir: string;
   language: string;
+}> = ({
+  theme,
+  t,
+  dir,
+  language,
 }) => {
   const { token, setIsOperationPending } = useAppContext();
   const [threshold, setThreshold] = useState<number>(10);
@@ -202,7 +163,7 @@ export const MemoryCenterView = ({
       if (res.ok) {
         showToast(
           language === "ar"
-            ? `تم ضغط الذاكرة بذكاء بنجاح. تم تكثيف ${data.compressedCount} جلسة.`
+            ? `تم ضغط الذاكرة بنجاح. تم تكثيف ${data.compressedCount} جلسة.`
             : `Smart compression completed. Condensed ${data.compressedCount} active sessions.`,
           true
         );
@@ -288,6 +249,16 @@ export const MemoryCenterView = ({
     return () => clearInterval(intervalId);
   }, [token, refreshInterval]);
 
+  useEffect(() => {
+    const handleCleanEvent = () => {
+      handleRunContextCleanup();
+    };
+    window.addEventListener("admin-clean-memory", handleCleanEvent);
+    return () => {
+      window.removeEventListener("admin-clean-memory", handleCleanEvent);
+    };
+  }, [ttlDays, token]);
+
   const handleRunConsolidation = async () => {
     setIsRunning(true);
     setIsOperationPending(true);
@@ -326,6 +297,38 @@ export const MemoryCenterView = ({
     }
   };
 
+  const handleRunMigration = async () => {
+    setIsRunning(true);
+    setIsOperationPending(true);
+    try {
+      const res = await fetch("/api/admin/memories/migrate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(
+          language === "ar"
+            ? `تم ترحيل الذاكرة الموحدة بنجاح! (${data.result?.newFactsSaved || 0} حقيقة)`
+            : `Local memory migration completed! (${data.result?.newFactsSaved || 0} facts saved)`,
+          true
+        );
+        fetchStats();
+      } else {
+        showToast(data.error || "Failed to execute migration", false);
+      }
+    } catch (err: any) {
+      showToast(err.message || "Network error", false);
+    } finally {
+      setIsRunning(false);
+      setIsOperationPending(false);
+    }
+  };
+
   const filteredReports = reports.filter(
     (item) =>
       item.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -334,134 +337,112 @@ export const MemoryCenterView = ({
   );
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="w-full max-w-full space-y-6 animate-in fade-in duration-300 px-1 md:px-2">
 
-      {/* Hero Header */}
-      <div
-        className="p-6 rounded-lg border bg-[var(--surface-card)] border-[var(--border-default)] shadow-sm"
-      >
-        <div className="flex items-start gap-4">
-          <div className="p-3 bg-accent/10 rounded-lg text-accent shadow-sm">
-            <Brain
-              size={28}
-              className="text-accent"
-            />
+      {/* Sovereign Top Header Banner */}
+      <div className="p-6 rounded-[var(--radius-lg)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-xs transition-theme flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-center justify-center text-[var(--fg-accent)] shadow-xs shrink-0">
+            <Brain size={22} />
           </div>
-          <div className="flex-1 space-y-1">
-            <h4 className="text-lg font-bold text-[var(--text-primary)]">
+          <div>
+            <h1 className="text-xl font-black tracking-tight flex items-center gap-3 text-[var(--text-primary)]">
+              <span>{language === "ar" ? "إدارة ذاكرة وسياق النظام" : "Memory & Context Engine"}</span>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-[var(--radius-xs)] bg-[var(--bg-accent-emphasis)]/10 text-[var(--fg-accent)] border border-[var(--border-accent)]/30 flex items-center gap-1.5 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-[var(--radius-full)] bg-[var(--fg-accent)] animate-pulse" />
+                {language === "ar" ? "المحرك نشط" : "Buffer Active"}
+              </span>
+            </h1>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
               {language === "ar"
-                ? "بروتوكول تحسين وصيانة الذاكرة التراكمية"
-                : "PERPLEXTA SYSTEM MEMORY OPTIMIZATION PROTOCOL"}
-            </h4>
-            <p className="text-sm text-[var(--text-muted)]">
-              {language === "ar"
-                ? "تنظيم وفهرسة سجلات ذاكرة المستخدمين لتحسين الدقة وتقليل زمن الاستجابة."
-                : "Organize and optimize user memory fragments to improve AI response and reduce context load."}
+                ? "تنظيم وفهرسة سجلات ذاكرة المستخدمين، ضغط السياق التلقائي وتقليل زمن الاستجابة"
+                : "Organize user memory fragments, automatic context compression, and latency reduction"}
             </p>
           </div>
         </div>
+
+        <button
+          onClick={fetchStats}
+          disabled={loadingStats}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] touch-target-44 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-subtle)]/80 border border-[var(--border-default)] text-[var(--text-primary)] font-bold text-xs shadow-xs transition-all cursor-pointer shrink-0"
+        >
+          <RefreshCw size={15} className={loadingStats ? "animate-spin text-[var(--fg-accent)]" : ""} />
+          <span>{language === "ar" ? "تحديث البيانات" : "Refresh Data"}</span>
+        </button>
       </div>
 
       {/* Real-Time System Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div
-          className="p-6 rounded-lg border bg-[var(--surface-card)] border-[var(--border-default)] shadow-md relative overflow-hidden group"
-        >
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="p-5 rounded-[var(--radius-md)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-xs relative overflow-hidden group">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-[var(--text-muted)] uppercase tracking-wider">
+            <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
               {language === "ar" ? "إجمالي السجلات" : "TOTAL MEMORIES"}
             </span>
-            <Database
-              size={18}
-              className="text-[var(--text-muted)] group-hover:text-accent transition-theme"
-            />
+            <Database size={18} className="text-[var(--text-muted)] group-hover:text-[var(--fg-accent)] transition-colors" />
           </div>
-          <div className="mt-4 flex items-baseline">
+          <div className="mt-3 flex items-baseline">
             {loadingStats ? (
-              <span className="text-3xl font-extrabold text-accent/30 animate-pulse">
-                ...
-              </span>
+              <span className="text-2xl font-black text-[var(--text-muted)] animate-pulse">...</span>
             ) : (
-              <span className="text-3xl font-extrabold text-[var(--text-primary)] tracking-tight font-sans">
+              <span className="text-2xl font-black text-[var(--text-primary)] tracking-tight font-mono">
                 {systemStats?.totalMemories ?? 0}
               </span>
             )}
           </div>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-accent/10 to-transparent"></div>
         </div>
 
-        <div
-          className="p-6 rounded-lg border bg-[var(--surface-card)] border-[var(--border-default)] shadow-md relative overflow-hidden group"
-        >
+        <div className="p-5 rounded-[var(--radius-md)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-xs relative overflow-hidden group">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-[var(--text-muted)] uppercase tracking-wider">
-              {language === "ar" ? "المخدمين النشطين" : "ACTIVE PROFILES"}
+            <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
+              {language === "ar" ? "المستخدمين النشطين" : "ACTIVE PROFILES"}
             </span>
-            <Users
-              size={18}
-              className="text-[var(--text-muted)] group-hover:text-accent transition-theme"
-            />
+            <Users size={18} className="text-[var(--text-muted)] group-hover:text-[var(--fg-accent)] transition-colors" />
           </div>
-          <div className="mt-4 flex items-baseline">
+          <div className="mt-3 flex items-baseline">
             {loadingStats ? (
-              <span className="text-3xl font-extrabold text-accent/30 animate-pulse">
-                ...
-              </span>
+              <span className="text-2xl font-black text-[var(--text-muted)] animate-pulse">...</span>
             ) : (
-              <span className="text-3xl font-extrabold text-[var(--text-primary)] tracking-tight font-sans">
+              <span className="text-2xl font-black text-[var(--text-primary)] tracking-tight font-mono">
                 {systemStats?.usersWithMemories ?? 0}
               </span>
             )}
           </div>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-accent/10 to-transparent"></div>
         </div>
 
-        <div
-          className="p-6 rounded-lg border bg-[var(--surface-card)] border-[var(--border-default)] shadow-md relative overflow-hidden group"
-        >
+        <div className="p-5 rounded-[var(--radius-md)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-xs relative overflow-hidden group">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-[var(--text-muted)] uppercase tracking-wider">
-              {language === "ar"
-                ? "متوسط الكثافة لكل حساب"
-                : "MEAN PROFILE DENSITY"}
+            <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
+              {language === "ar" ? "متوسط الكثافة" : "MEAN PROFILE DENSITY"}
             </span>
-            <Cpu
-              size={18}
-              className="text-[var(--text-muted)] group-hover:text-accent transition-theme"
-            />
+            <Cpu size={18} className="text-[var(--text-muted)] group-hover:text-[var(--fg-accent)] transition-colors" />
           </div>
-          <div className="mt-4 flex items-baseline">
+          <div className="mt-3 flex items-baseline gap-1.5">
             {loadingStats ? (
-              <span className="text-3xl font-extrabold text-accent/30 animate-pulse">
-                ...
-              </span>
+              <span className="text-2xl font-black text-[var(--text-muted)] animate-pulse">...</span>
             ) : (
-              <span className="text-3xl font-extrabold text-[var(--text-primary)] tracking-tight font-sans">
-                {systemStats?.averageMemories ?? 0}{" "}
-                <span className="text-sm font-normal text-[var(--text-muted)]">
-                  rec/user
+              <>
+                <span className="text-2xl font-black text-[var(--text-primary)] tracking-tight font-mono">
+                  {systemStats?.averageMemories ?? 0}
                 </span>
-              </span>
+                <span className="text-xs font-normal text-[var(--text-muted)] font-mono">rec/user</span>
+              </>
             )}
           </div>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-accent/10 to-transparent"></div>
         </div>
       </div>
 
-      {/* Real-time Diagnostics & Active Context Sessions Panel */}
+      {/* Real-time Diagnostics Panel */}
       {diagnosticsData && (
-        <div
-          className="p-6 rounded-lg border bg-[var(--surface-card)] border-[var(--border-default)] shadow-md space-y-4"
-        >
+        <div className="p-5 rounded-[var(--radius-md)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-3">
             <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-accent animate-ping"></div>
-              <h4 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">
-                {language === "ar" ? "تشخيصات محرك الذاكرة الحي (Live Buffer Diagnostics)" : "Live Buffer Diagnostics & Engine Health"}
+              <div className="w-2 h-2 rounded-[var(--radius-full)] bg-[var(--fg-accent)] animate-ping" />
+              <h4 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">
+                {language === "ar" ? "تشخيصات ذاكرة التخزين المؤقت" : "Live Buffer Diagnostics & Engine Health"}
               </h4>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-[var(--text-muted)] bg-[var(--surface-subtle)] px-2 py-0.5 rounded border border-[var(--border-default)]">
+              <span className="text-[11px] font-mono text-[var(--text-muted)] bg-[var(--surface-subtle)] px-2.5 py-1 rounded-[var(--radius-xs)] border border-[var(--border-default)]">
                 {diagnosticsData.engine} ({diagnosticsData.mode})
               </span>
               {(() => {
@@ -470,20 +451,20 @@ export const MemoryCenterView = ({
                 const pct = Math.round((count / limit) * 100);
                 if (pct >= 80) {
                   return (
-                    <span className="text-xs font-mono text-red-500 bg-red-500/10 border border-red-500/30 px-2 py-0.5 rounded flex items-center gap-1 font-bold">
+                    <span className="text-xs font-mono text-[var(--fg-danger)] bg-[var(--status-danger-subtle)] border border-[var(--fg-danger)]/30 px-2 py-0.5 rounded-[var(--radius-xs)] flex items-center gap-1 font-bold">
                       <Bell size={10} className="animate-bounce" /> {pct}% {language === "ar" ? "حرج" : "CRITICAL"}
                     </span>
                   );
                 }
                 if (pct >= 50) {
                   return (
-                    <span className="text-xs font-mono text-amber-500 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded flex items-center gap-1 font-bold">
+                    <span className="text-xs font-mono text-[var(--fg-warning)] bg-[var(--status-warning-subtle)] border border-[var(--fg-warning)]/30 px-2 py-0.5 rounded-[var(--radius-xs)] flex items-center gap-1 font-bold">
                       <Bell size={10} className="animate-pulse" /> {pct}% {language === "ar" ? "تنبيه" : "WARNING"}
                     </span>
                   );
                 }
                 return (
-                  <span className="text-xs font-mono text-[var(--fg-success)] bg-[var(--status-success-subtle)] border border-[var(--fg-success)]/30 px-2 py-0.5 rounded flex items-center gap-1">
+                  <span className="text-xs font-mono text-[var(--fg-success)] bg-[var(--status-success-subtle)] border border-[var(--fg-success)]/30 px-2 py-0.5 rounded-[var(--radius-xs)] flex items-center gap-1 font-bold">
                     <CheckCircle2 size={10} /> {pct}% {language === "ar" ? "مستقر" : "HEALTHY"}
                   </span>
                 );
@@ -491,201 +472,57 @@ export const MemoryCenterView = ({
             </div>
           </div>
 
-          {/* Notification Alert System for Custom Percentage Thresholds & Token Spike Alerts */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border-default)] font-sans">
+          {/* Trigger Thresholds Row */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)]">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded bg-accent/15 text-accent">
-                <Sliders size={16} />
+              <div className="p-1.5 rounded-[var(--radius-xs)] bg-[var(--bg-accent-emphasis)]/10 text-[var(--fg-accent)]">
+                <Sliders size={15} />
               </div>
               <div>
                 <span className="text-xs font-bold text-[var(--text-primary)] block">
-                  {language === "ar" ? "عتبات التنبيهات والإشعارات المخصصة" : "Configurable Trigger Thresholds"}
+                  {language === "ar" ? "عتبات التنبيهات والإشعارات" : "Configurable Trigger Thresholds"}
                 </span>
-                <span className="text-[11px] text-[var(--text-muted)]">
+                <span className="text-[11px] text-[var(--text-muted)] font-mono">
                   {language === "ar"
-                    ? `العتبات الحالية: الأولية ${lowThreshold}% | الحرج ${highThreshold}%`
+                    ? `العتبة الأولية: ${lowThreshold}% | العتبة الحرجة: ${highThreshold}%`
                     : `Active Triggers: Low ${lowThreshold}% | High ${highThreshold}%`}
                 </span>
               </div>
             </div>
             <button
               onClick={() => setIsThresholdModalOpen(true)}
-              className="px-3 py-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 border border-accent/30 text-accent font-bold text-xs flex items-center gap-1.5 transition-theme cursor-pointer shadow-sm"
+              className="px-3 py-1.5 min-h-[38px] rounded-[var(--radius-sm)] bg-[var(--surface-card)] hover:bg-[var(--surface-card)]/80 border border-[var(--border-default)] text-[var(--text-primary)] font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs shrink-0"
             >
-              <Sliders size={14} />
-              <span>{language === "ar" ? "تعديل العتبات المخصصة" : "Configure Thresholds"}</span>
+              <Sliders size={13} />
+              <span>{language === "ar" ? "تعديل العتبات" : "Configure"}</span>
             </button>
           </div>
 
-          {(() => {
-            const bufferLimit = diagnosticsData?.bufferLimit || 50;
-            const currentCount = systemStats?.totalMemories || 25;
-            const bufferUsagePercent = Math.round((currentCount / bufferLimit) * 100);
-
-            if (bufferUsagePercent >= highThreshold) {
-              return (
-                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/40 text-red-600 dark:text-red-400 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in font-sans shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-full bg-red-500/20 text-red-500 shrink-0 mt-0.5 animate-bounce">
-                      <AlertTriangle size={18} />
-                    </div>
-                    <div>
-                      <div className="font-bold text-xs uppercase tracking-wider flex items-center gap-2">
-                        <span>
-                          {language === "ar"
-                            ? `تحذير حرج: تجاوز استهلاك الذاكرة عتبة ${highThreshold}% المخصصة!`
-                            : `CRITICAL ALERT: Memory Buffer Exceeded Custom ${highThreshold}% Capacity!`}
-                        </span>
-                        <span className="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded font-mono font-bold">
-                          {bufferUsagePercent}% {language === "ar" ? "السعة" : "LOAD"}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
-                        {language === "ar"
-                          ? `وصلت كثافة استهلاك سياق الذاكرة إلى ${bufferUsagePercent}%. يوصى ببدء تقليص الذاكرة فوراً لمنع البطء والتأثير على سرعة الاستجابة.`
-                          : `Buffer load has reached ${bufferUsagePercent}%. Immediate context compression is strongly recommended to prevent latency spikes.`}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleSmartCompress}
-                    disabled={isCompressing}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold transition-all shrink-0 flex items-center gap-2 shadow cursor-pointer disabled:opacity-50"
-                  >
-                    {isCompressing ? (
-                      <RefreshCw className="animate-spin" size={14} />
-                    ) : (
-                      <Zap size={14} />
-                    )}
-                    <span>
-                      {language === "ar" ? "تقليص الذاكرة الآن" : "Shrink Memory Now"}
-                    </span>
-                  </button>
-                </div>
-              );
-            }
-
-            if (bufferUsagePercent >= lowThreshold) {
-              return (
-                <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/40 text-amber-600 dark:text-amber-400 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in font-sans shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-full bg-amber-500/20 text-amber-500 shrink-0 mt-0.5">
-                      <AlertCircle size={18} />
-                    </div>
-                    <div>
-                      <div className="font-bold text-xs uppercase tracking-wider flex items-center gap-2">
-                        <span>
-                          {language === "ar"
-                            ? `إشعار تنبيه: استهلاك الذاكرة وصل إلى عتبة ${lowThreshold}% المخصصة`
-                            : `WARNING: Memory Buffer Reached Custom ${lowThreshold}% Capacity`}
-                        </span>
-                        <span className="text-[10px] bg-amber-500/30 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded font-mono font-bold">
-                          {bufferUsagePercent}% {language === "ar" ? "السعة" : "LOAD"}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
-                        {language === "ar"
-                          ? `وصلت سعة التخزين المؤقت إلى ${bufferUsagePercent}%. يمكنك تنفيذ تقليص الذاكرة للحفاظ على أداء سريع وتوزيع مثالي للرموز.`
-                          : `Buffer capacity is currently at ${bufferUsagePercent}%. You can shrink memory now to maintain optimal response speeds.`}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleSmartCompress}
-                    disabled={isCompressing}
-                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-bold transition-all shrink-0 flex items-center gap-2 shadow cursor-pointer disabled:opacity-50"
-                  >
-                    {isCompressing ? (
-                      <RefreshCw className="animate-spin" size={14} />
-                    ) : (
-                      <Zap size={14} />
-                    )}
-                    <span>
-                      {language === "ar" ? "تقليص الذاكرة" : "Shrink Memory"}
-                    </span>
-                  </button>
-                </div>
-              );
-            }
-
-            return null;
-          })()}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-            <div className="p-3 rounded bg-[var(--surface-subtle)] border border-[var(--border-default)]">
-              <span className="text-[var(--text-muted)] block mb-1">{language === "ar" ? "سعة التخزين المؤقت القصوى" : "Buffer Limit Capacity"}</span>
-              <span className="text-base font-bold text-[var(--text-primary)]">{diagnosticsData.bufferLimit} Records Max</span>
-            </div>
-            <div className="p-3 rounded bg-[var(--surface-subtle)] border border-[var(--border-default)]">
-              <span className="text-[var(--text-muted)] block mb-1">{language === "ar" ? "الجلسات النشطة ذات السياق" : "Active Context Sessions"}</span>
-              <span className="text-base font-bold text-accent">{diagnosticsData.activeContextSessions?.length || 0} Sessions</span>
-            </div>
-          </div>
-
-          {diagnosticsData.activeContextSessions && diagnosticsData.activeContextSessions.length > 0 && (
-            <div className="space-y-2 mt-4">
-              <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider block">
-                {language === "ar" ? "أحدث جلسات المحادثة ذات السياق النشط" : "Recent Active Context Sessions"}
-              </span>
-              <div className="max-h-48 overflow-y-auto space-y-2 pr-1 font-mono text-xs">
-                {diagnosticsData.activeContextSessions.map((session: any) => (
-                  <div key={session.id} className="p-2.5 rounded bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-center justify-between gap-2">
-                    <div className="truncate flex items-center gap-2">
-                      <span className="font-bold text-accent">#{session.id}</span>
-                      <span className="text-[var(--text-primary)] truncate">{session.title || 'Untitled Session'}</span>
-                      <span className="text-[10px] font-mono bg-accent/10 text-accent px-1.5 py-0.2 rounded shrink-0">
-                        ⚡ {language === "ar" ? "نشط" : "Active Context"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[10px] text-[var(--text-muted)] whitespace-nowrap">
-                        {new Date(session.updated_at).toLocaleTimeString()}
-                      </span>
-                      <button
-                        onClick={handleSmartCompress}
-                        disabled={isCompressing}
-                        className="text-[10px] font-mono text-accent hover:underline px-1.5 py-0.5 bg-accent/5 hover:bg-accent/10 rounded border border-accent/20 cursor-pointer disabled:opacity-50"
-                        title={language === "ar" ? "تقليص سياق هذه الجلسة" : "Shrink Session Context"}
-                      >
-                        {language === "ar" ? "تقليص" : "Shrink"}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Buffer Usage Density Trend Over Last 60 Minutes */}
-          <div className="space-y-2 mt-6 pt-4 border-t border-[var(--border-default)]">
+          {/* Buffer Trend Chart */}
+          <div className="space-y-2 pt-2 border-t border-[var(--border-default)]">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider block">
-                {language === "ar" ? "كثافة استخدام ذاكرة التخزين المؤقت خلال آخر 60 دقيقة" : "Buffer Usage Density Trend (Last 60 Minutes)"}
+                {language === "ar" ? "كثافة الذاكرة خلال آخر 60 دقيقة" : "Buffer Density Trend (Last 60m)"}
               </span>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 text-xs font-mono">
-                  <span className="text-[var(--text-muted)] text-[11px]">
-                    {language === "ar" ? "معدل التحديث:" : "Refresh:"}
-                  </span>
-                  <select
-                    value={refreshInterval}
-                    onChange={(e) => setRefreshInterval(Number(e.target.value))}
-                    className="bg-[var(--surface-subtle)] text-[var(--text-primary)] border border-[var(--border-default)] text-[11px] rounded px-2 py-0.5 font-mono focus:outline-none focus:border-accent transition-theme cursor-pointer"
-                  >
-                    <option value={5}>5s</option>
-                    <option value={10}>10s</option>
-                    <option value={30}>30s</option>
-                  </select>
-                </div>
-                <span className="text-[10px] font-mono text-accent bg-accent/10 px-2 py-0.5 rounded">
-                  Real-time Telemetry
+                <span className="text-[11px] text-[var(--text-muted)] font-mono">
+                  {language === "ar" ? "معدل التحديث:" : "Refresh:"}
                 </span>
+                <select
+                  value={refreshInterval}
+                  onChange={(e) => setRefreshInterval(Number(e.target.value))}
+                  className="bg-[var(--surface-subtle)] text-[var(--text-primary)] border border-[var(--border-default)] text-[11px] rounded-[var(--radius-xs)] px-2 py-0.5 font-mono focus:outline-none cursor-pointer"
+                >
+                  <option value={5}>5s</option>
+                  <option value={10}>10s</option>
+                  <option value={30}>30s</option>
+                </select>
               </div>
             </div>
-            <div className="h-48 w-full pt-2">
+            <div className="h-40 w-full pt-2">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={bufferTrendData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+                <LineChart data={bufferTrendData} margin={{ top: 5, right: 15, left: -20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-default)" />
                   <XAxis dataKey="time" stroke="var(--text-muted)" fontSize={10} tickLine={false} />
                   <YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false} />
                   <Tooltip 
@@ -700,21 +537,10 @@ export const MemoryCenterView = ({
                   <Line 
                     type="monotone" 
                     dataKey="density" 
-                    stroke="var(--sys-color-primary, #10b881)" 
-                    strokeWidth={2.5} 
-                    dot={{ fill: 'var(--sys-color-primary, #10b881)', r: 4 }} 
-                    activeDot={{ r: 6, fill: 'var(--sys-color-primary, #10b881)', stroke: '#ffffff', strokeWidth: 2 }} 
-                  />
-                  <ReferenceLine 
-                    y={40} 
-                    stroke="#ef4444" 
-                    strokeDasharray="4 4" 
-                    label={{ 
-                      value: language === 'ar' ? 'عتبة 80% للحمل الأقصى' : '80% Capacity Threshold', 
-                      fill: '#ef4444', 
-                      fontSize: 10, 
-                      position: 'insideTopRight' 
-                    }} 
+                    stroke="var(--fg-accent, #10b881)" 
+                    strokeWidth={2} 
+                    dot={{ fill: 'var(--fg-accent, #10b881)', r: 3 }} 
+                    activeDot={{ r: 5, fill: 'var(--fg-accent, #10b881)' }} 
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -724,138 +550,148 @@ export const MemoryCenterView = ({
       )}
 
       {/* Action Trigger Consolidation Form Console */}
-      <div
-        className="p-6 rounded-lg border bg-[var(--surface-card)] border-[var(--border-default)] shadow-md"
-      >
-        <h4 className="text-base font-bold text-[var(--text-primary)] mb-6 border-b border-[var(--border-default)] pb-3">
-          {language === "ar"
-            ? "أدوات التشغيل وتحديد الأهداف"
-            : "TRIGGER MANIFEST & MANIPULATION"}
+      <div className="p-5 rounded-[var(--radius-md)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-xs space-y-4">
+        <h4 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider border-b border-[var(--border-default)] pb-3">
+          {language === "ar" ? "أدوات التكثيف والترحيل اليدوي" : "MANUAL DISTILLATION & MIGRATION TOOLS"}
         </h4>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider block">
-              {language === "ar"
-                ? "الحد الأدنى للذكريات المستهدفة"
-                : "MINIMUM ACCUMULATION LIMIT (THRESHOLD)"}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-[var(--text-muted)] block">
+              {language === "ar" ? "الحد الأدنى للذكريات" : "MINIMUM THRESHOLD"}
             </label>
             <input
               type="number"
               value={threshold}
-              onChange={(e) =>
-                setThreshold(Math.max(2, parseInt(e.target.value) || 2))
-              }
-              className="w-full px-4 py-2 rounded border focus:outline-none focus:ring-1 focus:ring-accent-500/50 transition-theme font-mono text-sm bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
+              onChange={(e) => setThreshold(Math.max(2, parseInt(e.target.value) || 2))}
+              className="w-full min-h-[44px] touch-target-44 px-3 py-2 rounded-[var(--radius-sm)] border focus:outline-none transition-theme font-mono text-xs bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
               placeholder="e.g. 10"
               min="2"
             />
-            <p className="text-[10px] text-[var(--text-muted)]">
-              {language === "ar"
-                ? "سيتم فقط معالجة المستخدمين الذين لديهم هذا العدد من الذكريات أو أكثر."
-                : "Process profiles containing this memory record count or higher."}
-            </p>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider block">
-              {language === "ar"
-                ? "معرّف مستخدم محدد (اختياري)"
-                : "EXPLICIT USER IDENTIFIER ID (OPTIONAL)"}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-[var(--text-muted)] block">
+              {language === "ar" ? "معرّف المستهدف (اختياري)" : "TARGET USER ID"}
             </label>
             <input
               type="text"
               value={targetUserId}
-              onChange={(e) =>
-                setTargetUserId(e.target.value.replace(/\D/g, ""))
-              }
-              className="w-full px-4 py-2 rounded border focus:outline-none focus:ring-1 focus:ring-accent-500/50 transition-theme font-mono text-sm bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
+              onChange={(e) => setTargetUserId(e.target.value.replace(/\D/g, ""))}
+              className="w-full min-h-[44px] touch-target-44 px-3 py-2 rounded-[var(--radius-sm)] border focus:outline-none transition-theme font-mono text-xs bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
               placeholder="e.g. 52"
             />
-            <p className="text-[10px] text-[var(--text-muted)]">
-              {language === "ar"
-                ? "اترك هذا الحقل فارغاً لتشغيل عملية التكثيف لجميع المستخدمين المؤهلين."
-                : "Leave blank to process all system users matching the criteria."}
-            </p>
           </div>
 
-          <div>
-            <button
-              onClick={handleRunConsolidation}
-              disabled={isRunning}
-              className="w-full flex items-center justify-center gap-2 px-6 py-2.5 bg-accent hover:bg-accent disabled:bg-accent/40 text-[var(--fg-on-emphasis)] rounded-[4px] font-medium text-sm transition-theme shadow-sm cursor-pointer"
-            >
-              {isRunning ? (
-                <>
-                  <div className="w-4 h-4 rounded-full border-2 border-white/35 border-t-white animate-spin"></div>
-                  {language === "ar"
-                    ? "جاري التكثيف والتوليف..."
-                    : "DISTILLING MEMORIES..."}
-                </>
-              ) : (
-                <>
-                  <Brain
-                    size={16}
-                    className="text-[var(--fg-on-emphasis)]"
-                  />
-                  {language === "ar"
-                    ? "بدء عملية التكثيف اليدوي"
-                    : "EXECUTE MANIFEST CYCLE"}
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            onClick={handleRunConsolidation}
+            disabled={isRunning}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] touch-target-44 rounded-[var(--radius-sm)] bg-[var(--bg-accent-emphasis)] hover:opacity-90 text-[var(--fg-on-emphasis)] font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
+          >
+            {isRunning ? (
+              <>
+                <RefreshCw size={15} className="animate-spin" />
+                <span>{language === "ar" ? "جاري المعالجة..." : "Processing..."}</span>
+              </>
+            ) : (
+              <>
+                <Brain size={15} />
+                <span>{language === "ar" ? "تذويب الذاكرة" : "Execute Distillation"}</span>
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={handleRunMigration}
+            disabled={isRunning}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] touch-target-44 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-subtle)]/80 border border-[var(--border-default)] text-[var(--text-primary)] font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
+          >
+            <Database size={15} className="text-[var(--text-muted)]" />
+            <span>{language === "ar" ? "ترحيل البيانات" : "Migrate Data"}</span>
+          </button>
         </div>
       </div>
 
-      {/* Automated Context Cleanup Routine Panel */}
-      <div
-        className="p-6 rounded-lg border bg-[var(--surface-card)] border-[var(--border-default)] shadow-md"
-      >
-        <h4 className="text-base font-bold text-[var(--text-primary)] mb-2 border-b border-[var(--border-default)] pb-3">
-          {language === "ar"
-            ? "محرك تنظيف السياق التلقائي (Context TTL Cleanup)"
-            : "AUTOMATED CONTEXT TTL CLEANUP ROUTINE"}
-        </h4>
-        <p className="text-xs text-[var(--text-muted)] mb-6">
-          {language === "ar"
-            ? "تحديد ومسح ملخصات السياق للجلسات غير النشطة بناءً على عتبة TTL للحفاظ على خفة و كفاءة ذاكرة المحرك."
-            : "Identify and purge inactive session context summaries based on a configurable TTL threshold to maintain engine buffer efficiency."}
-        </p>
+      {/* Automated Context Cleanup & Smart Compress Controls */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Context TTL Cleanup */}
+        <div className="p-5 rounded-[var(--radius-md)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-xs space-y-3 flex flex-col justify-between">
+          <div>
+            <h4 className="text-sm font-bold text-[var(--text-primary)] border-b border-[var(--border-default)] pb-2 mb-2">
+              {language === "ar" ? "محرك تنظيف السياق التلقائي" : "Context TTL Cleanup Engine"}
+            </h4>
+            <p className="text-xs text-[var(--text-muted)] mb-3">
+              {language === "ar"
+                ? "مسح ملخصات السياق للجلسات غير النشطة بناءً على فترة عدم النشاط المحجوزة"
+                : "Prune inactive session summaries to maintain buffer capacity"}
+            </p>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider block">
-              {language === "ar" ? "عتبة فترة عدم النشاط (TTL باليوم)" : "INACTIVITY TTL THRESHOLD (DAYS)"}
-            </label>
+          <div className="flex items-center gap-3">
             <select
               value={ttlDays}
               onChange={(e) => setTtlDays(parseInt(e.target.value, 10))}
-              className="w-full px-4 py-2 rounded border focus:outline-none focus:ring-1 focus:ring-accent-500/50 transition-theme font-mono text-sm bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
+              className="flex-1 min-h-[44px] touch-target-44 px-3 py-2 rounded-[var(--radius-sm)] border focus:outline-none font-mono text-xs bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] cursor-pointer"
             >
               <option value="7">7 Days (Aggressive)</option>
               <option value="15">15 Days (Standard)</option>
               <option value="30">30 Days (Recommended)</option>
               <option value="60">60 Days (Extended)</option>
-              <option value="90">90 Days (Archival)</option>
             </select>
-          </div>
 
-          <div>
             <button
               onClick={handleRunContextCleanup}
               disabled={isCleaning}
-              className="w-full flex items-center justify-center gap-2 px-6 py-2.5 bg-[var(--surface-subtle)] hover:bg-accent/10 border border-[var(--border-default)] text-[var(--text-primary)] hover:text-accent disabled:opacity-50 rounded-[4px] font-medium text-sm transition-theme cursor-pointer"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] touch-target-44 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-subtle)]/80 border border-[var(--border-default)] text-[var(--text-primary)] font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
             >
               {isCleaning ? (
                 <>
-                  <div className="w-4 h-4 rounded-full border-2 border-accent/35 border-t-accent animate-spin"></div>
-                  {language === "ar" ? "جاري تنظيف السياق..." : "PURGING INACTIVE CONTEXT..."}
+                  <RefreshCw size={15} className="animate-spin text-[var(--fg-accent)]" />
+                  <span>{language === "ar" ? "جاري التنظيف..." : "Cleaning..."}</span>
                 </>
               ) : (
                 <>
-                  <Database size={16} />
-                  {language === "ar" ? "تشغيل تنظيف السياق الآن" : "RUN CONTEXT CLEANUP ROUTINE"}
+                  <Database size={15} />
+                  <span>{language === "ar" ? "بدء التنظيف" : "Run Cleanup"}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Smart Context Compression */}
+        <div className="p-5 rounded-[var(--radius-md)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-xs space-y-3 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-2 mb-2">
+              <h4 className="text-sm font-bold text-[var(--text-primary)]">
+                {language === "ar" ? "الضغط الذكي للسياق" : "Smart Context Compression"}
+              </h4>
+              <span className="text-[10px] font-mono text-[var(--fg-accent)] bg-[var(--bg-accent-emphasis)]/10 px-2 py-0.5 rounded-[var(--radius-xs)]">
+                {language === "ar" ? "توفير الرموز" : "Token Trim"}
+              </span>
+            </div>
+            <p className="text-xs text-[var(--text-muted)] mb-3">
+              {language === "ar"
+                ? "ضغط وتقليم النصوص الطويلة في جلسات المحادثة مع الحفاظ على المعلومات الجوهرية"
+                : "Trim redundant tokens while preserving essential context statements"}
+            </p>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              onClick={handleSmartCompress}
+              disabled={isCompressing}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 min-h-[44px] touch-target-44 rounded-[var(--radius-sm)] bg-[var(--bg-accent-emphasis)] hover:opacity-90 text-[var(--fg-on-emphasis)] font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
+            >
+              {isCompressing ? (
+                <>
+                  <RefreshCw size={15} className="animate-spin" />
+                  <span>{language === "ar" ? "جاري الضغط..." : "Compressing..."}</span>
+                </>
+              ) : (
+                <>
+                  <Zap size={15} />
+                  <span>{language === "ar" ? "بدء الضغط" : "Run Compression"}</span>
                 </>
               )}
             </button>
@@ -863,229 +699,84 @@ export const MemoryCenterView = ({
         </div>
       </div>
 
-      {/* Smart Compress Heuristic Panel */}
-      <div
-        className="p-6 rounded-lg border bg-[var(--surface-card)] border-[var(--border-default)] shadow-md"
-      >
-        <div className="flex items-center justify-between mb-2 border-b border-[var(--border-default)] pb-3">
-          <h4 className="text-base font-bold text-[var(--text-primary)]">
-            {language === "ar"
-              ? "الضغط الذكي للسياق (Smart Context Compression)"
-              : "SMART CONTEXT COMPRESSION & HEURISTIC TRIM"}
-          </h4>
-          <span className="text-xs font-mono text-accent bg-accent/10 px-2.5 py-1 rounded">
-            {language === "ar" ? "تقليل استهلاك الرموز" : "Token Load Reduction"}
-          </span>
-        </div>
-        <p className="text-xs text-[var(--text-muted)] mb-6">
-          {language === "ar"
-            ? "تطبيق خوارزمية استدلالية ذكية لضغط وتقليم النصوص الطويلة في جلسات المحادثة النشطة مع الاحتفاظ بالمعلومات الجوهرية وتخفيف الحمل على المحرك."
-            : "Apply lightweight heuristic compression to trim redundant tokens from long-running active sessions while preserving core context summaries."}
-        </p>
-
-        <div className="flex items-center justify-end">
-          <button
-            onClick={handleSmartCompress}
-            disabled={isCompressing}
-            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-[var(--surface-subtle)] hover:bg-accent/10 border border-[var(--border-default)] text-[var(--text-primary)] hover:text-accent disabled:opacity-50 rounded-[4px] font-medium text-sm transition-theme cursor-pointer"
-          >
-            {isCompressing ? (
-              <>
-                <div className="w-4 h-4 rounded-full border-2 border-accent/35 border-t-accent animate-spin"></div>
-                {language === "ar" ? "جاري الضغط الذكي..." : "COMPRESSING SESSIONS..."}
-              </>
-            ) : (
-              <>
-                <Zap size={16} className="text-accent" />
-                {language === "ar" ? "تشغيل الضغط الذكي الآن" : "RUN SMART COMPRESSION"}
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Dynamic Results & Verification Console */}
-      <div
-        className="p-6 rounded-lg border bg-[var(--surface-card)] border-[var(--border-default)] shadow-md space-y-6"
-      >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--border-default)] pb-4">
+      {/* Dynamic Results Console */}
+      <div className="p-5 rounded-[var(--radius-md)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-xs space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--border-default)] pb-3">
           <div>
-            <h4 className="text-base font-bold text-[var(--text-primary)]">
-              {language === "ar"
-                ? "تقرير معالجة تكثيف الذاكرة"
-                : "DISTILLATION EXECUTION REPORT"}
+            <h4 className="text-sm font-bold text-[var(--text-primary)]">
+              {language === "ar" ? "تقرير نتائج المعالجة والتوليف" : "Distillation Execution Report"}
             </h4>
-            <p className="text-xs text-[var(--text-muted)] mt-1">
-              {language === "ar"
-                ? "تحقق من جودة التوليف الذكي ومخرجات الذكاء الاصطناعي لكل مستخدم نشط."
-                : "Audit the generated high-density facts and compression quality below."}
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+              {language === "ar" ? "نتائج معالجة التكثيف والتوليف لكل حساب مستخدم" : "Audit generated high-density facts and compression quality"}
             </p>
           </div>
 
-          <div className="relative w-full md:w-80">
+          <div className="relative w-full md:w-72">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2 pl-10 pr-4 rounded border focus:outline-none focus:ring-1 focus:ring-accent-500/50 transition-theme text-xs bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
-              placeholder={
-                language === "ar"
-                  ? "بحث عن اسم، بريد، أو محتوى..."
-                  : "Search name, email, or synthesized fact..."
-              }
+              className="w-full min-h-[42px] px-3 py-2 pl-9 rounded-[var(--radius-sm)] border focus:outline-none text-xs bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
+              placeholder={language === "ar" ? "بحث عن بريد أو اسم..." : "Search user or fact..."}
             />
-            <div className="absolute top-2.5 left-3 text-[var(--text-muted)]">
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            </div>
+            <Search size={14} className="absolute top-3 left-3 text-[var(--text-muted)]" />
           </div>
         </div>
 
         {filteredReports.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center rounded bg-[var(--surface-subtle)] border border-dashed border-[var(--border-default)]">
-            <Brain
-              size={48}
-              className="text-[var(--text-muted)] opacity-60 mb-4 animate-pulse"
-            />
-            <p className="text-sm font-bold text-[var(--text-muted)]">
-              {language === "ar"
-                ? "لا توجد نتائج معالجة حالية"
-                : "No active runtime logs available."}
-            </p>
-            <p className="text-xs text-[var(--text-muted)] mt-1 max-w-sm">
-              {language === "ar"
-                ? "ابدأ بتحديد الخيارات وضغط بدء عملية التكثيف اليدوي أعلاه لاستيراد ومكثفة سجلات المستخدمين."
-                : "Select targets and run the manifest cycle to stream and capture direct synthesis details here."}
+          <div className="flex flex-col items-center justify-center p-10 text-center rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-dashed border-[var(--border-default)]">
+            <Brain size={36} className="text-[var(--text-muted)] opacity-60 mb-2 animate-pulse" />
+            <p className="text-xs font-bold text-[var(--text-muted)]">
+              {language === "ar" ? "لا توجد نتائج معالجة حالية" : "No active runtime logs available."}
             </p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {filteredReports.map((report) => (
               <div
                 key={report.userId}
-                className={`p-5 rounded-lg border transition-theme ${
+                className={`p-4 rounded-[var(--radius-sm)] border transition-theme ${
                   report.success
-                    ? "bg-[var(--surface-subtle)] border-accent/25 shadow-sm"
-                    : "bg-red-500/5 border-red-500/20"
+                    ? "bg-[var(--surface-subtle)] border-[var(--border-default)] shadow-xs"
+                    : "bg-[var(--fg-danger)]/5 border-[var(--fg-danger)]/20"
                 }`}
               >
-                {/* User Header Details */}
-                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--border-default)] pb-3 mb-4">
-                  <div className="space-y-1">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-default)] pb-3 mb-3">
+                  <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-[var(--text-primary)]">
-                        {report.userName}
-                      </span>
-                      <span className="text-[10px] px-2 py-0.5 rounded font-mono bg-[var(--surface-card)] text-[var(--text-muted)] border border-[var(--border-default)]">
-                        UID: #{report.userId}
+                      <span className="font-bold text-xs text-[var(--text-primary)]">{report.userName}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-[var(--radius-xs)] font-mono bg-[var(--surface-card)] text-[var(--text-muted)] border border-[var(--border-default)]">
+                        #{report.userId}
                       </span>
                     </div>
-                    <div className="text-xs text-[var(--text-muted)] font-mono">
-                      {report.userEmail}
-                    </div>
+                    <div className="text-[11px] text-[var(--text-muted)] font-mono">{report.userEmail}</div>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    {/* Compression indicator with glow */}
-                    <div className="flex items-center gap-2">
-                      <div className="text-right">
-                        <div className="text-[10px] text-[var(--text-muted)] font-bold tracking-wider uppercase">
-                          {language === "ar"
-                            ? "السجلات المعالجة"
-                            : "OPTIMIZATION SCALE"}
-                        </div>
-                        <div className="text-xs font-mono text-[var(--text-muted)]">
-                          <span className="text-red-400 font-bold">
-                            {report.oldCount}
-                          </span>
-                          {" ➔ "}
-                          <span className="text-accent font-bold">
-                            {report.newCount}
-                          </span>
-                        </div>
-                      </div>
-                      <span className="text-xs font-extrabold text-accent px-2.5 py-1 rounded bg-accent/10 border border-accent/20">
-                        {Math.round(
-                          ((report.oldCount - report.newCount) /
-                            report.oldCount) *
-                            100
-                        )}
-                        % {language === "ar" ? "تقليص" : "REDUCED"}
-                      </span>
-                    </div>
-
-                    {/* Status Badge */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold font-mono text-[var(--fg-accent)] px-2.5 py-1 rounded-[var(--radius-xs)] bg-[var(--bg-accent-emphasis)]/10 border border-[var(--border-accent)]/30">
+                      {Math.round(((report.oldCount - report.newCount) / report.oldCount) * 100)}% {language === "ar" ? "تقليص" : "REDUCED"}
+                    </span>
                     {report.success ? (
-                      <span className="flex items-center gap-1.5 text-xs text-accent font-bold bg-accent/10 border border-accent/20 px-2.5 py-1 rounded">
-                        <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse animate-duration-1000"></span>
-                        {language === "ar" ? "ناجح" : "COMPLETED"}
+                      <span className="flex items-center gap-1.5 text-xs text-[var(--fg-success)] font-bold bg-[var(--status-success-subtle)] border border-[var(--fg-success)]/20 px-2.5 py-1 rounded-[var(--radius-xs)]">
+                        <span className="w-1.5 h-1.5 rounded-[var(--radius-full)] bg-[var(--fg-success)] animate-pulse" />
+                        {language === "ar" ? "مكتمل" : "SUCCESS"}
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1.5 text-xs text-red-500 font-bold bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                      <span className="flex items-center gap-1.5 text-xs text-[var(--fg-danger)] font-bold bg-[var(--status-danger-subtle)] border border-[var(--fg-danger)]/20 px-2.5 py-1 rounded-[var(--radius-xs)]">
                         {language === "ar" ? "فشل" : "FAILED"}
                       </span>
                     )}
                   </div>
                 </div>
 
-                {report.success ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Distilled segment */}
-                    <div className="space-y-2">
-                      <div className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                        {language === "ar"
-                          ? "الذاكرة التوليفية عالية الكثافة"
-                          : "SYNTHESIZED INTEL FACT STATEMENT (RESULTS)"}
-                      </div>
-                      <blockquote
-                        className="p-4 rounded border-s-4 border-accent leading-relaxed text-sm font-medium bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--text-primary)]"
-                      >
-                        “{report.distilledFact}”
-                      </blockquote>
+                {report.success && (
+                  <div className="space-y-2">
+                    <div className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                      {language === "ar" ? "الذاكرة المجمعة" : "SYNTHESIZED INTEL FACT"}
                     </div>
-
-                    {/* Archived Segment list */}
-                    <div className="space-y-2">
-                      <div className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center justify-between">
-                        <span>
-                          {language === "ar"
-                            ? "السجلات الـ 10 المؤرشفة القديمة"
-                            : "ARCHIVED LEGACY FACT STATEMENTS"}
-                        </span>
-                        <span className="text-[10px] text-[var(--text-muted)] font-normal font-mono">
-                          Count: {report.archivedFacts.length}
-                        </span>
-                      </div>
-                      <div
-                        className="p-3 rounded border font-mono text-[11px] leading-relaxed max-h-36 overflow-y-auto custom-scrollbar space-y-1.5 bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--text-secondary)]"
-                      >
-                        {report.archivedFacts.map((fact, idx) => (
-                          <div
-                            key={`archived-fact-${report.userId}-${idx}`}
-                            className="border-b border-[var(--border-subtle)] last:border-0 pb-1 last:pb-0"
-                          >
-                            {fact}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-xs text-red-400 font-mono p-3 bg-red-500/5 rounded border border-red-500/10">
-                    <strong>Error description:</strong>{" "}
-                    {report.error || "Failed to process consolidation."}
+                    <blockquote className="p-3 rounded-[var(--radius-xs)] border-s-3 border-[var(--fg-accent)] text-xs font-medium bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--text-primary)]">
+                      “{report.distilledFact}”
+                    </blockquote>
                   </div>
                 )}
               </div>

@@ -1,4 +1,7 @@
-import 'dotenv/config';
+import './bootstrapEnv.js';
+import dotenv from 'dotenv';
+dotenv.config({ override: false });
+import fs from 'fs';
 import './utils/validateSecrets.js';
 import { createServer } from 'http';
 
@@ -21,9 +24,10 @@ process.on('unhandledRejection', (reason: any) => {
 
 import app, { ensureApiPerfLogsTable } from './app.js';
 import { initSocket } from './config/socket.js';
-import { initializePerplextaPools, synchronizePerplextaPoolsFromRegistry, startConnectionHealthCheck, startPoolSaturationGuardian } from './db/index.js';
+import { initializePerplextaPools, synchronizePerplextaPoolsFromRegistry, startConnectionHealthCheck, startPoolSaturationGuardian, isDatabaseConnected } from './db/index.js';
 import { createServer as createViteServer } from 'vite';
 import { runDatabaseMigrations, setIo, verifySchemaIntegrity } from './db/migrations.js';
+import { ensureDatabaseTables } from './services/database-initializer.js';
 import { syncSystemTemplates } from './services/email.js';
 import { refreshCachedAppName } from './services/system.js';
 import { initializeSystemAssetSuite } from './services/systemAssetManager.js';
@@ -32,6 +36,8 @@ import { ensureBulletinSeedData } from './routes/bulletin.js';
 import { initCronJobs } from './jobs/cron.js';
 import { validateRequiredSecrets } from './utils/validateSecrets.js';
 import { initUploadsMonitor } from './services/uploadsMonitorService.js';
+import { connectCache } from './utils/cache.js';
+import { warmupSeoAndSystemCache } from './db/queries.js';
 
 const PORT = 3000;
 const MAX_DB_ATTEMPTS = 3;
@@ -43,35 +49,47 @@ const DB_RETRY_DELAY_MS = 4_000;
  * so the server can continue in Degraded Mode instead of crashing.
  */
 async function initDatabase(): Promise<boolean> {
+  const coreUrl = process.env.DATABASE_URL?.trim();
+  if (!coreUrl) {
+    console.log('[Server] Operating in Degraded Mode (no DATABASE_URL configured). Safe in-memory fallbacks active.');
+    return false;
+  }
+
   for (let attempt = 1; attempt <= MAX_DB_ATTEMPTS; attempt++) {
     try {
       await initializePerplextaPools(
-        process.env.DATABASE_URL        || '',
+        coreUrl,
         process.env.LEDGER_DATABASE_URL  || '',
         process.env.EXTERNAL_DATABASE_URL || '',
-        process.env.SECURITY_DATABASE_URL || ''
+        process.env.SECURITY_DATABASE_URL || '',
+        process.env.MEDIA_DATABASE_URL   || ''
       );
-      await runDatabaseMigrations();
+      if (!isDatabaseConnected()) {
+        throw new Error('Database connection could not be established.');
+      }
       await synchronizePerplextaPoolsFromRegistry();
+      await runDatabaseMigrations();
+      await ensureDatabaseTables();
       await Promise.allSettled([
         syncSystemTemplates(),
         refreshCachedAppName(),
         initializeSystemAssetSuite(),
         ensureAdsSeedData(),
         ensureBulletinSeedData(),
-        ensureApiPerfLogsTable()
+        ensureApiPerfLogsTable(),
+        warmupSeoAndSystemCache()
       ]);
       return true;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[Server] DB init attempt ${attempt}/${MAX_DB_ATTEMPTS} failed: ${msg}`);
+      const msg = err instanceof Error ? err.stack || err.message : String(err);
       if (attempt < MAX_DB_ATTEMPTS) {
-        console.log(`[Server] Retrying in ${DB_RETRY_DELAY_MS / 1000}s...`);
+        console.warn(`[Server] DB connection attempt ${attempt}/${MAX_DB_ATTEMPTS}: ${msg}. Retrying in ${DB_RETRY_DELAY_MS / 1000}s...`);
         await new Promise(resolve => setTimeout(resolve, DB_RETRY_DELAY_MS));
+      } else {
+        console.warn(`[Server] All DB init attempts exhausted (${msg}). Continuing in Degraded Mode.`);
       }
     }
   }
-  console.error('[Server] All DB init attempts exhausted. Entering Degraded Mode.');
   return false;
 }
 
@@ -80,6 +98,7 @@ async function startServer() {
     console.log('[Server] Initializing Perplexta Ecosystem...');
 
     validateRequiredSecrets();
+    await connectCache();
 
     if (process.env.NODE_ENV !== 'production') {
       const vite = await createViteServer({

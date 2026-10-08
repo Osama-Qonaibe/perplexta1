@@ -141,7 +141,7 @@ export const injectJsonLdSchema = (id: string, schema: object): void => {
     document.head.appendChild(script);
   }
 
-  script.innerHTML = JSON.stringify(schema, null, 2);
+  script.textContent = JSON.stringify(schema, null, 2);
   console.log(`[SEO Schema Builder] Successfully injected JSON-LD schema with ID: ${id}`);
 };
 

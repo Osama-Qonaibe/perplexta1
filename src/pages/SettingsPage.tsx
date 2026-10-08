@@ -13,8 +13,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { triggerHaptic } from '../utils/haptics';
 import { 
   User as UserIcon, Activity, Wallet, BrainCircuit, Terminal,
-  ChevronRight, ChevronLeft, LogOut
+  ChevronRight, ChevronLeft, LogOut, Award
 } from 'lucide-react';
+import CreatorDashboardPage from './CreatorDashboardPage';
 
 interface ProfileUpdate {
   name?: string;
@@ -30,7 +31,7 @@ interface ApiError extends Error {
   status?: number;
 }
 
-const VALID_SETTINGS_TABS = ['account', 'usage', 'wallet', 'memory', 'developer'];
+const VALID_SETTINGS_TABS = ['account', 'usage', 'wallet', 'memory', 'developer', 'creators-hub'];
 
 export const SettingsPage: React.FC = () => {
   const { t, dir, theme, setTheme, user, setUser, logout, token, language, setLanguage, isMobile } = useAppContext();
@@ -272,6 +273,7 @@ export const SettingsPage: React.FC = () => {
     { id: 'usage', icon: <Activity size={18} />, label: language === 'ar' ? 'الاستهلاك' : 'Usage' },
     { id: 'wallet', icon: <Wallet size={18} />, label: language === 'ar' ? 'المحفظة' : 'Wallet' },
     { id: 'memory', icon: <BrainCircuit size={18} />, label: language === 'ar' ? 'الذاكرة' : 'Memory' },
+    { id: 'creators-hub', icon: <Award size={18} />, label: language === 'ar' ? 'المبدعين والربح' : 'Creators Hub' },
     { id: 'developer', icon: <Terminal size={18} />, label: language === 'ar' ? 'المطورين' : 'Devs' },
   ];
 
@@ -280,53 +282,54 @@ export const SettingsPage: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div className={`w-full min-h-full md:h-full flex flex-col md:flex-row md:overflow-hidden bg-[var(--pub-surface-canvas)] text-[var(--pub-text-primary)]`}>
+    <div className={`w-full min-h-full md:h-full flex flex-col md:flex-row md:overflow-hidden bg-[var(--surface-page)] text-[var(--text-primary)] transition-theme`}>
       
       {/* Mobile Top Header - Native App Style */}
-      <div className="flex md:hidden sticky top-0 z-40 w-full h-14 px-4 items-center justify-between border-b backdrop-blur-xl bg-[var(--pub-surface-panel)]/95 border-[var(--pub-border-default)] shrink-0 select-none pt-[env(safe-area-inset-top,0px)]">
+      <div className="flex md:hidden sticky top-0 z-40 w-full h-14 px-4 items-center justify-between border-b backdrop-blur-md bg-[var(--surface-page)]/95 border-[var(--border-default)] shrink-0 select-none pt-[env(safe-area-inset-top,0px)]">
         <div className="flex items-center gap-2.5">
           <button 
             onClick={() => navigate(-1)} 
-            className="h-9 px-3 flex items-center gap-1 rounded-[var(--pub-radius-control)] bg-[var(--pub-surface-subtle)] border border-[var(--pub-border-default)] text-[var(--pub-text-primary)] hover:text-cyan-400 hover:border-cyan-500/30 transition-all duration-150 active:scale-95 cursor-pointer"
+            className="h-8 px-2.5 flex items-center gap-1 rounded-shape-sm bg-transparent hover:bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:border-[var(--border-accent)]/60 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-150 active:scale-95 cursor-pointer shadow-2xs"
           >
-            {dir === 'rtl' ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            {dir === 'rtl' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
             <span className="text-xs font-bold">{dir === 'rtl' ? 'رجوع' : 'Back'}</span>
           </button>
           <div className="flex flex-col justify-center">
-            <h1 className="text-sm font-black tracking-tight uppercase">{t('settings')}</h1>
+            <h1 className="text-sm font-bold tracking-tight text-[var(--text-primary)]">{t('settings')}</h1>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5">
           <button 
             onClick={() => logout()}
-            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-[var(--pub-radius-control)] text-rose-400 hover:bg-rose-500/10 active:scale-95 transition-all duration-150 cursor-pointer"
+            className="w-8 h-8 flex items-center justify-center rounded-shape-sm border border-[var(--border-default)] hover:border-rose-500/60 bg-transparent hover:bg-rose-500/10 text-rose-500 active:scale-95 transition-all duration-150 cursor-pointer shadow-2xs"
             title={t('logout')}
           >
-            <LogOut size={16} />
+            <LogOut size={14} />
           </button>
         </div>
       </div>
 
-      {/* Desktop Sidebar Navigation - Elite Standard */}
-      <div className={`hidden md:flex md:w-60 md:h-full flex-col border-b md:border-b-0 border-[var(--pub-border-default)] relative shrink-0 ${
+      {/* Desktop Sidebar Navigation */}
+      <div className={`hidden md:flex md:w-60 md:h-full flex-col border-b md:border-b-0 border-[var(--border-default)] relative shrink-0 ${
         dir === 'rtl' ? 'md:border-l' : 'md:border-r'
-      } bg-[var(--pub-surface-panel)]`}>
+      } bg-[var(--surface-card)]`}>
         
-        {/* Sidebar Header - Height matched with content header (h-16) */}
-        <div className="h-16 px-6 border-b border-[var(--pub-border-default)] flex items-center">
+        {/* Sidebar Header */}
+        <div className="h-16 px-6 border-b border-[var(--border-default)] flex items-center">
            <div className="flex items-center gap-3">
               <button 
                 onClick={() => navigate('/chat')} 
-                className="w-8 h-8 flex items-center justify-center rounded-[var(--pub-radius-micro)] bg-[var(--pub-surface-container)] border border-[var(--pub-border-default)] hover:bg-cyan-500/10 hover:border-cyan-500/30 text-[var(--pub-text-muted)] hover:text-cyan-400 transition-all duration-150 group cursor-pointer"
+                className="w-8 h-8 flex items-center justify-center rounded-shape-sm bg-transparent hover:bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:border-[var(--border-accent)]/60 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all duration-150 group cursor-pointer shadow-2xs"
+                title={dir === 'rtl' ? 'رجوع' : 'Back'}
               >
-                {dir === 'rtl' ? <ChevronLeft size={18} className="group-hover:-translate-x-0.5 transition-transform" /> : <ChevronRight size={18} className="group-hover:translate-x-0.5 transition-transform" />}
+                {dir === 'rtl' ? <ChevronLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" /> : <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />}
               </button>
-              <h1 className="text-base font-black tracking-tight uppercase">{t('settings')}</h1>
+              <h1 className="text-base font-bold tracking-tight text-[var(--text-primary)]">{t('settings')}</h1>
            </div>
         </div>
 
-        {/* Sidebar Tabs - Scrollable Area */}
+        {/* Sidebar Tabs */}
         <div className="flex-1 overflow-y-auto no-scrollbar p-3 space-y-1">
           {tabs.map((tab, tabIdx) => {
             const isActive = activeTab === tab.id;
@@ -334,14 +337,14 @@ export const SettingsPage: React.FC = () => {
               <button
                 key={`settings-tab-${tab.id}-${tabIdx}`}
                 onClick={() => handleTabChange(tab.id)}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-[var(--pub-radius-control)] transition-all duration-150 group cursor-pointer border ${
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-shape-sm transition-all duration-fast group cursor-pointer border border-transparent select-none active:scale-98 ${
                   isActive 
-                    ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400 font-bold' 
-                    : 'border-transparent text-[var(--pub-text-muted)] hover:text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-500/20'
+                    ? 'text-[var(--fg-accent)] font-bold hover:bg-[var(--surface-subtle)]/25' 
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]/25'
                 }`}
               >
-                <span className={`shrink-0 transition-all duration-150 ${
-                  isActive ? 'text-cyan-400' : 'text-[var(--pub-text-muted)] group-hover:text-cyan-400'
+                <span className={`shrink-0 transition-colors duration-fast ${
+                  isActive ? 'text-[var(--fg-accent)]' : 'text-[var(--text-muted)] group-hover:text-[var(--text-primary)]'
                 }`}>
                    {tab.icon}
                 </span>
@@ -353,11 +356,11 @@ export const SettingsPage: React.FC = () => {
           })}
         </div>
 
-        {/* Sidebar Footer - Permanent Anchor */}
-        <div className="p-3 border-t border-[var(--pub-border-default)]">
+        {/* Sidebar Footer */}
+        <div className="p-3 border-t border-[var(--border-default)]">
           <button 
             onClick={() => logout()}
-            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-[var(--pub-radius-control)] text-rose-400 hover:bg-rose-500/10 transition-all duration-150 border border-transparent hover:border-rose-500/20 group cursor-pointer"
+            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-shape-sm text-rose-500 hover:bg-rose-500/10 transition-all duration-150 border border-transparent hover:border-rose-500/30 group cursor-pointer"
           >
             <LogOut size={16} className="group-hover:rotate-12 transition-transform" />
             <span className="font-bold text-xs tracking-tight">{t('logout')}</span>
@@ -368,14 +371,14 @@ export const SettingsPage: React.FC = () => {
       {/* Content Area - With Sticky Header */}
       <div className="flex-1 flex flex-col md:h-full md:overflow-hidden relative min-w-0 pb-16 md:pb-0">
         {/* Sticky Desktop Page Header */}
-        <div className="hidden md:flex sticky top-0 z-30 w-full h-16 px-6 md:px-10 items-center border-b backdrop-blur-xl transition-all duration-150 flex-none bg-[var(--pub-surface-panel)]/90 border-[var(--pub-border-default)]">
+        <div className="hidden md:flex sticky top-0 z-30 w-full h-16 px-6 md:px-10 items-center border-b backdrop-blur-md transition-all duration-150 flex-none bg-[var(--surface-page)]/95 border-[var(--border-default)]">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-[var(--pub-radius-micro)] bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+            <div className="w-8 h-8 rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-center justify-center text-[var(--fg-accent)] shadow-2xs">
                {tabs.find(t => t.id === activeTab)?.icon}
             </div>
             <div className="flex flex-col">
-              <h1 className="text-base font-black tracking-tight">{tabs.find(t => t.id === activeTab)?.label}</h1>
-              <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--pub-text-muted)]">{t('appName')} / {activeTab}</span>
+              <h1 className="text-base font-bold tracking-tight text-[var(--text-primary)]">{tabs.find(t => t.id === activeTab)?.label}</h1>
+              <span className="text-[10px] font-medium tracking-wider text-[var(--text-muted)]">{t('appName')} / {activeTab}</span>
             </div>
           </div>
         </div>
@@ -436,43 +439,50 @@ export const SettingsPage: React.FC = () => {
                   {isMobile ? <DesktopOnlyNotice /> : <DeveloperAgentPortal />}
                 </div>
               )}
+
+              {/* Creators Hub Tab */}
+              {activeTab === 'creators-hub' && (
+                <div className="w-full">
+                  <CreatorDashboardPage />
+                </div>
+              )}
             </motion.div>
           </AnimatePresence>
           </div>
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation Footer Bar (Floating Capsule Design) */}
+      {/* Mobile Bottom Navigation Footer Bar */}
       <nav
         aria-label="Settings Mobile Bottom Navigation"
         className="md:hidden fixed bottom-4 left-4 right-4 z-[120] select-none pointer-events-auto"
       >
-        <div className="bg-[var(--pub-surface-panel)]/95 backdrop-blur-xl border border-[var(--pub-border-default)] rounded-[var(--pub-radius-container)] shadow-lg h-[58px] px-2 flex items-center justify-around max-w-lg mx-auto overflow-hidden">
+        <div className="bg-[var(--surface-page)]/95 backdrop-blur-md border border-[var(--border-default)] rounded-shape-md shadow-lg h-[54px] px-2 flex items-center justify-around max-w-lg mx-auto overflow-hidden">
           {activeTabsList.map((tab) => {
             const active = activeTab === tab.id;
             return (
               <button
                 key={`settings-bottom-nav-${tab.id}`}
                 onClick={() => handleTabChange(tab.id)}
-                className="relative flex-1 h-full min-h-[44px] flex flex-col items-center justify-center gap-1 cursor-pointer focus:outline-none active:scale-95 transition-all duration-150"
+                className="relative flex-1 h-full min-h-[44px] flex flex-col items-center justify-center gap-0.5 cursor-pointer focus:outline-none active:scale-95 transition-all duration-150"
               >
                 {active && (
                   <motion.div
                     layoutId="settings-bottom-nav-active-indicator"
-                    className="absolute top-1 w-6 h-0.5 rounded-full bg-cyan-400"
+                    className="absolute top-1 w-6 h-0.5 rounded-shape-full bg-[var(--accent)]"
                     transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                   />
                 )}
 
-                <div className={`relative flex items-center justify-center text-xs transition-colors duration-150 ${active ? 'text-cyan-400' : 'text-[var(--pub-text-muted)]'}`}>
+                <div className={`relative flex items-center justify-center text-xs transition-colors duration-150 ${active ? 'text-[var(--fg-accent)]' : 'text-[var(--text-muted)]'}`}>
                   {tab.icon}
                 </div>
 
                 <span
                   className={`text-[10px] tracking-tight transition-colors duration-150 leading-none ${
                     active 
-                      ? 'text-cyan-400 font-bold' 
-                      : 'text-[var(--pub-text-muted)] font-medium'
+                      ? 'text-[var(--fg-accent)] font-bold' 
+                      : 'text-[var(--text-muted)] font-medium'
                   }`}
                 >
                   {tab.label}

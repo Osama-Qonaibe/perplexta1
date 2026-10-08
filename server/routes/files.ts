@@ -9,8 +9,9 @@ import { getUserFiles, saveFileMetadata, getUserStorageUsage } from '../services
 import { auditFilePipeline, resolveMediaAbsolutePath } from '../services/fileValidationService.js';
 import { processUploadedVideo } from '../services/videoProcessor.js';
 import { optimizeUploadedImage } from '../services/mediaOptimizationService.js';
-import { pool } from '../db/index.js';
+import { pool, mediaPool } from '../db/index.js';
 import fs from 'fs/promises';
+import { createReadStream } from 'fs';
 import crypto from 'crypto';
 import path from 'path';
 
@@ -54,10 +55,13 @@ router.post("/upload", authenticateToken, checkDiskSpace, (upload.single('file')
       const limitBytes = allowedMb * 1024 * 1024;
       if (currentUsage + size > limitBytes) {
         return res.status(402).json({ 
-          error: 'Storage quota exceeded', 
-          message_ar: 'تجاوزت سعة التخزين المسموح بها ويرجى الاشتراك بخطة للاستمرار',
-          message_en: 'Storage limit exceeded. Please activate a subscription plan to upload.',
-          limit_mb: allowedMb 
+          error: 'You have reached the cloud storage limit', 
+          error_ar: 'لقد استنفدت سعة التخزين السحابي المتاحة',
+          message: 'You have reached the cloud storage limit',
+          message_ar: 'لقد استنفدت سعة التخزين السحابي المتاحة',
+          message_en: 'You have reached the cloud storage limit',
+          limit_mb: allowedMb,
+          type: 'STORAGE_QUOTA_EXCEEDED'
         });
       }
     }
@@ -74,7 +78,7 @@ router.post("/upload", authenticateToken, checkDiskSpace, (upload.single('file')
     let imageMetadata: any = {};
     let processedFileSize = size;
 
-    const videoExtensions = ['mp4', 'mov', 'avi', 'webm', 'mkv', 'wmv', 'flv', '3gp'];
+    const videoExtensions = ['mp4', 'mov', 'avi', 'webm', 'mkv', 'wmv', 'flv', '3gp', 'm4v', '3g2', 'ogv', 'ts', 'mts', 'm2ts', 'vob'];
     const isVideoExtension = videoExtensions.some(ext => originalname.toLowerCase().endsWith('.' + ext));
 
     if (mimetype.startsWith('image/')) {
@@ -107,6 +111,8 @@ router.post("/upload", authenticateToken, checkDiskSpace, (upload.single('file')
             width: result.width,
             height: result.height,
             resolution: result.resolution || `${result.width || 1280}x${result.height || 720}`,
+            aspectRatio: result.aspectRatio,
+            isVertical: result.isVertical,
             bitrate: result.bitrate,
             fileSize: result.fileSize,
             format: result.format,
@@ -119,8 +125,26 @@ router.post("/upload", authenticateToken, checkDiskSpace, (upload.single('file')
       }
     }
 
-    const currentFilePath = path.join(path.dirname(filePath), finalFilename);
-    const extractedText = await extractTextFromFile(currentFilePath, mimetype, originalname);
+    const safeFilename = path.basename(finalFilename);
+    const uploadsDir = path.resolve(process.cwd(), 'uploads');
+    const currentFilePath = path.resolve(uploadsDir, safeFilename);
+    if (!currentFilePath.startsWith(uploadsDir + path.sep)) {
+      throw new Error('Path traversal detected in file upload');
+    }
+
+    // Performance Optimization: Never run heavy multimodal AI extraction during upload for video/audio/image files
+    const isVideoFile = mimetype.startsWith('video/') || isVideoExtension;
+    const isAudioFile = mimetype.startsWith('audio/');
+    let extractedText = '';
+    if (isVideoFile) {
+      extractedText = `[Video Asset: ${originalname}, Resolution: ${videoMetadata?.resolution || 'N/A'}, Duration: ${videoMetadata?.duration || 0}s]`;
+    } else if (isAudioFile) {
+      extractedText = `[Audio Asset: ${originalname}]`;
+    } else if (mimetype.startsWith('image/')) {
+      extractedText = `[Image Asset: ${originalname}]`;
+    } else {
+      extractedText = await extractTextFromFile(currentFilePath, mimetype, originalname);
+    }
     
     let forensic = null;
     if (mimetype === 'application/pdf') {
@@ -154,36 +178,98 @@ router.post("/upload", authenticateToken, checkDiskSpace, (upload.single('file')
     const thumbnailUrl = videoMetadata.thumbnailUrl || '';
 
     try {
-      if (true /* try-catch will handle */) {
-        const fileBuf = await fs.readFile(currentFilePath);
-        await pool.query('UPDATE user_files SET file_data = $1 WHERE id = $2', [fileBuf, file.id]);
-        console.log(`[File Router] File data saved to PostgreSQL for ${finalFilename}`);
-        
-        // Ensure video or unoptimized file is also in media_assets if not already inserted by optimizeUploadedImage
-        if (mimetype.startsWith('video/') || isVideoExtension || mimetype.startsWith('audio/') || mimetype.startsWith('application/pdf')) {
-           const sha256Hash = crypto.createHash('sha256').update(fileBuf).digest('hex');
-           const storedPath = `uploads/${finalFilename}`;
-           let mContext = 'general';
-           if (mimetype.startsWith('video/') || isVideoExtension) mContext = 'general';
-           
-           await pool.query(`
-              INSERT INTO media_assets (
-                stored_path, original_filename, context, format, width, height, size_bytes, sha256_hash, is_public,
-                user_id, metadata, file_data
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-              ON CONFLICT (sha256_hash) DO UPDATE SET
-                 stored_path = EXCLUDED.stored_path,
-                 context = EXCLUDED.context,
-                 user_id = COALESCE(EXCLUDED.user_id, media_assets.user_id),
-                 file_data = EXCLUDED.file_data,
-                 updated_at = CURRENT_TIMESTAMP
-           `, [
-              storedPath, originalname, mContext, fileType, 
-              videoMetadata.width || 0, videoMetadata.height || 0, processedFileSize, sha256Hash, isPublicMedia,
-              userId, JSON.stringify(file.metadata), fileBuf
-           ]);
-           console.log(`[File Router] Registered asset in media_assets for ${finalFilename}`);
+      const isLargeMedia = processedFileSize > 100 * 1024 * 1024;
+      let fileBuf: Buffer | null = null;
+      let sha256Hash = '';
+
+      if (!isLargeMedia) {
+        try {
+          fileBuf = await fs.readFile(currentFilePath);
+          sha256Hash = crypto.createHash('sha256').update(fileBuf).digest('hex');
+          await pool.query('UPDATE user_files SET file_data = $1 WHERE id = $2', [fileBuf, file.id]);
+        } catch (_) {}
+      } else {
+        // Fast streaming hash calculation without loading 100MB into memory or blocking event loop
+        try {
+          const hash = crypto.createHash('sha256');
+          const stream = createReadStream(currentFilePath);
+          for await (const chunk of stream) {
+            hash.update(chunk);
+          }
+          sha256Hash = hash.digest('hex');
+        } catch (_) {
+          sha256Hash = crypto.randomUUID();
         }
+      }
+
+      // Ensure all media types (images, videos, audio, pdfs, documents) are stored in media_assets in the Media DB
+      const targetMediaPool = mediaPool || pool;
+      if (targetMediaPool) {
+        const storedPath = `uploads/${finalFilename}`;
+        let mContext = 'general';
+        if (mimetype.startsWith('image/')) mContext = 'image';
+        else if (mimetype.startsWith('video/') || isVideoExtension) mContext = 'video';
+        else if (mimetype.startsWith('audio/')) mContext = 'audio';
+        else if (mimetype.startsWith('application/pdf')) mContext = 'document';
+        
+        // Handle deduplication by sha256_hash or stored_path
+        const existingAsset = sha256Hash
+          ? await targetMediaPool.query('SELECT id, stored_path FROM media_assets WHERE sha256_hash = $1 LIMIT 1', [sha256Hash])
+          : { rows: [] };
+
+        if (existingAsset.rows.length > 0) {
+          await targetMediaPool.query(`
+            UPDATE media_assets SET
+              stored_path = $1,
+              original_filename = $2,
+              context = $3,
+              format = $4,
+              width = COALESCE($5, width),
+              height = COALESCE($6, height),
+              size_bytes = $7,
+              user_id = COALESCE($8, user_id),
+              metadata = $9,
+              file_data = COALESCE($10, file_data),
+              is_public = $11,
+              updated_at = CURRENT_TIMESTAMP
+            WHERE id = $12
+          `, [
+            storedPath, originalname, mContext, fileType,
+            videoMetadata.width || imageMetadata.width || 0,
+            videoMetadata.height || imageMetadata.height || 0,
+            processedFileSize, userId, JSON.stringify(file.metadata), fileBuf,
+            isPublicMedia, existingAsset.rows[0].id
+          ]);
+        } else {
+          const filesRouteAssetId = crypto.randomUUID();
+          await targetMediaPool.query(`
+            INSERT INTO media_assets (
+              id, stored_path, original_filename, context, format, width, height, size_bytes, sha256_hash, is_public,
+              user_id, metadata, file_data
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            ON CONFLICT (stored_path) DO UPDATE SET
+              original_filename = EXCLUDED.original_filename,
+              context = EXCLUDED.context,
+              format = EXCLUDED.format,
+              width = COALESCE(EXCLUDED.width, media_assets.width),
+              height = COALESCE(EXCLUDED.height, media_assets.height),
+              size_bytes = EXCLUDED.size_bytes,
+              sha256_hash = COALESCE(EXCLUDED.sha256_hash, media_assets.sha256_hash),
+              user_id = COALESCE(EXCLUDED.user_id, media_assets.user_id),
+              metadata = EXCLUDED.metadata,
+              file_data = COALESCE(EXCLUDED.file_data, media_assets.file_data),
+              is_public = EXCLUDED.is_public,
+              updated_at = CURRENT_TIMESTAMP
+          `, [
+            filesRouteAssetId,
+            storedPath, originalname, mContext, fileType, 
+            videoMetadata.width || imageMetadata.width || 0,
+            videoMetadata.height || imageMetadata.height || 0,
+            processedFileSize, sha256Hash || null, isPublicMedia,
+            userId, JSON.stringify(file.metadata), fileBuf
+          ]);
+        }
+        console.log(`[File Router] Registered asset in media_assets (${mContext}) for ${finalFilename}`);
       }
     } catch (dbErr: any) {
       console.error('[File Router] Failed to save file data to DB:', dbErr.message);
@@ -221,15 +307,23 @@ router.post("/analyze-forensic", authenticateToken, checkDiskSpace, (upload.sing
       return res.status(400).json({ error: 'No document attached for diagnostic audit.' });
     }
     const { path: filePath, mimetype } = req.file;
+    if (!filePath || typeof filePath !== 'string' || filePath.includes('..') || filePath.includes('\0')) {
+      return res.status(400).json({ error: 'Invalid file path.' });
+    }
+    const uploadsDir = path.resolve(process.cwd(), 'uploads');
+    const resolvedPath = path.resolve(filePath);
+    if (!resolvedPath.startsWith(uploadsDir + path.sep)) {
+      return res.status(400).json({ error: 'File path outside permitted directory.' });
+    }
 
     if (mimetype !== 'application/pdf') {
       return res.status(400).json({ error: 'Forensic mode analytical scanner is restricted to PDF binary documents.' });
     }
 
-    const fileBuffer = await fs.readFile(filePath);
+    const fileBuffer = await fs.readFile(resolvedPath);
     const forensicReport = forensicScanPDF(fileBuffer);
 
-    await fs.unlink(filePath).catch(() => {});
+    await fs.unlink(resolvedPath).catch(() => {});
 
     res.json({ success: true, forensic: forensicReport });
   } catch (error: any) {

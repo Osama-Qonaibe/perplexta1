@@ -2,24 +2,31 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import type { QueryClient, WrappedClient, MigrationMetrics } from "./types.js";
 import { TABLE_POOL_REGISTRY, hashStringToAdvisoryLockKey } from "./types.js";
-import { ensureColumnsBulk, ensureForeignKey, sanitizeForLogging, isValidIdentifier, safeQueryClient } from "./helpers.js";
+import { ensureColumnsBulk, ensureForeignKey, tableExists, columnExists, sanitizeForLogging, isValidIdentifier, safeQueryClient } from "./helpers.js";
 import { encrypt, decrypt } from "../../utils/crypto.js";
 import { syncAllContentSeoMetadata } from "../../services/seoSync.js";
+import { syncMasterCategoriesToDatabase } from "../../services/system.js";
 
 export async function runVersionedMigrations(
   client: any,
   externalClient: any,
   ledgerClient: any,
   securityClient: any,
+  mediaClient: any,
   targetPool: QueryClient,
   targetLedgerPool: QueryClient,
   targetExternalPool: QueryClient,
   targetSecurityPool: QueryClient,
-  migrationMetrics: MigrationMetrics
+  targetMediaPool: QueryClient,
+  migrationMetrics: MigrationMetrics = { total: 0, successful: 0, failed: 0, totalDuration: 0, perMigration: new Map() }
 ) {
+  if (!migrationMetrics) {
+    migrationMetrics = { total: 0, successful: 0, failed: 0, totalDuration: 0, perMigration: new Map() };
+  }
   const extTarget = externalClient || client;
   const ledgerTarget = ledgerClient || client;
   const secTarget = securityClient || client;
+  const mediaTarget = mediaClient || client;
 
   const existingMigrationsRes = await client.query("SELECT migration_name FROM migration_history").catch(() => ({ rows: [] }));
   const existingMigrations = new Set(existingMigrationsRes.rows.map((r: any) => r.migration_name));
@@ -36,15 +43,20 @@ export async function runVersionedMigrations(
     if (ledgerClient) await ledgerClient.query("BEGIN");
     if (externalClient) await externalClient.query("BEGIN");
     if (securityClient) await securityClient.query("BEGIN");
+    if (mediaClient) await mediaClient.query("BEGIN");
     try {
-      await client.query(`SELECT pg_try_advisory_xact_lock($1)`, [lockKey]).catch(() => {});
+      const lockRes = await client.query(`SELECT pg_try_advisory_xact_lock($1)`, [lockKey]).catch(() => ({ rows: [] }));
+      if (lockRes.rows?.[0]?.pg_try_advisory_xact_lock === false) {
+        throw new Error(`[Migrations] Advisory transaction lock unavailable for ${name}. Another process is migrating.`);
+      }
         const doubleCheck = await client.query("SELECT 1 FROM migration_history WHERE migration_name = $1", [name]);
         if (doubleCheck.rows.length > 0) {
           existingMigrations.add(name);
-          await client.query("COMMIT");
           if (ledgerClient) await ledgerClient.query("COMMIT");
           if (externalClient) await externalClient.query("COMMIT");
           if (securityClient) await securityClient.query("COMMIT");
+          if (mediaClient) await mediaClient.query("COMMIT");
+          await client.query("COMMIT");
           return;
         }
 
@@ -61,6 +73,8 @@ export async function runVersionedMigrations(
                   return externalClient || client;
                 case "security":
                   return securityClient || client;
+                case "media":
+                  return mediaClient || client;
               }
             }
           }
@@ -76,6 +90,9 @@ export async function runVersionedMigrations(
             } else if (text && typeof text === "object" && text.text) {
               sqlString = text.text;
             }
+            if (process.env.NODE_ENV === 'production' && /DROP\s+TABLE/i.test(sqlString)) {
+              throw new Error(`[Migrations] DROP TABLE is FORBIDDEN in production migrations: ${sqlString.slice(0, 100)}`);
+            }
             const targetClient = findClientForQuery(sqlString, params);
             return targetClient.query(text, params);
           }
@@ -90,6 +107,9 @@ export async function runVersionedMigrations(
             } else if (text && typeof text === "object" && text.text) {
               sqlString = text.text;
             }
+            if (process.env.NODE_ENV === 'production' && /DROP\s+TABLE/i.test(sqlString)) {
+              throw new Error(`[Migrations] DROP TABLE is FORBIDDEN in production migrations: ${sqlString.slice(0, 100)}`);
+            }
             const targetClient = findClientForQuery(sqlString, params);
             const finalClient = targetClient === client ? (ledgerClient || client) : targetClient;
             return finalClient.query(text, params);
@@ -97,12 +117,19 @@ export async function runVersionedMigrations(
         };
 
         await fn(wrappedClient, wrappedLedgerClient);
-        await client.query("INSERT INTO migration_history (migration_name) VALUES ($1) ON CONFLICT (migration_name) DO NOTHING", [name]);
+        const checksum = crypto.createHash('sha256').update(fn.toString()).digest('hex');
+        await client.query(
+          "INSERT INTO migration_history (migration_name, checksum, executed_at) VALUES ($1, $2, CURRENT_TIMESTAMP) ON CONFLICT (migration_name) DO UPDATE SET checksum = EXCLUDED.checksum",
+          [name, checksum]
+        ).catch(() => {
+          return client.query("INSERT INTO migration_history (migration_name) VALUES ($1) ON CONFLICT (migration_name) DO NOTHING", [name]);
+        });
         existingMigrations.add(name);
-        await client.query("COMMIT");
         if (ledgerClient) await ledgerClient.query("COMMIT");
         if (externalClient) await externalClient.query("COMMIT");
         if (securityClient) await securityClient.query("COMMIT");
+        if (mediaClient) await mediaClient.query("COMMIT");
+        await client.query("COMMIT");
         const duration = Date.now() - startTime;
         migrationMetrics.total++;
         migrationMetrics.successful++;
@@ -114,6 +141,7 @@ export async function runVersionedMigrations(
         if (ledgerClient) await ledgerClient.query("ROLLBACK");
         if (externalClient) await externalClient.query("ROLLBACK");
         if (securityClient) await securityClient.query("ROLLBACK");
+        if (mediaClient) await mediaClient.query("ROLLBACK");
         const err = error as Error & { code?: string };
         console.error(`[Migrations] Failed to apply ${name}:`, err.message);
         migrationMetrics.total++;
@@ -257,17 +285,6 @@ export async function runVersionedMigrations(
 
       await ensureColumnsBulk(tx, 'plans', {
         plan_type: { type: 'VARCHAR(100)', default: `'user'` }
-      });
-
-      await ensureColumnsBulk(tx, 'marketplace_items', {
-        download_url: { type: 'TEXT' },
-        preview_url: { type: 'TEXT' },
-        video_url: { type: 'TEXT' },
-        features: { type: 'TEXT' },
-        technologies: { type: 'TEXT' },
-        referral_percent: { type: 'NUMERIC(5,2)' },
-        highlight_tag: { type: 'VARCHAR(50)' },
-        license_type: { type: 'VARCHAR(50)' }
       });
 
       await ensureColumnsBulk(tx, 'registered_agents', {
@@ -448,13 +465,20 @@ export async function runVersionedMigrations(
         }
 
         if (needsUpdate) {
-          const fieldsArray = Object.keys(updates);
-          const fieldsSql = fieldsArray.map((k, i) => `${k} = $${i + 1}`).join(', ');
-          const values = Object.values(updates);
-          values.push(row.id);
-          const idParamIdx = values.length;
-
-          await tx.query(`UPDATE system_settings SET ${fieldsSql}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idParamIdx}`, values);
+          await tx.query(
+            `UPDATE system_settings 
+             SET stripe_publishable_key = COALESCE($1, stripe_publishable_key),
+                 stripe_secret_key = COALESCE($2, stripe_secret_key),
+                 stripe_webhook_secret = COALESCE($3, stripe_webhook_secret),
+                 updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $4`,
+            [
+              updates['stripe_publishable_key'] ?? null,
+              updates['stripe_secret_key'] ?? null,
+              updates['stripe_webhook_secret'] ?? null,
+              row.id
+            ]
+          );
         }
       }
     });
@@ -496,16 +520,7 @@ export async function runVersionedMigrations(
       `);
     });
 
-    await runVersioned('v12_token_blacklist_security_hardening', 'Hardening token_blacklist indexes', async (tx) => {
-      await safeQueryClient(securityClient, client, `
-        CREATE TABLE IF NOT EXISTS token_blacklist (
-          id SERIAL PRIMARY KEY,
-          token TEXT UNIQUE NOT NULL,
-          expires_at TIMESTAMP NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-
+    await runVersioned('v12_token_blacklist_security_hardening', 'Hardening token_blacklist indexes', async () => {
       await safeQueryClient(securityClient, client, `CREATE UNIQUE INDEX IF NOT EXISTS token_blacklist_pkey ON token_blacklist(id)`);
       await safeQueryClient(securityClient, client, `CREATE UNIQUE INDEX IF NOT EXISTS token_blacklist_token_key ON token_blacklist(token)`);
       await safeQueryClient(securityClient, client, `CREATE INDEX IF NOT EXISTS idx_token_blacklist_active_expires ON token_blacklist(expires_at)`);
@@ -866,42 +881,17 @@ export async function runVersionedMigrations(
       console.log('[Migrations] token_blacklist cleared for SHA-256 migration.');
     });
 
-    await runVersioned('v42_missing_indexes', 'Adding critical performance indexes', async (tx) => {
+    await runVersioned('v42_performance_audit_additive', 'Adding critical performance indexes and blog tables', async (tx) => {
       await tx.query(`CREATE INDEX IF NOT EXISTS idx_password_resets_email ON password_resets(email)`);
       await tx.query(`CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token)`);
 
-      await tx.query(`CREATE INDEX IF NOT EXISTS idx_marketplace_items_status ON marketplace_items(status)`);
-      await tx.query(`CREATE INDEX IF NOT EXISTS idx_marketplace_items_user_id ON marketplace_items(user_id)`);
+      if (await tableExists(tx, 'marketplace_items')) {
+        await tx.query(`CREATE INDEX IF NOT EXISTS idx_marketplace_items_status ON marketplace_items(status)`);
+        await tx.query(`CREATE INDEX IF NOT EXISTS idx_marketplace_items_user_id ON marketplace_items(user_id)`);
+      }
 
       const extTarget = externalClient || client;
       try {
-        await extTarget.query(`
-          CREATE TABLE IF NOT EXISTS blog_articles (
-            id SERIAL PRIMARY KEY,
-            author_id INTEGER NOT NULL,
-            slug VARCHAR(255) UNIQUE NOT NULL,
-            title_en VARCHAR(255) NOT NULL,
-            title_ar VARCHAR(255) NOT NULL,
-            content_en TEXT NOT NULL,
-            content_ar TEXT NOT NULL,
-            image_url TEXT,
-            category_en VARCHAR(100) NOT NULL,
-            category_ar VARCHAR(100) NOT NULL,
-            views INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          )
-        `);
-        await extTarget.query(`
-          CREATE TABLE IF NOT EXISTS blog_comments (
-            id SERIAL PRIMARY KEY,
-            article_id INTEGER NOT NULL,
-            user_id INTEGER NOT NULL,
-            content TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          )
-        `);
         await extTarget.query(`CREATE INDEX IF NOT EXISTS idx_blog_comments_article_id ON blog_comments(article_id)`);
       } catch (e: any) {
         console.warn('[Migrations v42] Notice on blog_comments setup:', e?.message || e);
@@ -1197,7 +1187,7 @@ export async function runVersionedMigrations(
           ('/subscription', 'خطط الاشتراكات - منصة بيربليكستا', 'Subscription Plans - Perplexta Platform', 'استكشف الباقات والاشتراكات والوصول الكامل لأدوات التحليل الذكي.', 'Explore subscription plans and full access to intelligence models.', 'اشتراكات, خطط, باقات', 'subscriptions, pricing, plans', true),
           ('/marketplace', 'متجر الإضافات والنماذج - منصة بيربليكستا', 'AI Marketplace - Perplexta Platform', 'تصفح المتجر الرقمي للإضافات والأدوات الذكية المعتمدة.', 'Browse our digital marketplace for artificial intelligence add-ons.', 'متجر, نماذج, أدوات', 'marketplace, tools, plugins', true),
           ('/blog', 'المدونة التقنية والأبحاث - بيربليكستا', 'Technical Blog & Research - Perplexta', 'قراءة أحدث المقالات التقنية والدراسات التحليلية.', 'Read the latest technical publications and deep research insights.', 'مقالات, مدونة, أبحاث', 'blog, articles, research', true),
-          ('/viralbook', 'فايرال بوك والمنشورات - بيربليكستا', 'ViralBook Feed & Ads - Perplexta', 'تصفح منشورات فايرال بوك التفاعلية والعروض التجارية.', 'Browse ViralBook commercial ads and interactive public posts.', 'فايرال بوك, منشورات, إعلانات', 'viralbook, ads, posts', true),
+          ('/viralbook', 'فيرال بوك والمنشورات - بيربليكستا', 'ViralBook Feed & Ads - Perplexta', 'تصفح منشورات فيرال بوك التفاعلية والعروض التجارية.', 'Browse ViralBook commercial ads and interactive public posts.', 'فيرال بوك, منشورات, إعلانات', 'viralbook, ads, posts', true),
           ('/rewards', 'نظام المكافآت والأرباح - بيربليكستا', 'Rewards & Referral Program - Perplexta', 'احصل على مكافآت ونقاط عند مشاركة ودعوة الأصدقاء.', 'Earn rewards and commission by referring friends and partners.', 'مكافآت, إحالة, أرباح', 'rewards, referral, affiliate', true),
           ('/about', 'عن منصة بيربليكستا والرؤية المستقبلية', 'About Perplexta - Vision & Mission', 'تعرف على رؤية فريق بيربليكستا وتاريخ تطوير المنصة.', 'Discover the history, tech vision, and team behind Perplexta.', 'عن المنصة, رؤية, فريق', 'about, vision, company', true),
           ('/terms', 'شروط الخدمة والاستخدام - بيربليكستا', 'Terms of Service - Perplexta', 'اطّلع على شروط وأحكام استخدام منصة بيربليكستا.', 'Read our official terms and conditions governing platform usage.', 'شروط, أحكام, اتفاقية', 'terms, conditions, legal', true),
@@ -1330,25 +1320,6 @@ export async function runVersionedMigrations(
     });
     
     await runVersioned('v72_registered_agents_schema_fix', 'Ensuring registered_agents table has all required columns', async (tx) => {
-      await tx.query(`
-        CREATE TABLE IF NOT EXISTS registered_agents (
-          id SERIAL PRIMARY KEY,
-          client_id VARCHAR(255) UNIQUE NOT NULL,
-          client_secret VARCHAR(255),
-          api_key_hash VARCHAR(255),
-          client_name VARCHAR(255) NOT NULL,
-          identity_type VARCHAR(50) DEFAULT 'agent',
-          credential_type VARCHAR(50) DEFAULT 'client_credentials',
-          redirect_uris TEXT[],
-          jwks_uri VARCHAR(500),
-          user_agent VARCHAR(500),
-          signature_keys JSONB,
-          permissions JSONB DEFAULT '[]',
-          is_active BOOLEAN DEFAULT true,
-          user_id INTEGER,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
       await ensureColumnsBulk(tx, 'registered_agents', {
         api_key_hash: { type: 'VARCHAR(255)' },
         permissions: { type: 'JSONB', default: `'[]'` },
@@ -1439,7 +1410,7 @@ export async function runVersionedMigrations(
       await tx.query(`DROP INDEX IF EXISTS idx_system_settings_seo_image_url`);
       await tx.query(`DROP INDEX IF EXISTS idx_system_settings_favicon_url`);
     });
-    await runVersioned('v79_sync_content_seo_metadata', 'Syncing missing SEO metadata for blog_articles and marketplace_items', async () => {
+    await runVersioned('v79_sync_content_seo_metadata', 'Syncing missing SEO metadata for Bulletin Board', async () => {
       await syncAllContentSeoMetadata().catch((err) => {
         console.warn('[Migrations] Non-fatal SEO metadata sync warning:', err.message || err);
       });
@@ -1516,15 +1487,9 @@ export async function runVersionedMigrations(
         )
       `);
 
-      // Ensure constraint for context values
-      const chkExists = await tx.query(`SELECT 1 FROM pg_constraint WHERE conname = 'chk_media_assets_context'`);
-      if (chkExists.rowCount === 0) {
-        await tx.query(`
-          ALTER TABLE media_assets 
-          ADD CONSTRAINT chk_media_assets_context 
-          CHECK (context IN ('avatar', 'blog', 'marketplace', 'bulletin', 'ad', 'system', 'general'))
-        `);
-      }
+      // Ensure any legacy restrictive constraint for context values is dropped so all contexts (pwa_asset, brand, video, etc.) are valid
+      await tx.query(`ALTER TABLE media_assets DROP CONSTRAINT IF EXISTS chk_media_assets_context`).catch(() => {});
+      await tx.query(`ALTER TABLE media_assets DROP CONSTRAINT IF EXISTS media_assets_context_check`).catch(() => {});
 
       // Ensure columns exist on media_assets if table already existed previously
       await tx.query(`ALTER TABLE media_assets ADD COLUMN IF NOT EXISTS user_id INTEGER`);
@@ -1534,7 +1499,15 @@ export async function runVersionedMigrations(
 
       // === Core DB Columns ===
       await tx.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_asset_id UUID`);
-      await tx.query(`ALTER TABLE marketplace_items ADD COLUMN IF NOT EXISTS image_asset_id UUID`);
+      
+      await tx.query(`
+        DO $$
+        BEGIN
+          IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'marketplace_items') THEN
+            ALTER TABLE marketplace_items ADD COLUMN IF NOT EXISTS image_asset_id UUID;
+          END IF;
+        END $$;
+      `);
 
       // === External DB Columns ===
       const extTarget = externalClient || tx;
@@ -1560,7 +1533,15 @@ export async function runVersionedMigrations(
       await tx.query(`CREATE INDEX IF NOT EXISTS idx_media_assets_user_id ON media_assets(user_id)`);
       await tx.query(`CREATE INDEX IF NOT EXISTS idx_media_assets_marketplace_item_id ON media_assets(marketplace_item_id)`);
       await tx.query(`CREATE INDEX IF NOT EXISTS idx_users_avatar_asset_id ON users(avatar_asset_id)`);
-      await tx.query(`CREATE INDEX IF NOT EXISTS idx_marketplace_items_image_asset_id ON marketplace_items(image_asset_id)`);
+      
+      await tx.query(`
+        DO $$
+        BEGIN
+          IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'marketplace_items') THEN
+            CREATE INDEX IF NOT EXISTS idx_marketplace_items_image_asset_id ON marketplace_items(image_asset_id);
+          END IF;
+        END $$;
+      `);
 
       // External Indexes
       if (blogArticlesExists.rows[0].exists) {
@@ -1569,9 +1550,30 @@ export async function runVersionedMigrations(
 
       // === Foreign Keys (Only within the same database) ===
       await ensureForeignKey(tx, 'users', 'fk_users_avatar_asset_id', 'avatar_asset_id', 'media_assets', 'id', 'SET NULL');
-      await ensureForeignKey(tx, 'marketplace_items', 'fk_marketplace_items_image_asset_id', 'image_asset_id', 'media_assets', 'id', 'SET NULL');
+      
+      await tx.query(`
+        DO $$
+        BEGIN
+          IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'marketplace_items') THEN
+            IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_marketplace_items_image_asset_id') THEN
+              ALTER TABLE marketplace_items ADD CONSTRAINT fk_marketplace_items_image_asset_id FOREIGN KEY (image_asset_id) REFERENCES media_assets(id) ON DELETE SET NULL;
+            END IF;
+          END IF;
+        END $$;
+      `);
+
       await ensureForeignKey(tx, 'media_assets', 'fk_media_assets_user_id', 'user_id', 'users', 'id', 'SET NULL');
-      await ensureForeignKey(tx, 'media_assets', 'fk_media_assets_marketplace_item_id', 'marketplace_item_id', 'marketplace_items', 'id', 'SET NULL');
+      
+      await tx.query(`
+        DO $$
+        BEGIN
+          IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'marketplace_items') THEN
+            IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_media_assets_marketplace_item_id') THEN
+              ALTER TABLE media_assets ADD CONSTRAINT fk_media_assets_marketplace_item_id FOREIGN KEY (marketplace_item_id) REFERENCES marketplace_items(id) ON DELETE SET NULL;
+            END IF;
+          END IF;
+        END $$;
+      `);
     });
 
     await runVersioned('v84_media_player_mute_defaults', 'Ensure media_muted default columns on users and system_settings', async (tx) => {
@@ -1629,6 +1631,17 @@ export async function runVersionedMigrations(
       `);
       await tx.query(`CREATE INDEX IF NOT EXISTS idx_seo_metadata_route_path ON seo_metadata(route_path)`);
       await tx.query(`CREATE INDEX IF NOT EXISTS idx_seo_metadata_entity ON seo_metadata(entity_type, entity_id)`);
+
+      // Ensure bulletin_ads has SEO columns before querying
+      await ensureColumnsBulk(tx, 'bulletin_ads', {
+        meta_title_en: { type: 'VARCHAR(255)' },
+        meta_title_ar: { type: 'VARCHAR(255)' },
+        meta_description_en: { type: 'TEXT' },
+        meta_description_ar: { type: 'TEXT' },
+        keywords_en: { type: 'TEXT' },
+        keywords_ar: { type: 'TEXT' },
+        og_image_url: { type: 'TEXT' }
+      });
 
       // Seed/populate dynamic routes for existing bulletin ads
       await tx.query(`
@@ -2041,9 +2054,9 @@ export async function runVersionedMigrations(
             IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'media_assets' AND column_name = 'blog_article_id') THEN
               ALTER TABLE media_assets DROP COLUMN blog_article_id;
             END IF;
-            -- Update context check constraint if exists
+            -- Ensure restrictive context check constraints are dropped so all media contexts are accepted
             ALTER TABLE media_assets DROP CONSTRAINT IF EXISTS media_assets_context_check;
-            ALTER TABLE media_assets ADD CONSTRAINT media_assets_context_check CHECK (context IN ('avatar', 'bulletin', 'ad', 'system', 'general', 'video'));
+            ALTER TABLE media_assets DROP CONSTRAINT IF EXISTS chk_media_assets_context;
           END IF;
         END $$;
       `).catch(() => {});
@@ -2067,17 +2080,19 @@ export async function runVersionedMigrations(
       console.log('[Migrations] [Clean Slate] Deep architecture purge completed cleanly.');
     });
 
-    await runVersioned('v100_restore_registry_database_connections', 'Ensure core, ledger, external, and security connection strings in db_connections_registry are valid and active', async (tx) => {
+    await runVersioned('v100_restore_registry_database_connections', 'Ensure core, ledger, external, security, and media connection strings in db_connections_registry are valid and active', async (tx) => {
       const coreUrl = process.env.DATABASE_URL;
       const ledgerUrl = process.env.LEDGER_DATABASE_URL;
       const externalUrl = process.env.EXTERNAL_DATABASE_URL || coreUrl;
       const securityUrl = process.env.SECURITY_DATABASE_URL || coreUrl;
+      const mediaUrl = process.env.MEDIA_DATABASE_URL || coreUrl;
 
       const entries = [
         { id: 'core', url: coreUrl },
         { id: 'ledger', url: ledgerUrl },
         { id: 'external', url: externalUrl },
         { id: 'security', url: securityUrl },
+        { id: 'media', url: mediaUrl }
       ];
 
       for (const entry of entries) {
@@ -2111,6 +2126,15 @@ export async function runVersionedMigrations(
       await ensureColumnsBulk(tx, 'system_settings', {
         google_client_id: { type: 'VARCHAR(255)' },
         google_client_secret: { type: 'TEXT' },
+        github_client_id: { type: 'VARCHAR(255)' },
+        github_client_secret: { type: 'TEXT' },
+        apple_client_id: { type: 'VARCHAR(255)' },
+        apple_team_id: { type: 'VARCHAR(255)' },
+        apple_key_id: { type: 'VARCHAR(255)' },
+        apple_private_key: { type: 'TEXT' },
+        microsoft_client_id: { type: 'VARCHAR(255)' },
+        microsoft_client_secret: { type: 'TEXT' },
+        oauth_providers_config: { type: 'JSONB', default: "'{}'" },
         firebase_project_id: { type: 'VARCHAR(255)' },
         firebase_client_email: { type: 'VARCHAR(255)' },
         firebase_private_key: { type: 'TEXT' },
@@ -2323,6 +2347,504 @@ export async function runVersionedMigrations(
     await runVersioned('v108_allow_null_user_id_in_media_assets', 'Ensure user_id in media_assets table is nullable and does not enforce a NOT NULL constraint', async (tx) => {
       await tx.query(`
         ALTER TABLE media_assets ALTER COLUMN user_id DROP NOT NULL
+      `);
+    });
+
+    await runVersioned('v109_sanitize_registry_db_connections', 'Sanitize localhost connection strings in db_connections_registry when core DB is remote', async (tx) => {
+      const coreUrl = process.env.DATABASE_URL;
+      if (coreUrl && !coreUrl.includes('localhost') && !coreUrl.includes('127.0.0.1')) {
+        const encryptedCore = encrypt(coreUrl);
+        const rows = await tx.query(`SELECT id, connection_string, host FROM db_connections_registry WHERE id IN ('ledger', 'external', 'security', 'media')`);
+        for (const row of rows.rows) {
+          let shouldUpdate = false;
+          if (row.host === 'localhost' || row.host === '127.0.0.1') {
+            shouldUpdate = true;
+          } else if (row.connection_string) {
+            try {
+              const dec = decrypt(row.connection_string);
+              if (dec && (dec.includes('localhost') || dec.includes('127.0.0.1'))) {
+                shouldUpdate = true;
+              }
+            } catch {}
+          }
+          if (shouldUpdate) {
+            await tx.query(
+              `UPDATE db_connections_registry SET connection_string = $1, host = NULL, status = 'healthy' WHERE id = $2`,
+              [encryptedCore, row.id]
+            );
+          }
+        }
+      }
+    });
+
+    await runVersioned('v110_apply_sovereign_identity_v4_tokens', 'Apply Perplexta Sovereign Identity v4.0 design tokens to database tables and system settings', async (tx) => {
+      const canonicalLightTokens = JSON.stringify({
+        '--surface-page': '#ffffff',
+        '--surface-canvas': '#ffffff',
+        '--surface-card': '#ffffff',
+        '--surface-raised': '#ffffff',
+        '--surface-subtle': '#f6f8fa',
+        '--surface-inset': '#f6f8fa',
+        '--fg-primary': '#1f2328',
+        '--fg-secondary': '#656d76',
+        '--fg-muted': '#656d76',
+        '--accent': '#0969da',
+        '--accent-hover': '#0550ae',
+        '--fg-accent': '#0969da',
+        '--bg-accent-emphasis': '#1a7f37',
+        '--bg-accent-muted': 'rgba(9, 105, 218, 0.12)',
+        '--border-accent-emphasis': '#0969da',
+        '--focus-outline': '#0969da',
+        '--border-default': '#d0d7de',
+        '--border-outer-input': '#d0d7de',
+        '--border-inner-input': '#d0d7de',
+        '--border-subtle': '#d0d7de',
+        '--border-strong': '#656d76',
+        '--border-accent': '#0969da',
+        '--bg-btn-primary': '#1a7f37',
+        '--fg-btn-primary': '#ffffff',
+        '--bg-btn-secondary': '#f6f8fa',
+        '--border-btn-secondary': '#d0d7de',
+        '--control-active-bg': '#f6f8fa',
+        '--control-active-fg': '#0969da',
+        '--bg-input': '#ffffff',
+        '--border-focus': '#0969da',
+        '--chat-bubble-user': '#f6f8fa',
+        '--chat-bubble-assistant': 'transparent',
+        '--chat-bubble-user-text': '#1f2328',
+        '--chat-bubble-assistant-text': '#1f2328'
+      });
+
+      const canonicalDarkTokens = JSON.stringify({
+        '--surface-page': '#0d1117',
+        '--surface-canvas': '#0d1117',
+        '--surface-card': '#161b22',
+        '--surface-raised': '#161b22',
+        '--surface-subtle': '#161b22',
+        '--surface-inset': '#010409',
+        '--fg-primary': '#e6edf3',
+        '--fg-secondary': '#8b949e',
+        '--fg-muted': '#8b949e',
+        '--accent': '#58a6ff',
+        '--accent-hover': '#79c0ff',
+        '--fg-accent': '#58a6ff',
+        '--bg-accent-emphasis': '#238636',
+        '--bg-accent-muted': 'rgba(88, 166, 255, 0.15)',
+        '--border-accent-emphasis': '#58a6ff',
+        '--focus-outline': '#58a6ff',
+        '--border-default': '#3d444d',
+        '--border-outer-input': '#3d444d',
+        '--border-inner-input': '#3d444d',
+        '--border-subtle': '#3d444d',
+        '--border-strong': '#8b949e',
+        '--border-accent': '#58a6ff',
+        '--bg-btn-primary': '#238636',
+        '--fg-btn-primary': '#ffffff',
+        '--bg-btn-secondary': '#161b22',
+        '--border-btn-secondary': '#3d444d',
+        '--control-active-bg': '#161b22',
+        '--control-active-fg': '#58a6ff',
+        '--bg-input': '#21262d',
+        '--border-focus': '#58a6ff',
+        '--chat-bubble-user': '#161b22',
+        '--chat-bubble-assistant': 'transparent',
+        '--chat-bubble-user-text': '#e6edf3',
+        '--chat-bubble-assistant-text': '#e6edf3'
+      });
+
+      await tx.query(`
+        INSERT INTO admin_theme_customizations (theme_mode, tokens, updated_at)
+        VALUES ('light', $1::jsonb, CURRENT_TIMESTAMP)
+        ON CONFLICT (theme_mode) DO UPDATE
+        SET tokens = $1::jsonb, updated_at = CURRENT_TIMESTAMP
+      `, [canonicalLightTokens]);
+
+      await tx.query(`
+        INSERT INTO admin_theme_customizations (theme_mode, tokens, updated_at)
+        VALUES ('dark', $1::jsonb, CURRENT_TIMESTAMP)
+        ON CONFLICT (theme_mode) DO UPDATE
+        SET tokens = $1::jsonb, updated_at = CURRENT_TIMESTAMP
+      `, [canonicalDarkTokens]);
+
+      const fontConfigJson = JSON.stringify({
+        ar: { fontFamily: 'Tajawal', enabled: true, url: 'https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap' },
+        en: { fontFamily: 'Geist', enabled: true, url: 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap' },
+        dynamicLoading: true
+      });
+
+      await tx.query(`
+        UPDATE system_settings
+        SET 
+          font_loading_config = $1::jsonb,
+          font_config_ar = $2::jsonb,
+          font_config_en = $3::jsonb,
+          site_name_en = CASE WHEN site_name_en = 'Perplexa' THEN 'Perplexta' ELSE site_name_en END,
+          site_name_ar = CASE WHEN site_name_ar = 'بيربليكسا' THEN 'بيربليكستا' ELSE site_name_ar END
+        WHERE id = (SELECT id FROM system_settings ORDER BY id ASC LIMIT 1)
+      `, [
+        fontConfigJson,
+        JSON.stringify({ fontFamily: 'Tajawal', enabled: true, url: 'https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap' }),
+        JSON.stringify({ fontFamily: 'Geist', enabled: true, url: 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap' })
+      ]).catch(() => {});
+    });
+
+    await runVersioned('v111_add_data_saver_column_to_users', 'Ensure data_saver BOOLEAN column exists on users table for aggressive content compression', async (tx) => {
+      await tx.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS data_saver BOOLEAN DEFAULT false`);
+    });
+
+    await runVersioned('v112_finalize_perplexta_identity', 'Ensure official Perplexta branding across system settings and metadata', async (tx) => {
+      await tx.query(`
+        UPDATE system_settings
+        SET 
+          site_name_en = CASE WHEN site_name_en = 'Perplexa' OR site_name_en IS NULL OR site_name_en = '' THEN 'Perplexta' ELSE site_name_en END,
+          site_name_ar = CASE WHEN site_name_ar = 'بيربليكسا' OR site_name_ar IS NULL OR site_name_ar = '' THEN 'بيربليكستا' ELSE site_name_ar END,
+          seo_site_name_en = CASE WHEN seo_site_name_en = 'Perplexa' OR seo_site_name_en IS NULL OR seo_site_name_en = '' THEN 'Perplexta' ELSE seo_site_name_en END,
+          seo_site_name_ar = CASE WHEN seo_site_name_ar = 'بيربليكسا' OR seo_site_name_ar IS NULL OR seo_site_name_ar = '' THEN 'بيربليكستا' ELSE seo_site_name_ar END
+        WHERE id = (SELECT id FROM system_settings ORDER BY id ASC LIMIT 1)
+      `).catch(() => {});
+    });
+
+    // v113 is enabled per Audit Plan Phase 3 (confirmed 0 live consumers in codebase)
+    await runVersioned('v113_drop_legacy_cost_columns', 'Drop legacy point deduction and wallet cost columns and indices from tool_orchestrator table', async (tx) => {
+      await tx.query(`
+        ALTER TABLE tool_orchestrator DROP COLUMN IF EXISTS wallet_cost;
+        ALTER TABLE tool_orchestrator DROP COLUMN IF EXISTS points_required;
+        ALTER TABLE tool_orchestrator DROP COLUMN IF EXISTS cost_per_usage;
+        ALTER TABLE tool_orchestrator DROP COLUMN IF EXISTS cost_per_1k_input_tokens;
+        ALTER TABLE tool_orchestrator DROP COLUMN IF EXISTS cost_per_1k_output_tokens;
+      `).catch((err) => {
+        console.warn('[Migration v113] Warning during legacy cost columns dropping:', err.message);
+      });
+    });
+
+    await runVersioned('v114_unrestrict_media_assets_context', 'Drop restrictive context check constraints on media_assets to allow all media types and contexts', async (tx) => {
+      await tx.query(`
+        ALTER TABLE media_assets DROP CONSTRAINT IF EXISTS chk_media_assets_context;
+        ALTER TABLE media_assets DROP CONSTRAINT IF EXISTS media_assets_context_check;
+      `).catch((err) => {
+        console.warn('[Migration v114] Warning dropping media_assets context check on primary pool:', err.message);
+      });
+    });
+
+    // Phase 2 & 4 Reconciliation Migrations
+    await runVersioned('v115_unify_media_assets_storage', 'Reconcile and unify media_assets into dedicated Media DB and clean orphaned columns', async (tx) => {
+      await tx.query(`
+        ALTER TABLE media_assets DROP COLUMN IF EXISTS blog_article_id;
+        ALTER TABLE media_assets DROP COLUMN IF EXISTS marketplace_item_id;
+      `).catch((err) => {
+        console.warn('[Migration v115] Warning cleaning media_assets columns:', err.message);
+      });
+    });
+
+    await runVersioned('v116_security_split_data_reconciliation', 'Verify and reconcile security audit indexes and integrity across Security DB split', async (tx) => {
+      await tx.query(`
+        CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at);
+        CREATE INDEX IF NOT EXISTS idx_security_alerts_user ON security_alerts(user_id);
+        CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_created ON admin_audit_logs(created_at);
+      `).catch((err) => {
+        console.warn('[Migration v116] Warning during security split index reconciliation:', err.message);
+      });
+    });
+
+    await runVersioned('v117_drop_ghost_external_tables', 'Drop decommissioned ghost external tables (external_articles, external_categories, external_sync_logs)', async (tx) => {
+      const ext = externalClient || tx;
+      await ext.query(`DROP TABLE IF EXISTS external_sync_logs, external_categories, external_articles CASCADE`).catch((err: any) => {
+        console.warn('[Migration v117] Notice during external ghost tables cleanup:', err.message);
+      });
+    });
+
+    await runVersioned('v118_migrate_deprecated_orchestrator_gemini_models', 'Migrate deprecated Gemini models in tool_orchestrator to active models (gemini-3.6-flash / gemini-3.1-pro-preview)', async (tx) => {
+      await tx.query(`
+        UPDATE tool_orchestrator
+        SET primary_model = 'models/gemini-3.6-flash'
+        WHERE primary_model IN ('models/gemini-2.5-flash', 'gemini-2.5-flash', 'models/gemini-2.0-flash', 'gemini-2.0-flash', 'models/gemini-1.5-flash', 'gemini-1.5-flash');
+
+        UPDATE tool_orchestrator
+        SET primary_model = 'models/gemini-3.1-pro-preview'
+        WHERE primary_model IN ('models/gemini-2.5-pro', 'gemini-2.5-pro', 'models/gemini-2.0-pro', 'gemini-2.0-pro', 'models/gemini-1.5-pro', 'gemini-1.5-pro');
+
+        UPDATE tool_orchestrator
+        SET fallback_1_model = 'models/gemini-3.6-flash'
+        WHERE fallback_1_model IN ('models/gemini-2.5-flash', 'gemini-2.5-flash', 'models/gemini-2.0-flash', 'gemini-2.0-flash', 'models/gemini-1.5-flash', 'gemini-1.5-flash');
+
+        UPDATE tool_orchestrator
+        SET fallback_2_model = 'models/gemini-3.6-flash'
+        WHERE fallback_2_model IN ('models/gemini-2.5-flash', 'gemini-2.5-flash', 'models/gemini-2.0-flash', 'gemini-2.0-flash', 'models/gemini-1.5-flash', 'gemini-1.5-flash');
+      `).catch((err: any) => {
+        console.warn('[Migration v118] Notice migrating deprecated models:', err.message);
+      });
+    });
+
+    await runVersioned('v119_isolate_gpu_tools_and_clean_orchestrator', 'Enforce absolute GPU and media compute isolation by purging text LLM fallbacks from media/vision tools', async (tx) => {
+      await tx.query(`
+        UPDATE tool_orchestrator
+        SET fallback_1_provider = '', fallback_1_model = '',
+            fallback_2_provider = '', fallback_2_model = '',
+            fallback_3_provider = '', fallback_3_model = ''
+        WHERE tool_id IN ('vision', 'perplexta_vision', 'image', 'video', 'canvas', 'stt', 'tts', 'perplexta_music')
+          AND (fallback_1_provider IN ('google', 'openai', 'anthropic', 'deepseek', 'groq')
+               OR fallback_2_provider IN ('google', 'openai', 'anthropic', 'deepseek', 'groq')
+               OR fallback_3_provider IN ('google', 'openai', 'anthropic', 'deepseek', 'groq'));
+
+        UPDATE tool_orchestrator
+        SET primary_provider = '', primary_model = ''
+        WHERE tool_id IN ('vision', 'perplexta_vision', 'image', 'video')
+          AND primary_provider IN ('google', 'openai', 'anthropic', 'deepseek', 'groq');
+      `).catch((err: any) => {
+        console.warn('[Migration v119] Notice isolating GPU tools:', err.message);
+      });
+    });
+
+    await runVersioned('v120_add_post_code_and_ownership_metadata', 'Add post_code and author_username to bulletin_ads and page slug/owner columns for privacy and ownership', async (tx) => {
+      await tx.query(`ALTER TABLE bulletin_ads ADD COLUMN IF NOT EXISTS post_code VARCHAR(50)`);
+      await tx.query(`ALTER TABLE bulletin_ads ADD COLUMN IF NOT EXISTS author_username VARCHAR(100)`);
+      await tx.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bulletin_ads_post_code ON bulletin_ads(post_code) WHERE post_code IS NOT NULL`);
+      
+      await tx.query(`ALTER TABLE bulletin_pages ADD COLUMN IF NOT EXISTS slug VARCHAR(120)`);
+      await tx.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_bulletin_pages_slug ON bulletin_pages(slug) WHERE slug IS NOT NULL`);
+
+      // Auto-generate post_code for existing ads where post_code is NULL
+      const existingAds = await tx.query(`SELECT id FROM bulletin_ads WHERE post_code IS NULL OR post_code = ''`);
+      for (const ad of existingAds.rows) {
+        const code = 'PX-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+        await tx.query(`UPDATE bulletin_ads SET post_code = $1 WHERE id = $2 AND (post_code IS NULL OR post_code = '')`, [code, ad.id]).catch(() => {});
+      }
+
+      // Auto-generate slug for existing bulletin_pages where slug is NULL
+      const existingPages = await tx.query(`SELECT id, name FROM bulletin_pages WHERE slug IS NULL OR slug = ''`);
+      for (const pg of existingPages.rows) {
+        const cleanSlug = (pg.name || 'page')
+          .toLowerCase()
+          .trim()
+          .replace(/[^\w\u0600-\u06FF\s-]/g, '')
+          .replace(/[\s_]+/g, '-') + '-' + pg.id;
+        await tx.query(`UPDATE bulletin_pages SET slug = $1 WHERE id = $2 AND (slug IS NULL OR slug = '')`, [cleanSlug, pg.id]).catch(() => {});
+      }
+    });
+
+    await runVersioned('v121_production_query_indexes_optimization', 'Create composite indexes on bulletin_ads, messages, and ledger_transactions for high-concurrency production', async (tx) => {
+      // 1. Core DB: Feed & Location composite indexes
+      await tx.query(`
+        CREATE INDEX IF NOT EXISTS idx_bulletin_ads_feed ON bulletin_ads (status, is_boosted DESC, created_at DESC) WHERE deleted_at IS NULL;
+        CREATE INDEX IF NOT EXISTS idx_bulletin_ads_location ON bulletin_ads (location_city, status, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON messages (chat_id, created_at ASC);
+      `).catch((err: any) => {
+        console.warn('[Migration v121] Notice creating core production indexes:', err.message);
+      });
+
+      // 2. Ledger DB: Ledger transactions composite index (strict segregation)
+      await ledgerTarget.query(`
+        CREATE INDEX IF NOT EXISTS idx_ledger_tx_user_created ON ledger_transactions (user_id, created_at DESC) WHERE is_hidden IS NOT TRUE;
+      `).catch((err: any) => {
+        console.warn('[Migration v121] Notice creating ledger production indexes:', err.message);
+      });
+    });
+
+    await runVersioned('v122_repair_gemini_orchestrator_fallbacks', 'Configure multi-layer silent fallbacks and update primary models in tool_orchestrator for 503 high-demand resilience', async (tx) => {
+      await tx.query(`
+        -- Fast chat & search tools: Primary gemini-3.8-flash, Fallback 1 gemini-3.6-flash, Fallback 2 gemini-3.1-flash-lite
+        UPDATE tool_orchestrator
+        SET primary_provider = 'google',
+            primary_model = 'models/gemini-3.8-flash',
+            fallback_1_provider = 'google',
+            fallback_1_model = 'models/gemini-3.6-flash',
+            fallback_2_provider = 'google',
+            fallback_2_model = 'models/gemini-3.1-flash-lite'
+        WHERE tool_id IN ('chat_fast', 'sovereign_search', 'ads_copilot', 'x402_api');
+
+        -- Deep reasoning & code tools: Primary gemini-3.8-flash, Fallback 1 gemini-3.1-pro-preview, Fallback 2 gemini-3.6-flash
+        UPDATE tool_orchestrator
+        SET primary_provider = 'google',
+            primary_model = 'models/gemini-3.8-flash',
+            fallback_1_provider = 'google',
+            fallback_1_model = 'models/gemini-3.1-pro-preview',
+            fallback_2_provider = 'google',
+            fallback_2_model = 'models/gemini-3.6-flash'
+        WHERE tool_id IN ('chat_pro', 'chat_reasoning', 'code', 'perplexta_analysis');
+
+        -- Ensure any other tool currently stuck on only gemini-3.6-flash has fallback protection
+        UPDATE tool_orchestrator
+        SET primary_model = 'models/gemini-3.8-flash',
+            fallback_1_provider = 'google',
+            fallback_1_model = 'models/gemini-3.6-flash'
+        WHERE primary_model = 'models/gemini-3.6-flash'
+          AND (fallback_1_model IS NULL OR fallback_1_model = '' OR fallback_1_model = 'models/gemini-3.6-flash')
+          AND tool_id NOT IN ('vision', 'perplexta_vision', 'image', 'video', 'canvas', 'stt', 'tts', 'perplexta_music');
+      `).catch((err: any) => {
+        console.warn('[Migration v122] Notice configuring orchestrator fallbacks:', err.message);
+      });
+    });
+
+    await runVersioned('v123_bulletin_ad_boost_settings', 'Add boost_goal, boost_daily_budget, boost_settings to bulletin_ads', async (tx) => {
+      await tx.query(`ALTER TABLE bulletin_ads ADD COLUMN IF NOT EXISTS boost_goal VARCHAR(100) DEFAULT 'whatsapp_leads'`);
+      await tx.query(`ALTER TABLE bulletin_ads ADD COLUMN IF NOT EXISTS boost_daily_budget NUMERIC(10,2) DEFAULT 2.00`);
+      await tx.query(`ALTER TABLE bulletin_ads ADD COLUMN IF NOT EXISTS boost_settings JSONB DEFAULT '{}'`);
+    });
+
+    await runVersioned('v124_platform_categories_and_targeting', 'Create and populate platform_categories table for rich business and interest targeting', async (tx) => {
+      await tx.query(`
+        CREATE TABLE IF NOT EXISTS platform_categories (
+          id VARCHAR(100) PRIMARY KEY,
+          name_ar VARCHAR(255) NOT NULL,
+          name_en VARCHAR(255) NOT NULL,
+          group_id VARCHAR(100) NOT NULL,
+          group_ar VARCHAR(255) NOT NULL,
+          group_en VARCHAR(255) NOT NULL,
+          icon VARCHAR(50) DEFAULT 'Layers',
+          audience_reach BIGINT DEFAULT 150000,
+          keywords TEXT[] DEFAULT '{}',
+          is_featured BOOLEAN DEFAULT false,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_platform_categories_group ON platform_categories (group_id);
+        CREATE INDEX IF NOT EXISTS idx_platform_categories_featured ON platform_categories (is_featured);
+      `);
+    });
+
+    await runVersioned('v125_ad_targeting_categories_seed', 'Seed master business and technology categories into platform_categories table for targeted advertising', async (tx) => {
+      await syncMasterCategoriesToDatabase(tx);
+    });
+
+    await runVersioned('v126_plans_custom_billing_cycles', 'Add custom billing cycles (days, monthly control, annual control) to plans table', async (tx) => {
+      await tx.query(`
+        ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_monthly_enabled BOOLEAN DEFAULT true;
+        ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_annual_enabled BOOLEAN DEFAULT true;
+        ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_daily_enabled BOOLEAN DEFAULT false;
+        ALTER TABLE plans ADD COLUMN IF NOT EXISTS daily_price NUMERIC(10, 2) DEFAULT 0;
+        ALTER TABLE plans ADD COLUMN IF NOT EXISTS daily_days INTEGER DEFAULT 7;
+      `);
+    });
+
+    await runVersioned('v127_email_logs_and_notification_delivery_tracking', 'Add email tracking columns (is_sent, retry_count, last_error, sent_at) to notifications and create user_email_logs table', async (tx) => {
+      await tx.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS is_sent BOOLEAN DEFAULT false`);
+      await tx.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sent_at TIMESTAMP`);
+      await tx.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS retry_count INTEGER DEFAULT 0`);
+      await tx.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS last_error TEXT`);
+
+      await tx.query(`
+        CREATE TABLE IF NOT EXISTS user_email_logs (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          recipient_email VARCHAR(255) NOT NULL,
+          template_name VARCHAR(255) NOT NULL DEFAULT 'custom',
+          subject VARCHAR(255) NOT NULL,
+          status VARCHAR(50) DEFAULT 'pending',
+          retry_count INTEGER DEFAULT 0,
+          last_error TEXT,
+          sent_at TIMESTAMP,
+          metadata JSONB DEFAULT '{}',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      await tx.query(`CREATE INDEX IF NOT EXISTS idx_user_email_logs_recipient ON user_email_logs (recipient_email)`);
+      await tx.query(`CREATE INDEX IF NOT EXISTS idx_user_email_logs_status ON user_email_logs (status)`);
+      await tx.query(`CREATE INDEX IF NOT EXISTS idx_user_email_logs_template ON user_email_logs (template_name)`);
+    });
+
+    await runVersioned('v128_email_logs_deliverability_table', 'Create email_logs table for email deliverability tracking with user_id, template_name, status, is_sent, retry_count, last_error, created_at', async (tx) => {
+      await tx.query(`
+        CREATE TABLE IF NOT EXISTS email_logs (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          recipient VARCHAR(255),
+          template_name VARCHAR(255) NOT NULL DEFAULT 'custom',
+          status VARCHAR(50) DEFAULT 'pending',
+          is_sent BOOLEAN DEFAULT false,
+          retry_count INTEGER DEFAULT 0,
+          last_error TEXT,
+          metadata JSONB DEFAULT '{}',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      await tx.query(`CREATE INDEX IF NOT EXISTS idx_email_logs_user_id ON email_logs (user_id)`);
+      await tx.query(`CREATE INDEX IF NOT EXISTS idx_email_logs_template_name ON email_logs (template_name)`);
+      await tx.query(`CREATE INDEX IF NOT EXISTS idx_email_logs_status ON email_logs (status)`);
+      await tx.query(`CREATE INDEX IF NOT EXISTS idx_email_logs_is_sent ON email_logs (is_sent)`);
+    });
+
+    await runVersioned('v129_consolidate_email_logs', 'Consolidate user_email_logs into single unified email_logs table with recipient_email, subject, sent_at and status indexes', async (tx) => {
+      await tx.query(`ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS recipient_email VARCHAR(255)`);
+      await tx.query(`ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS subject VARCHAR(255) DEFAULT ''`);
+      await tx.query(`ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS sent_at TIMESTAMP`);
+
+      // Populate recipient_email from recipient if empty (safely checking if column exists first)
+      const hasRecipient = await columnExists(tx, 'email_logs', 'recipient');
+      if (hasRecipient) {
+        await tx.query(`UPDATE email_logs SET recipient_email = recipient WHERE recipient_email IS NULL AND recipient IS NOT NULL`);
+      }
+
+      // Migrate records from user_email_logs if table exists
+      await tx.query(`
+        DO $$
+        BEGIN
+          IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'user_email_logs') THEN
+            INSERT INTO email_logs (user_id, recipient_email, template_name, subject, status, is_sent, retry_count, last_error, sent_at, metadata, created_at, updated_at)
+            SELECT user_id, recipient_email, template_name, subject, status, (status = 'sent'), retry_count, last_error, sent_at, metadata, created_at, updated_at
+            FROM user_email_logs
+            ON CONFLICT DO NOTHING;
+          END IF;
+        END $$;
+      `);
+
+      await tx.query(`CREATE INDEX IF NOT EXISTS idx_email_logs_recipient_email ON email_logs (recipient_email)`);
+    });
+
+    if (!existingMigrations.has('v121_bulletin_schema_perfection')) {
+      await runVersioned('v130_bulletin_schema_perfection', 'Synchronize media_urls, reaction, managers and audio metadata across bulletin tables', async (tx) => {
+        await tx.query(`ALTER TABLE bulletin_ads ADD COLUMN IF NOT EXISTS media_urls JSONB DEFAULT '[]'::JSONB`);
+        await tx.query(`ALTER TABLE bulletin_ads ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::JSONB`);
+        await tx.query(`ALTER TABLE bulletin_ads ADD COLUMN IF NOT EXISTS post_code VARCHAR(50)`);
+        await tx.query(`ALTER TABLE bulletin_ads ADD COLUMN IF NOT EXISTS author_username VARCHAR(100)`);
+        await tx.query(`ALTER TABLE bulletin_ads ADD COLUMN IF NOT EXISTS audio_url TEXT`);
+        await tx.query(`ALTER TABLE bulletin_ads ADD COLUMN IF NOT EXISTS audio_title VARCHAR(255)`);
+        await tx.query(`ALTER TABLE bulletin_ads ADD COLUMN IF NOT EXISTS audio_artist VARCHAR(255)`);
+        await tx.query(`ALTER TABLE bulletin_ads ADD COLUMN IF NOT EXISTS audio_track_id VARCHAR(100)`);
+        await tx.query(`ALTER TABLE bulletin_pages ADD COLUMN IF NOT EXISTS managers JSONB DEFAULT '[]'::JSONB`);
+        await tx.query(`ALTER TABLE bulletin_ad_likes ADD COLUMN IF NOT EXISTS reaction VARCHAR(20) DEFAULT 'like'`);
+        await tx.query(`ALTER TABLE bulletin_comment_likes ADD COLUMN IF NOT EXISTS reaction VARCHAR(20) DEFAULT 'like'`);
+        
+        await tx.query(`
+          UPDATE bulletin_ads 
+          SET media_urls = jsonb_build_array(image_url) 
+          WHERE (media_urls IS NULL OR media_urls = '[]'::jsonb) 
+            AND image_url IS NOT NULL 
+            AND image_url != ''
+        `);
+      });
+    }
+
+    await runVersioned('v131_plans_and_subscriptions_credit_engine', 'Add daily_credits, monthly_credits, annual_credits to plans and cycle_credits, used_credits, last_reset_at to subscriptions', async (tx) => {
+      await tx.query(`
+        ALTER TABLE plans ADD COLUMN IF NOT EXISTS daily_credits INTEGER DEFAULT 0;
+        ALTER TABLE plans ADD COLUMN IF NOT EXISTS monthly_credits INTEGER DEFAULT 0;
+        ALTER TABLE plans ADD COLUMN IF NOT EXISTS annual_credits INTEGER DEFAULT 0;
+
+        ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS cycle_credits INTEGER DEFAULT 0;
+        ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS used_credits INTEGER DEFAULT 0;
+        ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS last_reset_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+        UPDATE plans SET
+          monthly_credits = CASE 
+            WHEN monthly_credits > 0 THEN monthly_credits
+            WHEN monthly_price > 0 THEN ROUND(COALESCE(monthly_price, 0) * 1000)
+            ELSE 100
+          END,
+          annual_credits = CASE 
+            WHEN annual_credits > 0 THEN annual_credits
+            WHEN annual_price > 0 THEN ROUND(COALESCE(annual_price, 0) * 1000)
+            WHEN monthly_price > 0 THEN ROUND(COALESCE(monthly_price, 0) * 12 * 1000)
+            ELSE 1200
+          END,
+          daily_credits = CASE 
+            WHEN daily_credits > 0 THEN daily_credits
+            WHEN daily_price > 0 THEN ROUND(COALESCE(daily_price, 0) * 1000)
+            ELSE 0
+          END;
       `);
     });
     

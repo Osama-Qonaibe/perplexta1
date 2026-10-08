@@ -9,7 +9,6 @@ import { adsCopilotPrompt } from './adsCopilot.js';
 import { documentAnalysisPrompt } from './documentAnalysis.js';
 import { imageVisionPrompt } from './imageVision.js';
 import { videoMotionPrompt } from './videoMotion.js';
-import { sovereignMemoryPrompt } from './sovereignMemory.js';
 import { interactiveCanvasPrompt } from './interactiveCanvas.js';
 import { sceneArchitectPrompt } from './sceneArchitect.js';
 
@@ -45,7 +44,6 @@ export const TOOL_PROMPTS_REGISTRY: Record<string, ToolPromptDefinition> = {
   file_analysis: documentAnalysisPrompt,
   image: imageVisionPrompt,
   video: videoMotionPrompt,
-  sovereign_memory: sovereignMemoryPrompt,
   canvas: interactiveCanvasPrompt,
   scene_architect: sceneArchitectPrompt,
   scenearchitect: sceneArchitectPrompt,

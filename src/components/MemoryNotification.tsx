@@ -26,28 +26,28 @@ export const MemoryNotification: React.FC<MemoryNotificationProps> = ({ isVisibl
   const config = {
     startup: {
       desc: dir === 'rtl' ? 'جاري مزامنة الذاكرة...' : 'Syncing memory...',
-      color: 'text-accent',
-      bg: 'bg-accent/10',
+      color: 'text-[var(--fg-accent)]',
+      bg: 'bg-[var(--surface-subtle)]',
     },
     success: {
       desc: dir === 'rtl' ? 'تم تحديث الذاكرة.' : 'Memory updated.',
-      color: 'text-accent',
-      bg: 'bg-accent/10',
+      color: 'text-[var(--fg-accent)]',
+      bg: 'bg-[var(--surface-subtle)]',
     },
     warning: {
       desc: dir === 'rtl' ? 'تنبيه: امتلاء الذاكرة (45/50).' : 'Warning: Memory limit (45/50).',
-      color: 'text-amber-500',
-      bg: 'bg-amber-500/10',
+      color: 'text-[var(--fg-warning)]',
+      bg: 'bg-[var(--status-warning-subtle)]',
     },
     cleanup: {
       desc: dir === 'rtl' ? 'تم دمج السجلات القديمة.' : 'Old records merged.',
-      color: 'text-blue-500',
-      bg: 'bg-blue-500/10',
+      color: 'text-[var(--fg-info)]',
+      bg: 'bg-[var(--status-info-subtle)]',
     },
     optimization: {
       desc: dir === 'rtl' ? 'تم تحسين الكفاءة.' : 'Efficiency optimized.',
-      color: 'text-violet-500',
-      bg: 'bg-violet-500/10',
+      color: 'text-[var(--fg-accent)]',
+      bg: 'bg-[var(--surface-subtle)]',
     }
   };
 
@@ -56,8 +56,8 @@ export const MemoryNotification: React.FC<MemoryNotificationProps> = ({ isVisibl
 
   if (isMobile) {
     return (
-      <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-[280px] bg-[var(--surface-subtle)]/95 backdrop-blur-xl border border-[var(--border-default)] rounded-[4px] shadow-2xl py-1.5 px-3 flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-300">
-        <div className={`w-5 h-5 rounded-[4px] ${current.bg} flex items-center justify-center flex-shrink-0`}>
+      <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-[280px] bg-[var(--surface-subtle)]/95 backdrop-blur-xl border border-[var(--border-default)] rounded-[var(--radius-xs)] shadow-2xl py-1.5 px-3 flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-media">
+        <div className={`w-5 h-5 rounded-[var(--radius-xs)] ${current.bg} flex items-center justify-center flex-shrink-0`}>
           <BrainCircuit className={current.color} size={12} />
         </div>
         <p className="text-[10px] font-bold text-[var(--text-primary)] leading-none flex-1 truncate">
@@ -75,16 +75,16 @@ export const MemoryNotification: React.FC<MemoryNotificationProps> = ({ isVisibl
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="hidden md:flex items-center gap-3 px-4 py-1.5 rounded-[4px] bg-accent/[0.03] border border-accent/20 backdrop-blur-sm shadow-[0_0_20px_rgba(156,163,175,0.05)]"
+      className="hidden md:flex items-center gap-3 px-4 py-1.5 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] border border-[var(--border-accent)] backdrop-blur-sm shadow-[0_0_20px_rgba(156,163,175,0.05)]"
     >
-      <BrainCircuit className="text-accent" size={14} />
-      <span className="text-[11px] font-black text-accent/90 tracking-tight uppercase whitespace-nowrap">
+      <BrainCircuit className="text-[var(--fg-accent)]" size={14} />
+      <span className="text-[11px] font-black text-[var(--text-primary)] tracking-tight uppercase whitespace-nowrap">
         {displayDesc}
       </span>
-      <div className="w-px h-3 bg-accent/20 mx-1" />
+      <div className="w-px h-3 bg-[var(--border-default)] mx-1" />
       <button 
         onClick={onClose}
-        className="text-accent/40 hover:text-accent transition-colors"
+        className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
       >
         <X size={12} />
       </button>

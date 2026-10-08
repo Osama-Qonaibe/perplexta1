@@ -44,6 +44,15 @@ export const VisitorShell: React.FC<VisitorShellProps> = ({ children }) => {
           >
             {isRtl ? 'سياسة الخصوصية' : 'Privacy Policy'}
           </button>
+          <span className="hidden md:inline text-[var(--text-muted)] select-none">•</span>
+          <a 
+            href="/docs/legal" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className={`hidden md:inline ${themeConfig.visitor.footerLink}`}
+          >
+            {isRtl ? 'الوثائق القانونية' : 'Legal Docs'}
+          </a>
         </nav>
 
         <p className={themeConfig.visitor.footerCopyright}>

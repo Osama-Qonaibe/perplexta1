@@ -55,15 +55,17 @@ import { ActionConfirmationModal } from "../ActionConfirmationModal";
 import { ComplianceAuditLogsViewProps } from "./adminTypes";
 import { AdminRateLimitMetricsView } from "../../pages/AdminRateLimitMetricsView";
 import { AdminRenderMetricsView } from "../AdminRenderMetricsView";
+import { DatabaseHealthAuditView } from "./DatabaseHealthAuditView";
 
 export const ComplianceAuditLogsView = ({
   theme,
   t,
   dir,
   initialTab = "logs",
+  hideSubTabs = false,
 }: ComplianceAuditLogsViewProps) => {
   const { token, language } = useAppContext();
-  const [activeTab, setActiveTab] = useState<'logs' | 'radar' | 'metrics'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'logs' | 'radar' | 'metrics' | 'databases'>(initialTab);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
@@ -232,74 +234,91 @@ export const ComplianceAuditLogsView = ({
   return (
     <div className="space-y-6 font-sans" dir={isRtl ? "rtl" : "ltr"}>
       {/* Master Section Header & Internal Navigation Tabs */}
-      <div className="p-6 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-card)] shadow-sm transition-theme">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-[var(--radius-md)] bg-[var(--accent-subtle)] text-[var(--accent)] border border-[var(--border-default)] flex-shrink-0">
-              <ShieldAlert size={26} />
+      {!hideSubTabs && (
+        <div className="p-6 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-card)] shadow-sm transition-theme">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-[var(--radius-md)] bg-[var(--bg-accent-emphasis)]/10 text-[var(--fg-accent)] border border-[var(--border-default)] flex-shrink-0">
+                <ShieldAlert size={26} />
+              </div>
+              <div>
+                <h1 className="text-xl font-black text-[var(--text-primary)] tracking-tight">
+                  {isRtl ? "التدقيق والامتثال والأمان" : "Audit, Compliance & Security Hub"}
+                </h1>
+                <p className="text-xs text-[var(--text-secondary)] mt-1">
+                  {isRtl
+                    ? "المركز الموحد لمراقبة أمان النظام، سجلات التدقيق الإداري، ومقاييس الأداء ورندر المكونات."
+                    : "Unified master console for system security surveillance, compliance audit trail, and component render performance metrics."}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-black text-[var(--text-primary)] tracking-tight">
-                {isRtl ? "التدقيق والامتثال والأمان" : "Audit, Compliance & Security Hub"}
-              </h1>
-              <p className="text-xs text-[var(--text-secondary)] mt-1">
-                {isRtl
-                  ? "المركز الموحد لمراقبة أمان النظام، سجلات التدقيق الإداري، ومقاييس الأداء ورندر المكونات."
-                  : "Unified master console for system security surveillance, compliance audit trail, and component render performance metrics."}
-              </p>
+
+            {/* Internal Navigation Sub-Tabs */}
+            <div className="flex items-center p-1 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] self-start lg:self-auto overflow-x-auto max-w-full">
+              <button
+                type="button"
+                onClick={() => setActiveTab('logs')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === 'logs'
+                    ? 'bg-[var(--surface-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border-default)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
+                }`}
+              >
+                <ShieldAlert size={15} className={activeTab === 'logs' ? 'text-[var(--fg-accent)]' : ''} />
+                <span>{isRtl ? "سجلات التدقيق" : "Compliance Audit Trail"}</span>
+                {total > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[var(--bg-accent-emphasis)]/10 text-[var(--fg-accent)] font-mono font-bold">
+                    {total}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('radar')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === 'radar'
+                    ? 'bg-[var(--surface-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border-default)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
+                }`}
+              >
+                <Shield size={15} className={activeTab === 'radar' ? 'text-[var(--fg-accent)]' : ''} />
+                <span>{isRtl ? "رادار الأمان والحدود" : "Security Radar"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('metrics')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === 'metrics'
+                    ? 'bg-[var(--surface-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border-default)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
+                }`}
+              >
+                <Activity size={15} className={activeTab === 'metrics' ? 'text-[var(--fg-accent)]' : ''} />
+                <span>{isRtl ? "مقاييس الأداء والرندر" : "Render & Latency Metrics"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('databases')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === 'databases'
+                    ? 'bg-[var(--surface-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border-default)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
+                }`}
+              >
+                <Database size={15} className={activeTab === 'databases' ? 'text-[var(--fg-accent)]' : ''} />
+                <span>{isRtl ? "سلامة وتأخير قواعد البيانات" : "Database Health & Latency"}</span>
+              </button>
             </div>
-          </div>
-
-          {/* Internal Navigation Sub-Tabs */}
-          <div className="flex items-center p-1 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] self-start lg:self-auto overflow-x-auto max-w-full">
-            <button
-              type="button"
-              onClick={() => setActiveTab('logs')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === 'logs'
-                  ? 'bg-[var(--surface-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border-default)]'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
-              }`}
-            >
-              <ShieldAlert size={15} className={activeTab === 'logs' ? 'text-[var(--accent)]' : ''} />
-              <span>{isRtl ? "سجلات التدقيق" : "Compliance Audit Trail"}</span>
-              {total > 0 && (
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[var(--accent-subtle)] text-[var(--accent)] font-mono font-bold">
-                  {total}
-                </span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('radar')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === 'radar'
-                  ? 'bg-[var(--surface-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border-default)]'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
-              }`}
-            >
-              <Shield size={15} className={activeTab === 'radar' ? 'text-[var(--accent)]' : ''} />
-              <span>{isRtl ? "رادار الأمان والحدود" : "Security Radar"}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('metrics')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                activeTab === 'metrics'
-                  ? 'bg-[var(--surface-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border-default)]'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
-              }`}
-            >
-              <Activity size={15} className={activeTab === 'metrics' ? 'text-[var(--accent)]' : ''} />
-              <span>{isRtl ? "مقاييس الأداء والرندر" : "Render & Latency Metrics"}</span>
-            </button>
           </div>
         </div>
-      </div>
+      )}
 
-      {activeTab === 'radar' ? (
+      {activeTab === 'databases' ? (
+        <DatabaseHealthAuditView theme={theme} t={t} dir={dir} />
+      ) : activeTab === 'radar' ? (
         <AdminRateLimitMetricsView theme={theme} t={t} />
       ) : activeTab === 'metrics' ? (
         <AdminRenderMetricsView />
@@ -343,7 +362,7 @@ export const ComplianceAuditLogsView = ({
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-foreground)] rounded-[var(--radius-md)] text-xs font-bold cursor-pointer transition-colors duration-base disabled:opacity-50"
+            className="flex-1 md:flex-none min-h-[44px] touch-target-44 flex items-center justify-center gap-2 px-5 py-2.5 bg-[var(--fg-accent)] hover:opacity-90 text-[var(--fg-on-emphasis,#ffffff)] rounded-[var(--radius-md)] text-xs font-bold cursor-pointer transition-colors duration-base disabled:opacity-50"
           >
             {loading ? <RefreshCw className="animate-spin" size={14} /> : <Search size={14} />}
             {isRtl ? "تطبيق التصفية" : "Apply Filter"}
@@ -353,7 +372,7 @@ export const ComplianceAuditLogsView = ({
             type="button"
             onClick={handleReset}
             disabled={loading}
-            className="px-4 py-2.5 bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--fg-secondary)] hover:bg-[var(--surface-input)] rounded-[var(--radius-md)] text-xs font-bold cursor-pointer transition-colors duration-base"
+            className="px-4 py-2.5 min-h-[44px] touch-target-44 bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--fg-secondary)] hover:bg-[var(--surface-input)] rounded-[var(--radius-md)] text-xs font-bold cursor-pointer transition-colors duration-base"
           >
             {isRtl ? "إعادة تعيين" : "Reset"}
           </button>
@@ -396,7 +415,7 @@ export const ComplianceAuditLogsView = ({
                     type="checkbox"
                     checked={logs.length > 0 && logs.every((log) => selectedLogIds.includes(log.id))}
                     onChange={toggleSelectAll}
-                    className="rounded border-[var(--border-default)] text-[var(--accent)] focus:ring-[var(--border-focus)] cursor-pointer h-4 w-4"
+                    className="rounded border-[var(--border-default)] text-[var(--fg-accent)] focus:ring-[var(--border-focus)] cursor-pointer h-4 w-4"
                   />
                 </th>
                 <th className="py-3.5 px-4 text-center">{isRtl ? "الوقت (UTC)" : "Timestamp (UTC)"}</th>
@@ -411,7 +430,7 @@ export const ComplianceAuditLogsView = ({
               {loading ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-[var(--fg-muted)]">
-                    <RefreshCw className="animate-spin inline-block mr-2 text-[var(--accent)]" size={18} />
+                    <RefreshCw className="animate-spin inline-block mr-2 text-[var(--fg-accent)]" size={18} />
                     {isRtl ? "جاري جلب سجل التدقيق الأمني..." : "Ingesting secure compliance records..."}
                   </td>
                 </tr>
@@ -427,7 +446,7 @@ export const ComplianceAuditLogsView = ({
                     key={log.id} 
                     className={`transition-colors duration-base ${
                       selectedLogIds.includes(log.id)
-                        ? "bg-[var(--accent-subtle)]"
+                        ? "bg-[var(--bg-accent-emphasis)]/10"
                         : "hover:bg-[var(--surface-canvas)]"
                     }`}
                   >
@@ -436,7 +455,7 @@ export const ComplianceAuditLogsView = ({
                         type="checkbox"
                         checked={selectedLogIds.includes(log.id)}
                         onChange={() => toggleSelectLog(log.id)}
-                        className="rounded border-[var(--border-default)] text-[var(--accent)] focus:ring-[var(--border-focus)] cursor-pointer h-4 w-4"
+                        className="rounded border-[var(--border-default)] text-[var(--fg-accent)] focus:ring-[var(--border-focus)] cursor-pointer h-4 w-4"
                       />
                     </td>
                     <td className="py-3.5 px-4 text-center text-[10px] font-mono whitespace-nowrap text-[var(--fg-secondary)]">
@@ -456,7 +475,7 @@ export const ComplianceAuditLogsView = ({
                             : log.action.includes("DELETE")
                               ? "bg-[var(--status-danger-subtle)] text-[var(--status-danger)] border border-[var(--status-danger-subtle)]"
                               : "bg-[var(--status-warning-subtle)] text-[var(--status-warning)] border border-[var(--status-warning-subtle)]"
-                          : "bg-[var(--accent-subtle)] text-[var(--accent)] border border-[var(--accent-subtle)]"
+                          : "bg-[var(--bg-accent-emphasis)]/10 text-[var(--fg-accent)] border border-[var(--border-accent)]/30"
                       }`}>
                         {log.action}
                       </span>
@@ -470,7 +489,7 @@ export const ComplianceAuditLogsView = ({
                     <td className="py-3.5 px-4 text-center">
                       <button
                         onClick={() => setSelectedLog(log)}
-                        className="px-3 py-1 border border-[var(--border-default)] rounded-[var(--radius-md)] text-[10px] font-bold text-[var(--accent)] hover:bg-[var(--accent-subtle)] cursor-pointer transition-colors duration-base"
+                        className="px-3 py-1 border border-[var(--border-default)] rounded-[var(--radius-md)] text-[10px] font-bold text-[var(--fg-accent)] hover:bg-[var(--bg-accent-emphasis)]/10 cursor-pointer transition-colors duration-base"
                       >
                         {isRtl ? "عرض التفاصيل" : "Inspect Payload"}
                       </button>
@@ -528,12 +547,12 @@ export const ComplianceAuditLogsView = ({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
-              className="relative max-w-2xl w-full rounded-[var(--radius-xl)] border border-[var(--border-default)] p-6 z-10 shadow-lg bg-[var(--surface-raised)] text-[var(--fg-primary)]"
+              className="relative max-w-2xl w-full rounded-[var(--radius-lg)] border border-[var(--border-default)] p-6 z-10 shadow-lg bg-[var(--surface-card)] text-[var(--text-primary)]"
             >
               {/* Header */}
               <div className="flex items-center justify-between pb-3.5 border-b border-[var(--border-default)] mb-4">
                 <div className="flex items-center gap-2">
-                  <ShieldAlert className="text-[var(--accent)]" size={18} />
+                  <ShieldAlert className="text-[var(--fg-accent)]" size={18} />
                   <span className="text-xs uppercase font-black tracking-wider w-auto h-auto leading-none mt-0">
                     {isRtl ? "التدقيق والتفاصيل القياسية" : "Compliance Payload Audit Inspection"}
                   </span>
@@ -554,7 +573,7 @@ export const ComplianceAuditLogsView = ({
                 </div>
                 <div className="flex flex-col p-2.5 rounded-[var(--radius-md)] bg-[var(--surface-input)] border border-[var(--border-default)]">
                   <span className="text-[var(--fg-muted)] font-bold uppercase">{isRtl ? "العملية الإجرائية" : "Action Identifier"}</span>
-                  <span className="font-bold mt-0.5 text-[var(--accent)] font-mono">{selectedLog.action}</span>
+                  <span className="font-bold mt-0.5 text-[var(--fg-accent)] font-mono">{selectedLog.action}</span>
                 </div>
                 <div className="flex flex-col p-2.5 rounded-[var(--radius-md)] bg-[var(--surface-input)] border border-[var(--border-default)]">
                   <span className="text-[var(--fg-muted)] font-bold uppercase">{isRtl ? "الوقت (توقيت عالمي)" : "Logged Timestamp (UTC)"}</span>
@@ -578,7 +597,7 @@ export const ComplianceAuditLogsView = ({
                 <span className="text-[10px] font-bold text-[var(--fg-muted)] uppercase tracking-wider mb-1.5 pl-0.5">
                   {isRtl ? "البيانات المشفرة والمحفوظة (JSON Payloads)" : "Compliant Transaction Log (JSON)"}
                 </span>
-                <div className="h-48 overflow-y-auto rounded-[var(--radius-md)] bg-[var(--surface-input)] text-[11px] text-[var(--accent)] font-mono p-4 border border-[var(--border-default)] leading-loose scroll-smooth scrollbar-thin">
+                <div className="h-48 overflow-y-auto rounded-[var(--radius-md)] bg-[var(--surface-input)] text-[11px] text-[var(--fg-accent)] font-mono p-4 border border-[var(--border-default)] leading-loose scroll-smooth scrollbar-thin">
                   <pre className="whitespace-pre-wrap select-text">
                     {JSON.stringify(typeof selectedLog.details === "string" ? JSON.parse(selectedLog.details) : selectedLog.details, null, 2)}
                   </pre>

@@ -16,17 +16,17 @@ export const GlobalLoadingOverlay: React.FC = () => {
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm"
           style={{ pointerEvents: 'all' }}
         >
-          <div className="flex flex-col items-center justify-center p-6 rounded-2xl bg-[var(--surface-card)] border border-[var(--border-default)] shadow-2xl">
+          <div className="flex flex-col items-center justify-center p-6 rounded-[var(--radius-lg)] bg-[var(--surface-card)] border border-[var(--border-default)] shadow-2xl">
             <div className="relative w-12 h-12 flex items-center justify-center">
               {/* Subtle outer pulse */}
               <motion.div
-                className="absolute inset-0 rounded-[4px] border-2 border-[var(--text-primary)] opacity-20"
+                className="absolute inset-0 rounded-[var(--radius-xs)] border-2 border-[var(--text-primary)] opacity-20"
                 animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0, 0.3] }}
                 transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
               />
               {/* Inner spinning element */}
               <motion.div 
-                className="w-8 h-8 rounded-[4px] border-t-2 border-r-2 border-[var(--bg-accent-emphasis)]"
+                className="w-8 h-8 rounded-[var(--radius-xs)] border-t-2 border-r-2 border-[var(--bg-accent-emphasis)]"
                 animate={{ rotate: 360 }}
                 transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
               />

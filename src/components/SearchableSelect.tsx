@@ -1,20 +1,25 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronDown, Search } from 'lucide-react';
+import { ChevronDown, Search, Check } from 'lucide-react';
+import { SCROLL_STYLES } from '../styles/scrollStyles';
 
-interface Option {
+export interface SearchableSelectOption {
   value: string;
   label: string;
+  icon?: React.ReactNode;
 }
 
-interface SearchableSelectProps {
+export interface SearchableSelectProps {
   value: string;
   onChange: (value: string) => void;
-  options: Option[];
+  options: SearchableSelectOption[];
   placeholder?: string;
   disabled?: boolean;
   className?: string;
-  dir?: string;
+  dir?: 'rtl' | 'ltr' | string;
   dropdownPosition?: 'auto' | 'top' | 'bottom';
+  searchable?: boolean;
+  size?: 'sm' | 'md' | 'lg';
+  id?: string;
 }
 
 export const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -25,13 +30,18 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   disabled = false,
   className = '',
   dir = 'ltr',
-  dropdownPosition = 'auto'
+  dropdownPosition = 'auto',
+  searchable,
+  size = 'md',
+  id,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [openUpward, setOpenUpward] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const isSearchEnabled = searchable !== undefined ? searchable : options.length > 6;
 
   const calculatePosition = useCallback(() => {
     if (dropdownPosition === 'top') {
@@ -46,7 +56,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       const rect = wrapperRef.current.getBoundingClientRect();
       const spaceBelow = window.innerHeight - rect.bottom;
       const spaceAbove = rect.top;
-      // If less than 240px below and more room above, open upwards
       if (spaceBelow < 250 && spaceAbove > 180) {
         setOpenUpward(true);
       } else {
@@ -72,6 +81,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     function handleClickOutside(event: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        setSearchTerm('');
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -79,14 +89,13 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   }, []);
 
   useEffect(() => {
-    if (isOpen && inputRef.current) {
+    if (isOpen && isSearchEnabled && inputRef.current) {
       setTimeout(() => {
         inputRef.current?.focus();
       }, 50);
     }
-  }, [isOpen]);
+  }, [isOpen, isSearchEnabled]);
 
-  // Strip empty-value options from options array to avoid duplicating the placeholder item
   const validOptions = options.filter(option => option.value !== '');
 
   const filteredOptions = validOptions.filter(option =>
@@ -96,8 +105,11 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
 
   const selectedOption = validOptions.find(o => o.value === value);
 
+  const heightClass = size === 'sm' ? 'h-8 text-xs' : size === 'lg' ? 'h-11 text-sm' : 'h-10 text-xs';
+
   return (
     <div 
+      id={id}
       className={`relative ${isOpen ? 'z-[100]' : 'z-10'} ${className}`} 
       ref={wrapperRef} 
       dir={dir}
@@ -107,12 +119,12 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         tabIndex={0}
         role="button"
         aria-expanded={isOpen}
-        className={`w-full h-10 px-3 rounded-md border flex items-center justify-between cursor-pointer select-none transition-all duration-150 ${
-          disabled ? 'opacity-50 cursor-not-allowed' : ''
+        className={`w-full ${heightClass} px-3 rounded-[var(--radius-sm)] border flex items-center justify-between cursor-pointer select-none transition-all duration-fast ${
+          disabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
         } ${
           isOpen
-            ? 'border-[var(--border-default)] bg-[var(--surface-page)] shadow-sm'
-            : 'bg-[var(--surface-page)] border-[var(--border-default)] hover:border-[var(--border-default)]'
+            ? 'border-[var(--border-accent)] bg-[var(--surface-subtle)] ring-1 ring-[var(--border-accent)]/20 shadow-2xs'
+            : 'bg-[var(--surface-subtle)] border-[var(--border-default)] hover:border-[var(--border-accent)]/50 hover:bg-[var(--surface-card)]'
         } text-[var(--text-primary)]`}
         onClick={() => {
           if (!disabled) {
@@ -132,63 +144,81 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           }
         }}
       >
-        <span className="truncate text-[11px] font-bold text-start flex-1">
-          {selectedOption ? selectedOption.label : placeholder}
-        </span>
+        <div className="flex items-center gap-2 truncate flex-1 min-w-0">
+          {selectedOption?.icon && (
+            <span className="shrink-0 text-[var(--fg-accent)]">{selectedOption.icon}</span>
+          )}
+          <span className={`truncate font-bold text-start ${selectedOption ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)] font-medium'}`}>
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
+        </div>
         <ChevronDown 
           size={14} 
-          className={`opacity-60 transition-transform duration-200 shrink-0 ml-1.5 ${
-            isOpen ? 'rotate-180 text-accent opacity-100' : ''
+          className={`opacity-60 transition-transform duration-base shrink-0 ms-1.5 text-[var(--text-muted)] ${
+            isOpen ? 'rotate-180 text-[var(--fg-accent)] opacity-100' : ''
           }`} 
         />
       </div>
 
       {isOpen && (
         <div 
-          className={`absolute z-[100] w-full min-w-[220px] ${
+          className={`absolute z-[110] w-full min-w-[200px] ${
             openUpward 
               ? (dir === 'rtl' ? 'bottom-full mb-1.5 right-0 origin-bottom-right' : 'bottom-full mb-1.5 left-0 origin-bottom-left') 
               : (dir === 'rtl' ? 'top-full mt-1.5 right-0 origin-top-right' : 'top-full mt-1.5 left-0 origin-top-left')
-          } bg-[var(--pub-surface-container)] border border-[var(--pub-border-default)] rounded-xl shadow-2xl overflow-hidden backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100 overscroll-contain`}
-          style={{
-            boxShadow: '0 20px 40px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--pub-border-default)'
-          }}
+          } bg-[var(--surface-card)] border border-[var(--border-default)] rounded-[var(--radius-sm)] shadow-xl overflow-hidden backdrop-blur-md animate-in fade-in zoom-in-95 duration-100 overscroll-contain`}
         >
-          <div className="p-2 border-b border-[var(--pub-border-default)] flex items-center gap-2 bg-[var(--pub-surface-panel)]">
-             <Search size={14} className="opacity-50 text-[var(--pub-text-primary)] shrink-0" />
-             <input
-               ref={inputRef}
-               type="text"
-               className="w-full bg-transparent outline-none text-[11px] text-[var(--pub-text-primary)] font-bold placeholder:text-[var(--pub-text-muted)] placeholder:font-normal"
-               placeholder="Search..."
-               value={searchTerm}
-               onChange={(e) => setSearchTerm(e.target.value)}
-               onClick={(e) => e.stopPropagation()}
-             />
-          </div>
-          <div className="max-h-56 overflow-y-auto divide-y divide-[var(--pub-border-default)]/20 custom-scrollbar overscroll-contain">
-            <div 
-              className={`px-3 py-2 text-[11px] cursor-pointer hover:bg-cyan-500/10 hover:text-cyan-400 transition-colors ${
-                !value ? 'bg-cyan-500/15 font-bold text-cyan-400' : 'text-[var(--pub-text-secondary)]'
-              }`}
-              onClick={() => { onChange(''); setIsOpen(false); setSearchTerm(''); }}
-            >
-              {placeholder}
+          {isSearchEnabled && (
+            <div className="p-2 border-b border-[var(--border-default)] flex items-center gap-2 bg-[var(--surface-subtle)]">
+               <Search size={14} className="text-[var(--text-muted)] shrink-0" />
+               <input
+                 ref={inputRef}
+                 type="text"
+                 className="w-full bg-transparent outline-none text-xs text-[var(--text-primary)] font-medium placeholder:text-[var(--text-muted)]"
+                 placeholder={dir === 'rtl' ? 'بحث...' : 'Search...'}
+                 value={searchTerm}
+                 onChange={(e) => setSearchTerm(e.target.value)}
+                 onClick={(e) => e.stopPropagation()}
+               />
             </div>
-            {filteredOptions.map((option) => (
-              <div
-                key={option.value}
-                className={`px-3 py-2 text-[11px] font-semibold cursor-pointer hover:bg-cyan-500/10 hover:text-cyan-400 transition-colors ${
-                  value === option.value ? 'bg-cyan-500/15 text-cyan-400 font-bold' : 'text-[var(--pub-text-primary)]'
+          )}
+          <div className={`divide-y divide-[var(--border-default)]/30 ${SCROLL_STYLES.dropdown} max-h-60 p-1 space-y-0.5`}>
+            {placeholder && !validOptions.some(o => o.value === '') && (
+              <div 
+                className={`group px-3 py-2 text-xs rounded-[var(--radius-xs)] cursor-pointer transition-colors duration-fast flex items-center justify-between ${
+                  !value 
+                    ? 'font-bold bg-[var(--bg-accent-muted)] text-[var(--fg-accent)]' 
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)]'
                 }`}
-                onClick={() => { onChange(option.value); setIsOpen(false); setSearchTerm(''); }}
+                onClick={() => { onChange(''); setIsOpen(false); setSearchTerm(''); }}
               >
-                {option.label}
+                <span className="truncate">{placeholder}</span>
+                {!value && <Check size={14} className="shrink-0 text-[var(--fg-accent)] ms-2" />}
               </div>
-            ))}
+            )}
+            {filteredOptions.map((option) => {
+              const isSelected = value === option.value;
+              return (
+                <div
+                  key={option.value}
+                  className={`group px-3 py-2 text-xs rounded-[var(--radius-xs)] font-semibold cursor-pointer transition-colors duration-fast flex items-center justify-between ${
+                    isSelected 
+                      ? 'bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] font-bold' 
+                      : 'text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] hover:text-[var(--text-primary)]'
+                  }`}
+                  onClick={() => { onChange(option.value); setIsOpen(false); setSearchTerm(''); }}
+                >
+                  <div className="flex items-center gap-2 truncate flex-1 min-w-0">
+                    {option.icon && <span className="shrink-0">{option.icon}</span>}
+                    <span className="truncate">{option.label}</span>
+                  </div>
+                  {isSelected && <Check size={14} className="shrink-0 text-[var(--fg-accent)] ms-2" />}
+                </div>
+              );
+            })}
             {filteredOptions.length === 0 && (
-              <div className="px-3 py-3 text-[11px] font-medium text-[var(--pub-text-muted)] text-center">
-                No results found
+              <div className="px-3 py-3 text-xs font-medium text-[var(--text-muted)] text-center">
+                {dir === 'rtl' ? 'لا توجد نتائج' : 'No results found'}
               </div>
             )}
           </div>

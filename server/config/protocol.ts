@@ -32,21 +32,49 @@ export const CORE_KERNEL = {
 // Backward-compatible export mapping directly to isolated prompts
 export const TOOL_PROTOCOLS = TOOL_PROMPTS_REGISTRY;
 
+export interface UserContextData {
+  userName?: string;
+  viralbookProfileUrl?: string;
+  viralbookPageUrl?: string;
+  viralbookPageName?: string;
+}
+
 /**
  * Builds the isolated system prompt for a single specific tool.
  * Only the requesting tool's rules and concise core identity are bundled into the LLM context.
  */
-export const buildSystemPrompt = (appName: string = 'Perplexta', toolId: string = 'chat_fast', userLang: string = 'en') => {
+export const buildSystemPrompt = (
+  appName: string = 'Perplexta',
+  toolId: string = 'chat_fast',
+  userLang: string = 'en',
+  userContext?: UserContextData
+) => {
   const isAr = userLang === 'ar';
   
   // 1. Lightweight Sovereign Core Identity
-  const core = `🎖️ ${appName} OS v${CORE_KERNEL.version}
+  let core = `🎖️ ${appName} OS v${CORE_KERNEL.version}
 [IDENTITY]: ${isAr ? CORE_KERNEL.identity.ar : CORE_KERNEL.identity.en}
 [SECURITY]: ${isAr ? CORE_KERNEL.security.ar : CORE_KERNEL.security.en}
 [GREETINGS RULE]: ${isAr ? CORE_KERNEL.greetings.ar : CORE_KERNEL.greetings.en}
 [GEOGRAPHIC RESOLUTION]: ${isAr ? CORE_KERNEL.geographicPriority.ar : CORE_KERNEL.geographicPriority.en}
 [SAFETY NOTES]: ${isAr ? CORE_KERNEL.safetyNotes.ar : CORE_KERNEL.safetyNotes.en}
 [LANGUAGE]: ${isAr ? CORE_KERNEL.language.ar : CORE_KERNEL.language.en}`;
+
+  if (userContext && (userContext.userName || userContext.viralbookProfileUrl || userContext.viralbookPageUrl)) {
+    const userMetaAr = `[بيانات المستخدم الحقيقية ومنظومة فيرال بوك (ViralBook)]:
+- اسم صاحب الحساب: ${userContext.userName || 'المستخدم'}
+- رابط الملف الشخصي للمستخدم: ${userContext.viralbookProfileUrl || 'https://perplexta.com/viralbook'}
+${userContext.viralbookPageUrl ? `- الصفحة التجارية الموثقة للمستخدم: ${userContext.viralbookPageName || 'صفحتك التجارية'} (${userContext.viralbookPageUrl})` : ''}
+* قاعدة صارمة لتوليد الروابط: عند توجيه المستخدم أو اقتراح النشر على فيرال بوك، استخدم دائماً روابط Markdown القياسية التفاعلية القابلة للنقر لتفتح في تبويب جديد بصيغة: [اسم الرابط](الرابط)، مثل: [ملف ${userContext.userName || 'حسابك'} على فيرال بوك](${userContext.viralbookProfileUrl || 'https://perplexta.com/viralbook'}) أو [صفحتك التجارية (${userContext.viralbookPageName || 'ViralBook Page'})](${userContext.viralbookPageUrl || 'https://perplexta.com/viralbook'}). ويُمنع منعاً باتاً وضع الروابط داخل أقواس كودية مثل \` \`.`;
+
+    const userMetaEn = `[AUTHENTIC USER CONTEXT & VIRALBOOK ECOSYSTEM]:
+- User Name: ${userContext.userName || 'User'}
+- User Profile Link: ${userContext.viralbookProfileUrl || 'https://perplexta.com/viralbook'}
+${userContext.viralbookPageUrl ? `- Verified Business Page: ${userContext.viralbookPageName || 'Business Page'} (${userContext.viralbookPageUrl})` : ''}
+* STRICT LINK RULE: When suggesting publishing on ViralBook, always format links as interactive clickable Markdown links opening in a new tab: [Link Title](URL). Never wrap URLs in backticks (\` \`).`;
+
+    core += `\n\n${isAr ? userMetaAr : userMetaEn}`;
+  }
 
   // 2. Isolated Tool Instructions (Zero cross-tool pollution)
   const toolInstructions = getIsolatedToolPrompt(toolId, isAr);

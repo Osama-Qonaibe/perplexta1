@@ -1,12 +1,102 @@
-import { pool } from '../db/index.js';
+import { pool, mediaPool } from '../db/index.js';
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 import { triggerFileCacheInvalidation } from './fileValidationService.js';
 
+export async function registerMediaAsset(data: {
+  userId?: string | number | null;
+  storedPath: string;
+  originalFilename: string;
+  context: string;
+  format: string;
+  width?: number;
+  height?: number;
+  sizeBytes: number;
+  fileData?: Buffer;
+  metadata?: any;
+}) {
+  const targetMediaPool = mediaPool || pool;
+  if (!targetMediaPool) return;
+
+  try {
+    const numericUserId = data.userId && !isNaN(Number(data.userId)) ? Number(data.userId) : null;
+    const sha256Hash = data.fileData ? crypto.createHash('sha256').update(data.fileData).digest('hex') : '';
+    const cleanStoredPath = data.storedPath.replace(/^\/+/, '');
+
+    const existing = await targetMediaPool.query(
+      'SELECT id FROM media_assets WHERE stored_path = $1 OR (sha256_hash = $2 AND sha256_hash != \'\') LIMIT 1',
+      [cleanStoredPath, sha256Hash]
+    );
+
+    if (existing.rows.length > 0) {
+      await targetMediaPool.query(`
+        UPDATE media_assets SET
+          stored_path = $1,
+          original_filename = $2,
+          context = $3,
+          format = $4,
+          width = COALESCE($5, width),
+          height = COALESCE($6, height),
+          size_bytes = $7,
+          file_data = COALESCE($8, file_data),
+          user_id = COALESCE($9, user_id),
+          metadata = $10,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $11
+      `, [
+        cleanStoredPath,
+        data.originalFilename,
+        data.context,
+        data.format,
+        data.width || 0,
+        data.height || 0,
+        data.sizeBytes,
+        data.fileData || null,
+        numericUserId,
+        JSON.stringify(data.metadata || {}),
+        existing.rows[0].id
+      ]);
+    } else {
+      const newAssetId = crypto.randomUUID();
+      await targetMediaPool.query(`
+        INSERT INTO media_assets (
+          id, stored_path, original_filename, context, format, width, height, size_bytes, sha256_hash, is_public,
+          user_id, metadata, file_data
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        ON CONFLICT (stored_path) DO UPDATE SET
+          context = EXCLUDED.context,
+          user_id = COALESCE(EXCLUDED.user_id, media_assets.user_id),
+          file_data = COALESCE(EXCLUDED.file_data, media_assets.file_data),
+          updated_at = CURRENT_TIMESTAMP
+      `, [
+        newAssetId,
+        cleanStoredPath,
+        data.originalFilename,
+        data.context,
+        data.format,
+        data.width || 0,
+        data.height || 0,
+        data.sizeBytes,
+        sha256Hash,
+        true,
+        numericUserId,
+        JSON.stringify(data.metadata || {}),
+        data.fileData || null
+      ]);
+    }
+  } catch (err: any) {
+    console.warn(`[File Service] registerMediaAsset notice (${data.storedPath}):`, err.message);
+  }
+}
+
 export async function getUserFiles(userId: string) {
   if (!pool) throw new Error('Database initializing');
-  const result = await pool.query('SELECT * FROM user_files WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+  const numericUserId = !isNaN(Number(userId)) ? Number(userId) : null;
+  const result = await pool.query(
+    'SELECT * FROM user_files WHERE user_id = $1 OR ($2::INTEGER IS NOT NULL AND user_id = $2::INTEGER) ORDER BY created_at DESC', 
+    [userId, numericUserId]
+  );
   return result.rows;
 }
 
@@ -17,6 +107,7 @@ export async function saveFileMetadata(userId: string, data: {
   mime_type: string;
   file_type: string;
   metadata: any;
+  file_data?: Buffer;
 }) {
   if (!pool) throw new Error('Database initializing');
 
@@ -30,15 +121,15 @@ export async function saveFileMetadata(userId: string, data: {
     const newVersion = (existing.rows[0].file_version || 1) + 1;
     result = await pool.query(
       `UPDATE user_files 
-       SET file_name = $1, file_size = $2, mime_type = $3, file_type = $4, metadata = $5, file_version = $6, updated_at = CURRENT_TIMESTAMP
-       WHERE user_id = $7 AND file_url = $8 RETURNING *`,
-      [data.file_name, data.file_size, data.mime_type, data.file_type, JSON.stringify(data.metadata), newVersion, userId, data.file_url]
+       SET file_name = $1, file_size = $2, mime_type = $3, file_type = $4, metadata = $5, file_version = $6, file_data = COALESCE($7, file_data), updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $8 AND file_url = $9 RETURNING *`,
+      [data.file_name, data.file_size, data.mime_type, data.file_type, JSON.stringify(data.metadata), newVersion, data.file_data || null, userId, data.file_url]
     );
   } else {
     result = await pool.query(
-      `INSERT INTO user_files (user_id, file_name, file_url, file_size, mime_type, file_type, metadata, file_version)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 1) RETURNING *`,
-      [userId, data.file_name, data.file_url, data.file_size, data.mime_type, data.file_type, JSON.stringify(data.metadata)]
+      `INSERT INTO user_files (user_id, file_name, file_url, file_size, mime_type, file_type, metadata, file_version, file_data)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8) RETURNING *`,
+      [userId, data.file_name, data.file_url, data.file_size, data.mime_type, data.file_type, JSON.stringify(data.metadata), data.file_data || null]
     );
   }
 
@@ -338,21 +429,45 @@ export async function saveGeneratedImageToDisk(userId: string, imageData: string
   mimeType = validation.mimeType;
   fileExtension = validation.fileExtension;
 
-  const randomFilename = `${Date.now()}-${crypto.randomUUID()}.${fileExtension}`;
-  const filePath = path.join(uploadDir, randomFilename);
+  const safeExt = (fileExtension || 'png').replace(/[^a-z0-9]/gi, '').toLowerCase() || 'png';
+  const randomFilename = `${Date.now()}-${crypto.randomUUID()}.${safeExt}`;
+  const safeUploadDir = path.resolve(process.cwd(), 'uploads');
+  const filePath = path.resolve(safeUploadDir, randomFilename);
+  if (!filePath.startsWith(safeUploadDir + path.sep)) {
+    throw new Error('Path traversal detected');
+  }
 
   await fs.writeFile(filePath, buffer);
 
-  // Register the file metadata
-  await saveFileMetadata(userId, {
-    file_name: `Perplexta_Gen_${Date.now()}.${fileExtension}`,
+  // Register the file metadata with byte buffer
+  const savedFile = await saveFileMetadata(userId, {
+    file_name: `Perplexta_Gen_${Date.now()}.${safeExt}`,
     file_url: randomFilename,
     file_size: buffer.length,
     mime_type: mimeType,
     file_type: 'image',
     metadata: {
       generated: true,
-      origin: 'AI_Orchestrator_Studio'
+      origin: 'AI_Orchestrator_Studio',
+      is_public: true
+    },
+    file_data: buffer
+  });
+
+  // Register into sovereign media_assets
+  await registerMediaAsset({
+    userId,
+    storedPath: `uploads/${randomFilename}`,
+    originalFilename: `Perplexta_Gen_${Date.now()}.${safeExt}`,
+    context: 'image',
+    format: safeExt,
+    sizeBytes: buffer.length,
+    fileData: buffer,
+    metadata: {
+      generated: true,
+      origin: 'AI_Orchestrator_Studio',
+      fileId: savedFile?.id,
+      is_public: true
     }
   });
 
@@ -485,21 +600,44 @@ export async function saveGeneratedVideoToDisk(userId: string, videoData: string
   mimeType = validation.mimeType;
   fileExtension = validation.fileExtension;
 
-  const randomFilename = `${Date.now()}-${crypto.randomUUID()}.${fileExtension}`;
-  const filePath = path.join(uploadDir, randomFilename);
+  const safeExt = (fileExtension || 'mp4').replace(/[^a-z0-9]/gi, '').toLowerCase() || 'mp4';
+  const randomFilename = `${Date.now()}-${crypto.randomUUID()}.${safeExt}`;
+  const safeUploadDir = path.resolve(process.cwd(), 'uploads');
+  const filePath = path.resolve(safeUploadDir, randomFilename);
+  if (!filePath.startsWith(safeUploadDir + path.sep)) {
+    throw new Error('Path traversal detected');
+  }
 
   await fs.writeFile(filePath, buffer);
 
   // Register the file metadata
-  await saveFileMetadata(userId, {
-    file_name: `Perplexta_Video_${Date.now()}.${fileExtension}`,
+  const savedVideo = await saveFileMetadata(userId, {
+    file_name: `Perplexta_Video_${Date.now()}.${safeExt}`,
     file_url: randomFilename,
     file_size: buffer.length,
     mime_type: mimeType,
     file_type: 'video',
     metadata: {
       generated: true,
-      origin: 'AI_Orchestrator_Studio'
+      origin: 'AI_Orchestrator_Studio',
+      is_public: true
+    },
+    file_data: buffer
+  });
+
+  await registerMediaAsset({
+    userId,
+    storedPath: `uploads/${randomFilename}`,
+    originalFilename: `Perplexta_Video_${Date.now()}.${safeExt}`,
+    context: 'video',
+    format: safeExt,
+    sizeBytes: buffer.length,
+    fileData: buffer,
+    metadata: {
+      generated: true,
+      origin: 'AI_Orchestrator_Studio',
+      fileId: savedVideo?.id,
+      is_public: true
     }
   });
 
@@ -507,7 +645,7 @@ export async function saveGeneratedVideoToDisk(userId: string, videoData: string
 }
 
 export async function saveGeneratedAudioToDisk(userId: string, audioBase64: string, mimeType = 'audio/wav', prompt = 'AI_Track', lyrics = ''): Promise<string> {
-  const uploadDir = path.join(process.cwd(), 'uploads');
+  const uploadDir = path.resolve(process.cwd(), 'uploads');
   // Confirm uploads directory exists
   await fs.mkdir(uploadDir, { recursive: true }).catch(() => {});
 
@@ -517,13 +655,17 @@ export async function saveGeneratedAudioToDisk(userId: string, audioBase64: stri
   else if (mimeType.includes('mpeg')) fileExtension = 'mp3';
   else if (mimeType.includes('ogg')) fileExtension = 'ogg';
 
-  const randomFilename = `${Date.now()}-${crypto.randomUUID()}.${fileExtension}`;
-  const filePath = path.join(uploadDir, randomFilename);
+  const safeExt = (fileExtension || 'wav').replace(/[^a-z0-9]/gi, '').toLowerCase() || 'wav';
+  const randomFilename = `${Date.now()}-${crypto.randomUUID()}.${safeExt}`;
+  const filePath = path.resolve(uploadDir, randomFilename);
+  if (!filePath.startsWith(uploadDir + path.sep)) {
+    throw new Error('Path traversal detected');
+  }
 
   await fs.writeFile(filePath, buffer);
 
   // Register the file metadata
-  await saveFileMetadata(userId, {
+  const savedAudio = await saveFileMetadata(userId, {
     file_name: `${prompt.replace(/[^a-zA-Z0-9\s_\u0600-\u06FF-]/g, '').substring(0, 30) || 'Perplexta_Audio'}_${Date.now()}.${fileExtension}`,
     file_url: randomFilename,
     file_size: buffer.length,
@@ -533,7 +675,25 @@ export async function saveGeneratedAudioToDisk(userId: string, audioBase64: stri
       generated: true,
       origin: 'AI_Orchestrator_Audio_Studio',
       lyrics,
-      prompt
+      prompt,
+      is_public: true
+    },
+    file_data: buffer
+  });
+
+  await registerMediaAsset({
+    userId,
+    storedPath: `uploads/${randomFilename}`,
+    originalFilename: `${prompt.replace(/[^a-zA-Z0-9\s_\u0600-\u06FF-]/g, '').substring(0, 30) || 'Perplexta_Audio'}_${Date.now()}.${fileExtension}`,
+    context: 'audio',
+    format: fileExtension,
+    sizeBytes: buffer.length,
+    fileData: buffer,
+    metadata: {
+      generated: true,
+      origin: 'AI_Orchestrator_Audio_Studio',
+      fileId: savedAudio?.id,
+      is_public: true
     }
   });
 

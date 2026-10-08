@@ -12,35 +12,36 @@ import type { Transition, Variants } from 'motion/react';
 // ============================================================
 
 export const MOTION_TIMINGS = {
-  hover: 0.12,    // 120ms
+  hover: 0.15,    // 150ms
   popover: 0.15,  // 150ms
   modal: 0.20,    // 200ms
-  instant: 0.08,
-  fast: 0.12,
-  base: 0.18,
-  slow: 0.24,
+  instant: 0.05,  // 50ms
+  fast: 0.15,     // 150ms (Aligned with CSS --motion-fast)
+  base: 0.20,     // 200ms (Aligned with CSS --motion-base)
+  media: 0.30,    // 300ms (Aligned with CSS --motion-media)
+  slow: 0.30,     // 300ms (Aligned with CSS --motion-slow)
   deliberate: 0.35,
   cinematic: 0.5,
   slowMotion: 1.1, // Smooth session transitions
 } as const;
 
 export const EASING_CURVE = 'cubic-bezier(0.16, 1, 0.3, 1)';
-export const POPOVER_TRANSITION_TOKENS = 'animate-in fade-in zoom-in-95 duration-150 ease-out';
+export const POPOVER_TRANSITION_TOKENS = 'animate-in fade-in zoom-in-95 duration-fast ease-out';
 export const TOAST_TRANSITION_TOKENS = 'animate-in fade-in slide-in-from-bottom-3 duration-200 ease-out';
 
 export const MOTION_EASINGS = {
   standard: [0.16, 1, 0.3, 1] as [number, number, number, number],
-  smooth: [0.25, 0.1, 0.25, 1] as [number, number, number, number],
+  smooth: [0.16, 1, 0.3, 1] as [number, number, number, number],
   accelerate: [0.4, 0, 1, 1] as [number, number, number, number],
-  decelerate: [0, 0, 0.2, 1] as [number, number, number, number],
-  bounce: [0.34, 1.56, 0.64, 1] as [number, number, number, number],
-  material: [0.2, 0, 0, 1] as [number, number, number, number],
-  unified: [0.25, 1, 0.2, 1] as [number, number, number, number],
+  decelerate: [0.16, 1, 0.3, 1] as [number, number, number, number],
+  bounce: [0.16, 1, 0.3, 1] as [number, number, number, number],
+  material: [0.16, 1, 0.3, 1] as [number, number, number, number],
+  unified: [0.16, 1, 0.3, 1] as [number, number, number, number],
 } as const;
 
-export const UNIFIED_EASE = MOTION_EASINGS.unified;
-export const UNIFIED_DURATION = 0.25;
-export const GOOGLE_MATERIAL_EASE = MOTION_EASINGS.material;
+export const UNIFIED_EASE = MOTION_EASINGS.standard;
+export const UNIFIED_DURATION = 0.20;
+export const GOOGLE_MATERIAL_EASE = MOTION_EASINGS.standard;
 
 export const SPRING_PHYSICS = {
   tight: { type: 'spring', stiffness: 450, damping: 35 },
@@ -182,11 +183,11 @@ export const PAGE_TRANSITION: Variants = {
   initial: { opacity: 0 },
   animate: { 
     opacity: 1, 
-    transition: { duration: 0.32, ease: [0.16, 1, 0.3, 1] } 
+    transition: { duration: MOTION_TIMINGS.base, ease: MOTION_EASINGS.standard } 
   },
   exit: { 
     opacity: 0, 
-    transition: { duration: 0.18, ease: 'easeIn' } 
+    transition: { duration: MOTION_TIMINGS.fast, ease: MOTION_EASINGS.standard } 
   },
 };
 
@@ -199,10 +200,10 @@ export const DROPDOWN_VARIANTS: Variants = {
   closed: {
     opacity: 0,
     scale: 0.96,
-    y: 10,
+    y: 8,
     transition: {
       duration: MOTION_TIMINGS.fast,
-      ease: MOTION_EASINGS.smooth,
+      ease: MOTION_EASINGS.standard,
     },
   },
   open: {
@@ -220,10 +221,10 @@ export const MODAL_VARIANTS: Variants = {
   closed: {
     opacity: 0,
     scale: 0.98,
-    y: 15,
+    y: 12,
     transition: {
-      duration: MOTION_TIMINGS.base,
-      ease: MOTION_EASINGS.smooth,
+      duration: MOTION_TIMINGS.fast,
+      ease: MOTION_EASINGS.standard,
     },
   },
   open: {
@@ -231,7 +232,7 @@ export const MODAL_VARIANTS: Variants = {
     scale: 1,
     y: 0,
     transition: {
-      duration: MOTION_TIMINGS.slow,
+      duration: MOTION_TIMINGS.base,
       ease: MOTION_EASINGS.standard,
     },
   },
@@ -242,8 +243,8 @@ export const SLIDE_UP_FADE_IN: Variants = {
     opacity: 0,
     y: 12,
     transition: {
-      duration: MOTION_TIMINGS.base,
-      ease: MOTION_EASINGS.smooth,
+      duration: MOTION_TIMINGS.fast,
+      ease: MOTION_EASINGS.standard,
     },
   },
   open: {
@@ -259,11 +260,11 @@ export const SLIDE_UP_FADE_IN: Variants = {
 export const BACKDROP_VARIANTS: Variants = {
   closed: {
     opacity: 0,
-    transition: { duration: MOTION_TIMINGS.fast },
+    transition: { duration: MOTION_TIMINGS.fast, ease: MOTION_EASINGS.standard },
   },
   open: {
     opacity: 1,
-    transition: { duration: MOTION_TIMINGS.base },
+    transition: { duration: MOTION_TIMINGS.base, ease: MOTION_EASINGS.standard },
   },
 };
 
@@ -277,9 +278,9 @@ export const TOAST_VARIANTS: Variants = {
   },
   exit: { 
     opacity: 0, 
-    scale: 0.92, 
+    scale: 0.95, 
     y: -8, 
-    transition: { duration: MOTION_TIMINGS.fast, ease: MOTION_EASINGS.smooth } 
+    transition: { duration: MOTION_TIMINGS.fast, ease: MOTION_EASINGS.standard } 
   },
 };
 
@@ -332,6 +333,6 @@ export const variants = {
   },
   page: {
     hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { duration: MOTION_TIMINGS.slow, ease: MOTION_EASINGS.standard } },
+    visible: { opacity: 1, transition: { duration: MOTION_TIMINGS.base, ease: MOTION_EASINGS.standard } },
   },
 };

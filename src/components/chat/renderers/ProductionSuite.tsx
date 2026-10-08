@@ -136,11 +136,11 @@ export const ProductionSuite: React.FC<ProductionSuiteProps> = ({
             }`}>
               <div className="flex items-center gap-4">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-accent rounded-[4px] blur-md opacity-20" />
-                  <div className={`relative w-2 h-8 rounded-[4px] shadow-[0_0_15px_rgba(156,163,175,0.4)] ${isPending ? 'bg-amber-500/50 animate-pulse' : 'bg-accent'}`} />
+                  <div className="absolute inset-0 bg-[var(--surface-subtle)] rounded-[var(--radius-xs)] blur-md opacity-20" />
+                  <div className={`relative w-2 h-8 rounded-[var(--radius-xs)] shadow-[0_0_15px_rgba(156,163,175,0.4)] ${isPending ? 'bg-amber-500/50 animate-pulse' : 'bg-[var(--fg-accent)]'}`} />
                 </div>
                 <div className="flex flex-col">
-                  <span className={`text-[10px] font-black uppercase tracking-[0.3em] mb-0.5 ${isPending ? 'text-amber-500' : 'text-accent glow-accent'}`}>
+                  <span className={`text-[10px] font-black uppercase tracking-[0.3em] mb-0.5 ${isPending ? 'text-amber-500' : 'text-[var(--fg-accent)]'}`}>
                     {dir === 'rtl' ? 'مرحلة إنتاج بيربليكستا' : 'PERPLEXTA PRODUCTION PHASE'} {canon.phase}
                   </span>
                   <h3 className={`text-xl font-black tracking-tight uppercase ${isPending ? 'text-[var(--text-primary)] opacity-60 animate-pulse' : 'text-[var(--text-primary)]'}`}>
@@ -155,8 +155,8 @@ export const ProductionSuite: React.FC<ProductionSuiteProps> = ({
                      {dir === 'rtl' ? 'حالة العمل' : 'COMPILATION'}
                    </span>
                     <div className="flex items-center gap-2">
-                     <div className={`w-1.5 h-1.5 rounded-[4px] ${isPending ? 'bg-amber-400' : 'bg-accent'} animate-pulse shadow-[0_0_8px_rgba(156,163,175,0.8)]`} />
-                     <span className={`text-[10px] font-black uppercase ${isPending ? 'text-amber-400' : 'text-accent'}`}>
+                     <div className={`w-1.5 h-1.5 rounded-[var(--radius-full)] ${isPending ? 'bg-amber-400' : 'bg-[var(--fg-accent)]'} animate-pulse shadow-[0_0_8px_rgba(156,163,175,0.8)]`} />
+                     <span className={`text-[10px] font-black uppercase ${isPending ? 'text-amber-400' : 'text-[var(--fg-accent)]'}`}>
                        {isPending ? (dir === 'rtl' ? 'في الانتظار' : 'QUEUED') : (dir === 'rtl' ? 'مكتمل' : 'RESOLVED')}
                      </span>
                    </div>
@@ -186,16 +186,16 @@ export const ProductionSuite: React.FC<ProductionSuiteProps> = ({
                           theme={theme} 
                           coverImageUrl={coverImageUrl} 
                         />
-                        <div className="flex items-center gap-2 text-xs font-bold text-accent animate-pulse justify-center">
-                          <span className="w-1.5 h-1.5 rounded-[4px] bg-accent animate-ping" />
+                        <div className="flex items-center gap-2 text-xs font-bold text-[var(--fg-accent)] animate-pulse justify-center">
+                          <span className="w-1.5 h-1.5 rounded-[var(--radius-full)] bg-[var(--fg-accent)] animate-ping" />
                           <span>{dir === 'rtl' ? canon.pendingTextAr : canon.pendingTextEn}</span>
                         </div>
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <div className="h-4 bg-accent/5 rounded-md w-3/4 animate-pulse border border-accent/10" />
-                        <div className="h-4 bg-accent/5 rounded-md w-1/2 animate-pulse border border-accent/10" />
-                        <div className="h-4 bg-accent/5 rounded-md w-5/6 animate-pulse border border-accent/10" />
+                        <div className="h-4 bg-[var(--surface-subtle)] rounded-md w-3/4 animate-pulse border border-[var(--border-default)]" />
+                        <div className="h-4 bg-[var(--surface-subtle)] rounded-md w-1/2 animate-pulse border border-[var(--border-default)]" />
+                        <div className="h-4 bg-[var(--surface-subtle)] rounded-md w-5/6 animate-pulse border border-[var(--border-default)]" />
                         <p className="text-xs text-[var(--text-muted)] font-bold animate-pulse mt-4">
                           {dir === 'rtl' ? canon.pendingTextAr : canon.pendingTextEn}
                         </p>
@@ -232,14 +232,14 @@ export const ProductionSuite: React.FC<ProductionSuiteProps> = ({
                       p: 'div',
                       blockquote: ({ children }: any) => <BlockquoteWithActions dir={dir}>{children}</BlockquoteWithActions>,
                       img: ({ node, ...props }: any) => (
-                        <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-accent/20 shadow-2xl group/video">
+                        <div className="relative w-full aspect-video rounded-shape-md overflow-hidden border border-[var(--border-default)] shadow-2xl group/video">
                           <img {...props} className="w-full h-full object-cover transition-transform duration-300 group-hover/video:scale-110" referrerPolicy="no-referrer" />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-center justify-center">
-                             <div className="w-20 h-20 rounded-[4px] bg-accent/20 backdrop-blur-md border border-accent/30 flex items-center justify-center text-accent animate-pulse">
+                             <div className="w-20 h-20 rounded-shape-xs bg-[var(--surface-subtle)] backdrop-blur-md border border-[var(--border-accent)] flex items-center justify-center text-[var(--fg-accent)] animate-pulse">
                                <Music size={40} />
                              </div>
                           </div>
-                          <div className="absolute top-4 right-4 px-3 py-1 bg-black/60 backdrop-blur-md rounded-[4px] border border-white/10 text-[10px] font-bold text-white uppercase tracking-widest">
+                          <div className="absolute top-4 right-4 px-3 py-1 bg-black/60 backdrop-blur-md rounded-shape-xs border border-white/10 text-[10px] font-bold text-white uppercase tracking-widest">
                             {dir === 'rtl' ? 'عرض فني من بيربليكستا' : 'PERPLEXTA ART VIEW'}
                           </div>
                         </div>

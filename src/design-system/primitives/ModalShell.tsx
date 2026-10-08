@@ -58,16 +58,16 @@ export const ModalShell: React.FC<ModalShellProps> = ({
   if (typeof document === 'undefined') return null;
 
   const zIndexClass = layer === 'nested' 
-    ? `z-[${Z_INDEX.NESTED_MODAL}]` 
+    ? 'z-[1100]' 
     : layer === 'lightbox' 
-      ? `z-[${Z_INDEX.LIGHTBOX}]` 
-      : `z-50`;
+      ? 'z-[1200]' 
+      : 'z-[1000]';
 
   return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
-          className={`fixed inset-0 ${zIndexClass} bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 ${className}`}
+          className={`fixed inset-0 ${zIndexClass} bg-black/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain ${className}`}
           role="dialog"
           aria-modal="true"
           dir={dir}
@@ -85,10 +85,10 @@ export const ModalShell: React.FC<ModalShellProps> = ({
             animate="open"
             exit="closed"
             className={`
-              w-full ${SIZE_CLASSES[size]} rounded-xl bg-[#0d131f] border border-slate-800/90
-              p-4 shadow-2xl space-y-3 transform-gpu
-              text-[var(--text-primary)] my-auto max-h-[88dvh] flex flex-col
-              overflow-hidden transition-theme custom-scrollbar
+              w-full ${SIZE_CLASSES[size]} rounded-2xl sm:rounded-[var(--radius-md)] bg-[var(--surface-card)] border border-[var(--border-default)]
+              p-4 sm:p-6 shadow-[0_20px_50px_rgba(0,0,0,0.6)] space-y-3 sm:space-y-4 transform-gpu
+              text-[var(--text-primary)] my-auto max-h-[92dvh] sm:max-h-[88dvh] flex flex-col
+              overflow-y-auto overscroll-contain transition-theme custom-scrollbar
               ${contentClassName}
             `}
             onClick={(e) => e.stopPropagation()}

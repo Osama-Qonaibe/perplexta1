@@ -6,6 +6,7 @@ import { authenticateAdmin } from '../middleware/auth.js';
 import { Advertisement } from '../db/types.js';
 import { formatDatabaseError } from '../utils/dbErrors.js';
 import { getCachedSystemSettings } from '../db/queries.js';
+import { getMasterAdCategories, getCategoryGroups } from '../services/system.js';
 
 const router = express.Router();
 
@@ -14,11 +15,19 @@ let isAdsTableEnsured = false;
 async function deleteLocalFileIfPresent(fileUrl?: string | null) {
   if (!fileUrl || !fileUrl.startsWith('/uploads/')) return;
   try {
-    const filename = path.basename(fileUrl);
-    const filePath = path.join(process.cwd(), 'public', 'uploads', filename);
-    await fs.unlink(filePath).catch(() => {});
-    const altPath = path.join(process.cwd(), 'uploads', filename);
-    await fs.unlink(altPath).catch(() => {});
+    if (fileUrl.includes('..') || fileUrl.includes('\0')) return;
+    const filename = path.basename(fileUrl.split('?')[0]);
+    if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) return;
+    const publicUploadsDir = path.resolve(process.cwd(), 'public', 'uploads');
+    const uploadsDir = path.resolve(process.cwd(), 'uploads');
+    const filePath = path.resolve(publicUploadsDir, filename);
+    if (filePath.startsWith(publicUploadsDir + path.sep)) {
+      await fs.unlink(filePath).catch(() => {});
+    }
+    const altPath = path.resolve(uploadsDir, filename);
+    if (altPath.startsWith(uploadsDir + path.sep)) {
+      await fs.unlink(altPath).catch(() => {});
+    }
   } catch (e) {
     // ignore
   }
@@ -46,17 +55,64 @@ async function verifyImageUrl(url?: string | null): Promise<string> {
   if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:')) {
     return clean;
   }
+  if (clean.includes('..') || clean.includes('\0')) return fallback;
   const rel = clean.startsWith('/') ? clean.substring(1) : clean;
-  const p1 = path.join(process.cwd(), 'public', rel);
-  const p2 = path.join(process.cwd(), rel);
-  try {
-    const s1 = await fs.stat(p1).catch(() => null);
-    if (s1 && s1.isFile()) return clean;
-    const s2 = await fs.stat(p2).catch(() => null);
-    if (s2 && s2.isFile()) return clean;
-  } catch (e) {}
+  const publicDir = path.resolve(process.cwd(), 'public');
+  const cwdDir = path.resolve(process.cwd());
+
+  const p1 = path.resolve(publicDir, rel);
+  if (p1.startsWith(publicDir + path.sep)) {
+    try {
+      const s1 = await fs.stat(p1).catch(() => null);
+      if (s1 && s1.isFile()) return clean;
+    } catch (e) {}
+  }
+
+  const p2 = path.resolve(cwdDir, rel);
+  if (p2.startsWith(cwdDir + path.sep)) {
+    try {
+      const s2 = await fs.stat(p2).catch(() => null);
+      if (s2 && s2.isFile()) return clean;
+    } catch (e) {}
+  }
   return fallback;
 }
+
+/**
+ * GET /api/ads/categories
+ * Fetch the master list of business, technology, and industry categories for targeted advertising
+ */
+router.get('/categories', async (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+  try {
+    const { q, search, group, groupId, featured, limit, offset } = req.query;
+    const queryTerm = (q || search || '') as string;
+    const groupTerm = (groupId || group || 'all') as string;
+    const isFeatured = featured === 'true' ? true : (featured === 'false' ? false : undefined);
+    const parsedLimit = limit ? Math.min(200, Math.max(1, parseInt(String(limit), 10))) : 100;
+    const parsedOffset = offset ? Math.max(0, parseInt(String(offset), 10)) : 0;
+
+    const data = await getMasterAdCategories({
+      query: queryTerm,
+      groupId: groupTerm,
+      isFeatured,
+      limit: parsedLimit,
+      offset: parsedOffset
+    });
+
+    res.json({
+      success: true,
+      categories: data.categories,
+      groups: data.groups,
+      total: data.total,
+      limit: parsedLimit,
+      offset: parsedOffset
+    });
+  } catch (error: any) {
+    console.error('[Ads API] Error fetching ad categories:', error?.message || error);
+    res.status(500).json({ error: 'Failed to fetch categories for targeted advertising' });
+  }
+});
 
 /**
  * GET /api/ads

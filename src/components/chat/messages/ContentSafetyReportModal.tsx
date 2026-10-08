@@ -200,7 +200,7 @@ ${assistantResponse || 'No response snippet'}
           {/* Form Body */}
           {isSubmitted ? (
             <div className="p-6 flex flex-col items-center justify-center text-center space-y-2">
-              <div className="w-12 h-12 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-[var(--status-success-subtle)] text-[var(--fg-success)] border border-[var(--fg-success)]/30 flex items-center justify-center">
                 <CheckCircle2 size={26} />
               </div>
               <h4 className="text-sm font-bold text-[var(--text-primary)]">
@@ -276,7 +276,7 @@ ${assistantResponse || 'No response snippet'}
               {/* Encryption Note & Screen/PDF Attachment Controls */}
               <div className="p-2.5 rounded-shape-sm bg-[var(--surface-subtle)]/70 border border-[var(--border-default)] text-[10px] space-y-2">
                 <div className="flex items-start gap-1.5 text-[var(--text-muted)] leading-relaxed">
-                  <Lock size={12} className="text-emerald-500 shrink-0 mt-0.5" />
+                  <Lock size={12} className="text-[var(--fg-success)] shrink-0 mt-0.5" />
                   <span>
                     {isRtl 
                       ? 'ملاحظة: نظراً لأننا نستخدم تشفير AES-256 ولا يمكننا الوصول لدردشاتك، يمكنك إرفاق لقطة شاشة أو تصدير ملف PDF للرد المُراد الإبلاغ عنه.'
@@ -299,7 +299,7 @@ ${assistantResponse || 'No response snippet'}
                     onClick={() => fileInputRef.current?.click()}
                     className="flex-1 py-1 px-2 rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-default)] hover:border-[var(--text-muted)] text-[var(--text-primary)] text-[10px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer truncate"
                   >
-                    <Camera size={12} className="text-blue-500 shrink-0" />
+                    <Camera size={12} className="text-[var(--fg-accent)] shrink-0" />
                     <span className="truncate">
                       {attachmentName ? (isRtl ? `مُرفق: ${attachmentName}` : attachmentName) : (isRtl ? 'إرفاق لقطة شاشة' : 'Attach Screenshot')}
                     </span>
@@ -310,7 +310,7 @@ ${assistantResponse || 'No response snippet'}
                     onClick={handleExportPDF}
                     className="py-1 px-2.5 rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-default)] hover:border-[var(--text-muted)] text-[var(--text-primary)] text-[10px] font-semibold flex items-center gap-1 transition-colors cursor-pointer shrink-0"
                   >
-                    <FileText size={12} className="text-emerald-500" />
+                    <FileText size={12} className="text-[var(--fg-success)]" />
                     <span>{isRtl ? 'تصدير PDF' : 'Export PDF'}</span>
                   </button>
                 </div>

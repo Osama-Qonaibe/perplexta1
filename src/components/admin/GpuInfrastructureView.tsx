@@ -609,10 +609,10 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300" dir={dir}>
+    <div className="space-y-6 animate-in fade-in duration-media" dir={dir}>
       {/* Supreme Decree Notice Banner */}
-      <div className="p-4 rounded-lg bg-surface-card border border-[var(--border-default)] shadow-sm flex items-start gap-3.5">
-        <div className="w-9 h-9 rounded-md bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0 mt-0.5 text-accent">
+      <div className="p-4 rounded-shape-md bg-surface-card border border-[var(--border-default)] shadow-sm flex items-start gap-3.5">
+        <div className="w-9 h-9 rounded-shape-sm bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0 mt-0.5 text-accent">
           <Cpu size={20} />
         </div>
         <div className="flex-1 min-w-0">
@@ -632,7 +632,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
         </div>
         <button
           onClick={() => setIsSandboxOpen(true)}
-          className="shrink-0 px-3.5 py-2 rounded-md bg-[var(--surface-subtle)] text-[var(--fg-accent)] hover:bg-[var(--bg-accent-emphasis)] hover:text-[var(--fg-on-emphasis)] border border-[var(--border-accent)] text-xs font-bold transition-theme flex items-center gap-2"
+          className="shrink-0 px-3.5 py-2 rounded-shape-sm bg-[var(--surface-subtle)] text-[var(--fg-accent)] hover:bg-[var(--bg-accent-emphasis)] hover:text-[var(--fg-on-emphasis)] border border-[var(--border-accent)] text-xs font-bold transition-theme flex items-center gap-2"
         >
           <Play size={14} />
           <span>{isRtl ? "مختبر الرؤية الحي" : "Vision Test Bench"}</span>
@@ -677,12 +677,12 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                   placeholder={isRtl ? "بحث في خوادم الـ GPU أو الـ Endpoints..." : "Search GPU nodes or endpoint IDs..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-full py-2 bg-surface-card border border-[var(--border-default)] rounded-md text-xs text-text-primary focus:outline-none focus:border-accent ${
+                  className={`w-full py-2 bg-surface-card border border-[var(--border-default)] rounded-shape-sm text-xs text-text-primary focus:outline-none focus:border-accent ${
                     isRtl ? 'pr-9 pl-3' : 'pl-9 pr-3'
                   }`}
                 />
               </div>
-              <div className="flex items-center bg-surface-card border border-[var(--border-default)] rounded-md p-1 gap-1 shrink-0">
+              <div className="flex items-center bg-surface-card border border-[var(--border-default)] rounded-shape-sm p-1 gap-1 shrink-0">
                 {(['all', 'online', 'cold_boot', 'offline'] as const).map((st) => (
                   <button
                     key={st}
@@ -703,7 +703,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
               <button
                 onClick={fetchProviders}
                 disabled={isLoading}
-                className="px-3.5 py-2 rounded-md border border-[var(--border-default)] bg-surface-card hover:bg-surface-subtle text-text-primary font-bold text-xs transition-theme flex items-center gap-2 shadow-xs disabled:opacity-60"
+                className="px-3.5 py-2 rounded-shape-sm border border-[var(--border-default)] bg-surface-card hover:bg-surface-subtle text-text-primary font-bold text-xs transition-theme flex items-center gap-2 shadow-xs disabled:opacity-60"
                 title={isRtl ? "تحديث وفحص الخوادم" : "Refresh & Ping All Providers"}
               >
                 <RefreshCw size={15} className={isLoading ? "animate-spin text-accent" : "text-accent"} />
@@ -711,7 +711,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
               </button>
               <button
                 onClick={handleOpenAdd}
-                className="px-4 py-2 rounded-md bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] hover:opacity-90 font-bold text-xs transition-theme flex items-center gap-2 shadow-xs"
+                className="px-4 py-2 rounded-shape-sm bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] hover:opacity-90 font-bold text-xs transition-theme flex items-center gap-2 shadow-xs"
               >
                 <Plus size={16} />
                 <span>{isRtl ? "إضافة خادم GPU جديد" : "Add GPU Provider"}</span>
@@ -723,11 +723,11 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
               {[1, 2, 3].map((n) => (
-                <div key={n} className="h-64 rounded-lg bg-surface-card border border-[var(--border-default)] animate-pulse" />
+                <div key={n} className="h-64 rounded-shape-md bg-surface-card border border-[var(--border-default)] animate-pulse" />
               ))}
             </div>
           ) : filteredProviders.length === 0 ? (
-            <div className="p-12 text-center rounded-lg border border-dashed border-[var(--border-default)] bg-surface-card/50">
+            <div className="p-12 text-center rounded-shape-md border border-dashed border-[var(--border-default)] bg-surface-card/50">
               <Server size={40} className="mx-auto text-text-muted mb-3 opacity-40" />
               <h4 className="text-base font-bold text-text-primary mb-1">
                 {isRtl ? "لا توجد خوادم GPU مسجلة حالياً" : "No GPU Providers Registered Yet"}
@@ -740,7 +740,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
               <div className="flex items-center justify-center">
                 <button
                   onClick={handleOpenAdd}
-                  className="px-5 py-2.5 rounded-md bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-bold text-xs hover:opacity-90 inline-flex items-center gap-2 shadow-xs transition-theme"
+                  className="px-5 py-2.5 rounded-shape-sm bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-bold text-xs hover:opacity-90 inline-flex items-center gap-2 shadow-xs transition-theme"
                 >
                   <Plus size={16} />
                   <span>{isRtl ? "إضافة وربط خادم GPU جديد" : "Add GPU Provider"}</span>
@@ -760,13 +760,13 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                   <motion.div
                     key={p.id}
                     layout
-                    className="rounded-lg border border-[var(--border-default)] bg-surface-card p-5 shadow-sm hover:border-accent/40 transition-theme flex flex-col justify-between"
+                    className="rounded-shape-md border border-[var(--border-default)] bg-surface-card p-5 shadow-sm hover:border-accent/40 transition-theme flex flex-col justify-between"
                   >
                     <div>
                       {/* Card Header */}
                       <div className="flex items-start justify-between gap-3 mb-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-md bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0">
+                          <div className="w-10 h-10 rounded-shape-sm bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0">
                             <Server size={20} />
                           </div>
                           <div>
@@ -789,8 +789,8 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                                 isOnline
                                   ? 'bg-[var(--fg-success)] animate-pulse'
                                   : isCold
-                                  ? 'bg-amber-500 animate-pulse'
-                                  : 'bg-rose-500'
+                                  ? 'bg-[var(--fg-warning)] animate-pulse'
+                                  : 'bg-[var(--fg-danger)]'
                               }`}
                             />
                             <span
@@ -798,8 +798,8 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                                 isOnline
                                   ? 'text-[var(--fg-success)]'
                                   : isCold
-                                  ? 'text-amber-500'
-                                  : 'text-rose-500'
+                                  ? 'text-[var(--fg-warning)]'
+                                  : 'text-[var(--fg-danger)]'
                               }`}
                             >
                               {isOnline ? 'Online' : isCold ? 'Cold Boot' : 'Offline'}
@@ -812,7 +812,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                       </div>
 
                       {/* Provider Info Pills */}
-                      <div className="space-y-2.5 mb-4 p-3 rounded-md bg-surface-subtle border border-[var(--border-default)]/50 text-xs">
+                      <div className="space-y-2.5 mb-4 p-3 rounded-shape-sm bg-surface-subtle border border-[var(--border-default)]/50 text-xs">
                         <div className="flex items-center justify-between text-[11px]">
                           <span className="text-text-muted">{isRtl ? "نوع المزود:" : "Type:"}</span>
                           <span className="font-bold text-text-primary uppercase tracking-wider text-[10px]">
@@ -839,8 +839,8 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                             isOnline 
                               ? 'bg-[var(--status-success-subtle)] text-[var(--fg-success)]' 
                               : isCold 
-                              ? 'bg-amber-500/10 text-amber-500' 
-                              : 'bg-rose-500/10 text-rose-500'
+                              ? 'bg-[var(--status-warning-subtle)] text-[var(--fg-warning)]' 
+                              : 'bg-[var(--status-danger-subtle)] text-[var(--fg-danger)]'
                           }`}>
                             {isOnline ? '12% Active' : isCold ? 'Warmup (8%)' : '0% Idle'}
                           </span>
@@ -874,14 +874,14 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                         <div className="space-y-1 mb-4">
                           <div className="flex justify-between text-[10px] font-bold text-text-muted">
                             <span>{isRtl ? "الميزانية اليومية" : "Daily Quota"}</span>
-                            <span className={budgetPercent > 90 ? "text-rose-500" : "text-accent"}>
+                            <span className={budgetPercent > 90 ? "text-[var(--fg-danger)]" : "text-accent"}>
                               ${usedNum.toFixed(2)} / ${budgetNum.toFixed(2)}
                             </span>
                           </div>
                           <div className="h-1 bg-surface-subtle rounded-full overflow-hidden border border-[var(--border-default)]/50">
                             <div
                               className={`h-full transition-theme ${
-                                budgetPercent > 90 ? "bg-rose-500" : "bg-accent"
+                                budgetPercent > 90 ? "bg-[var(--fg-danger)]" : "bg-accent"
                               }`}
                               style={{ width: `${budgetPercent}%` }}
                             />
@@ -899,7 +899,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                           className="px-2.5 py-1.5 rounded text-[11px] font-bold bg-surface-subtle hover:bg-surface-card border border-[var(--border-default)] text-text-primary transition-theme flex items-center gap-1.5"
                           title={isRtl ? "اختبار النبض وزمن الاستجابة" : "Ping & Latency Check"}
                         >
-                          <Zap size={13} className={testingId === p.id ? "animate-spin text-amber-500" : "text-accent"} />
+                          <Zap size={13} className={testingId === p.id ? "animate-spin text-[var(--fg-warning)]" : "text-accent"} />
                           <span>{testingId === p.id ? "Pinging..." : (isRtl ? "فحص" : "Ping")}</span>
                         </button>
                         <button
@@ -923,7 +923,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                         </button>
                         <button
                           onClick={() => setDeleteModal(p)}
-                          className="p-1.5 rounded hover:bg-rose-500/10 text-rose-500/60 hover:text-rose-500 transition-theme"
+                          className="p-1.5 rounded hover:bg-[var(--status-danger-subtle)] text-[var(--fg-danger)]/60 hover:text-[var(--fg-danger)] transition-theme"
                           title={isRtl ? "حذف المزود" : "Delete Provider"}
                         >
                           <Trash2 size={15} />
@@ -939,9 +939,9 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
       )}
 
       {activeTab === 'jobs' && (
-        <div className="space-y-4 animate-in fade-in duration-300">
+        <div className="space-y-4 animate-in fade-in duration-media">
           {/* Filters & Actions for Jobs Queue */}
-          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-surface-card border border-[var(--border-default)] p-4 rounded-lg shadow-sm">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-surface-card border border-[var(--border-default)] p-4 rounded-shape-md shadow-sm">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex flex-col">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">
@@ -950,7 +950,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                 <select
                   value={jobTaskFilter}
                   onChange={(e: any) => setJobTaskFilter(e.target.value)}
-                  className="bg-surface-subtle border border-[var(--border-default)] text-xs font-bold rounded-md px-3 py-1.5 focus:outline-none focus:border-accent"
+                  className="bg-surface-subtle border border-[var(--border-default)] text-xs font-bold rounded-shape-sm px-3 py-1.5 focus:outline-none focus:border-accent"
                 >
                   <option value="all">{isRtl ? "كافة المهام" : "All Tasks"}</option>
                   <option value="vision_analysis">{isRtl ? "تحليل الصور الرؤية" : "Vision Analysis"}</option>
@@ -966,7 +966,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                 <select
                   value={jobStatusFilter}
                   onChange={(e: any) => setJobStatusFilter(e.target.value)}
-                  className="bg-surface-subtle border border-[var(--border-default)] text-xs font-bold rounded-md px-3 py-1.5 focus:outline-none focus:border-accent"
+                  className="bg-surface-subtle border border-[var(--border-default)] text-xs font-bold rounded-shape-sm px-3 py-1.5 focus:outline-none focus:border-accent"
                 >
                   <option value="all">{isRtl ? "كافة الحالات" : "All Statuses"}</option>
                   <option value="processing">{isRtl ? "جاري المعالجة" : "Processing"}</option>
@@ -977,7 +977,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
 
               {/* Total Records Counter */}
               <div className="flex flex-col justify-end">
-                <div className="px-3 py-1.5 rounded-md bg-surface-subtle border border-[var(--border-default)] text-text-muted text-xs font-bold flex items-center gap-1.5">
+                <div className="px-3 py-1.5 rounded-shape-sm bg-surface-subtle border border-[var(--border-default)] text-text-muted text-xs font-bold flex items-center gap-1.5">
                   <Database size={13} className="text-accent" />
                   <span>
                     {isRtl ? `إجمالي السجلات: ${totalJobsCount}` : `Total Records: ${totalJobsCount}`}
@@ -989,7 +989,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => setIsPurgeModalOpen(true)}
-                className="px-3.5 py-2 rounded-md bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 font-bold text-xs transition-theme flex items-center gap-2 shadow-xs"
+                className="px-3.5 py-2 rounded-shape-sm bg-[var(--status-danger-subtle)] hover:bg-[var(--fg-danger)]/20 text-[var(--fg-danger)] border border-[var(--fg-danger)]/30 font-bold text-xs transition-theme flex items-center gap-2 shadow-xs"
                 title={isRtl ? "تنظيف وتطهير سجل المهام لتفادي تضخم البيانات" : "Purge and clean jobs to prevent database bloat"}
               >
                 <Trash2 size={14} />
@@ -999,7 +999,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
               <button
                 onClick={fetchJobs}
                 disabled={isLoadingJobs}
-                className="px-4 py-2 rounded-md bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-bold text-xs hover:opacity-90 transition-theme flex items-center gap-2 disabled:opacity-50"
+                className="px-4 py-2 rounded-shape-sm bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-bold text-xs hover:opacity-90 transition-theme flex items-center gap-2 disabled:opacity-50"
               >
                 <RefreshCw size={14} className={isLoadingJobs ? "animate-spin" : ""} />
                 <span>{isRtl ? "تحديث السجل" : "Refresh Queue"}</span>
@@ -1009,7 +1009,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
 
           {/* Selected Jobs Action Banner */}
           {selectedJobIds.length > 0 && (
-            <div className="p-3 bg-[var(--surface-subtle)] border border-[var(--border-accent)] rounded-lg flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="p-3 bg-[var(--surface-subtle)] border border-[var(--border-accent)] rounded-shape-md flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-base">
               <div className="flex items-center gap-2 text-xs font-bold text-text-primary">
                 <span className="w-2 h-2 rounded-full bg-[var(--fg-accent)] animate-pulse" />
                 <span>
@@ -1041,11 +1041,11 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
           {isLoadingJobs ? (
             <div className="space-y-3">
               {[1, 2, 3, 4, 5].map((n) => (
-                <div key={n} className="h-16 rounded-lg bg-surface-card border border-[var(--border-default)] animate-pulse" />
+                <div key={n} className="h-16 rounded-shape-md bg-surface-card border border-[var(--border-default)] animate-pulse" />
               ))}
             </div>
           ) : jobs.length === 0 ? (
-            <div className="p-12 text-center rounded-lg border border-dashed border-[var(--border-default)] bg-surface-card/50">
+            <div className="p-12 text-center rounded-shape-md border border-dashed border-[var(--border-default)] bg-surface-card/50">
               <Cpu size={40} className="mx-auto text-text-muted mb-3 opacity-40" />
               <h4 className="text-base font-bold text-text-primary mb-1">
                 {isRtl ? "سجل مهام الحوسبة فارغ" : "GPU Jobs Queue is Empty"}
@@ -1057,7 +1057,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
               </p>
             </div>
           ) : (
-            <div className="bg-surface-card border border-[var(--border-default)] rounded-lg shadow-sm overflow-hidden overflow-x-auto">
+            <div className="bg-surface-card border border-[var(--border-default)] rounded-shape-md shadow-sm overflow-hidden overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border-default)] bg-surface-subtle text-[11px] font-black uppercase tracking-wider text-text-muted">
@@ -1083,14 +1083,14 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                 <tbody className="divide-y divide-[var(--border-default)]/40 text-xs">
                   {jobs.map((j) => {
                     const taskColors: Record<string, string> = {
-                      vision_analysis: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+                      vision_analysis: 'bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)] border-[var(--border-accent)]/20',
                       image_gen: 'bg-[var(--status-success-subtle)] text-[var(--fg-success)] border-[var(--fg-success)]/20',
-                      video_gen: 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20',
-                      audio_gen: 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                      video_gen: 'bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)] border-[var(--border-accent)]/20',
+                      audio_gen: 'bg-[var(--status-warning-subtle)] text-[var(--fg-warning)] border-[var(--fg-warning)]/20'
                     };
                     const statusColors = {
-                      pending: 'bg-slate-500/10 text-slate-500',
-                      processing: 'bg-amber-500/10 text-amber-500 animate-pulse',
+                      pending: 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]',
+                      processing: 'bg-[var(--status-warning-subtle)] text-[var(--fg-warning)] animate-pulse',
                       completed: 'bg-[var(--status-success-subtle)] text-[var(--fg-success)]',
                       failed: 'bg-[var(--fg-danger)]/10 text-[var(--fg-danger)]',
                       cancelled: 'bg-[var(--surface-subtle)] text-[var(--text-muted)]'
@@ -1133,7 +1133,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                         </td>
                         <td className="p-4 whitespace-nowrap">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase inline-flex items-center gap-1.5 ${statusColors[j.status] || ''}`}>
-                            {j.status === 'processing' && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />}
+                            {j.status === 'processing' && <span className="w-1.5 h-1.5 rounded-full bg-[var(--fg-warning)] animate-pulse" />}
                             {j.status}
                           </span>
                         </td>
@@ -1156,10 +1156,10 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                             <button
                               onClick={() => handleDeleteSingleJob(j)}
                               disabled={deletingJobId === j.job_id}
-                              className="p-1.5 rounded hover:bg-rose-500/10 text-rose-500/70 hover:text-rose-500 transition-theme disabled:opacity-50"
+                              className="p-1.5 rounded hover:bg-[var(--status-danger-subtle)] text-[var(--fg-danger)]/70 hover:text-[var(--fg-danger)] transition-theme disabled:opacity-50"
                               title={isRtl ? "حذف هذا السجل" : "Delete this job"}
                             >
-                              <Trash2 size={15} className={deletingJobId === j.job_id ? "animate-spin text-rose-500" : ""} />
+                              <Trash2 size={15} className={deletingJobId === j.job_id ? "animate-spin text-[var(--fg-danger)]" : ""} />
                             </button>
                           </div>
                         </td>
@@ -1175,8 +1175,8 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
 
       {/* Add / Edit GPU Provider Modal */}
       {isAddEditOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-xl rounded-lg bg-surface-card border border-[var(--border-default)] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-base">
+          <div className="w-full max-w-xl rounded-shape-md bg-surface-card border border-[var(--border-default)] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-base">
             <div className="p-5 border-b border-[var(--border-default)] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <Server size={18} className="text-accent" />
@@ -1396,8 +1396,8 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
 
       {/* Models Drawer / Management Modal */}
       {modelsModalProvider && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-2xl rounded-lg bg-surface-card border border-[var(--border-default)] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-base">
+          <div className="w-full max-w-2xl rounded-shape-md bg-surface-card border border-[var(--border-default)] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
             <div className="p-5 border-b border-[var(--border-default)] flex items-center justify-between">
               <div>
                 <h3 className="text-base font-black text-text-primary flex items-center gap-2">
@@ -1418,7 +1418,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
 
             <div className="p-6 overflow-y-auto space-y-6 flex-1">
               {/* Add Model Form */}
-              <form onSubmit={handleAddManualModel} className="p-4 rounded-lg bg-surface-subtle border border-[var(--border-default)] space-y-3">
+              <form onSubmit={handleAddManualModel} className="p-4 rounded-shape-md bg-surface-subtle border border-[var(--border-default)] space-y-3">
                 <div className="text-xs font-bold text-text-primary flex items-center gap-1.5">
                   <Plus size={14} className="text-accent" />
                   <span>{isRtl ? "إضافة نموذج يدوياً" : "Add Model Manually"}</span>
@@ -1480,7 +1480,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                     {isRtl ? "لا توجد نماذج مسجلة لهذا المزود. انقر مزامنة أو أضف نموذجاً." : "No models registered. Click sync or add one manually above."}
                   </div>
                 ) : (
-                  <div className="divide-y divide-[var(--border-default)]/50 rounded-lg border border-[var(--border-default)] bg-surface-card overflow-hidden">
+                  <div className="divide-y divide-[var(--border-default)]/50 rounded-shape-md border border-[var(--border-default)] bg-surface-card overflow-hidden">
                     {providerModels.map((m) => (
                       <div key={m.id} className="p-3 flex items-center justify-between gap-3 hover:bg-surface-subtle transition-theme">
                         <div className="min-w-0">
@@ -1498,7 +1498,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                         </div>
                         <button
                           onClick={() => handleDeleteModel(m.id)}
-                          className="text-text-muted hover:text-rose-500 p-1 rounded"
+                          className="text-text-muted hover:text-[var(--fg-danger)] p-1 rounded"
                           title="Delete Model"
                         >
                           <Trash2 size={14} />
@@ -1524,8 +1524,8 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
 
       {/* Vision Live Test Bench Sandbox Modal */}
       {isSandboxOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-3xl rounded-lg bg-surface-card border border-[var(--border-default)] shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-base">
+          <div className="w-full max-w-3xl rounded-shape-md bg-surface-card border border-[var(--border-default)] shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
             <div className="p-5 border-b border-[var(--border-default)] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Play size={18} className="text-accent" />
@@ -1592,7 +1592,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                   </div>
 
                   {sandboxImageUrl && (
-                    <div className="w-full h-40 rounded-lg overflow-hidden bg-surface-subtle border border-[var(--border-default)] flex items-center justify-center">
+                    <div className="w-full h-40 rounded-shape-md overflow-hidden bg-surface-subtle border border-[var(--border-default)] flex items-center justify-center">
                       <img
                         src={sandboxImageUrl}
                         alt="Preview"
@@ -1651,7 +1651,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
               </div>
 
               {sandboxResult && (
-                <div className="p-4 rounded-lg bg-surface-subtle border border-[var(--border-default)] space-y-3">
+                <div className="p-4 rounded-shape-md bg-surface-subtle border border-[var(--border-default)] space-y-3">
                   <div className="flex items-center justify-between text-[11px] font-bold">
                     <span className="text-accent flex items-center gap-1.5">
                       <CheckCircle2 size={14} />
@@ -1664,7 +1664,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
 
                   {/* Render Visual Media Outputs for Images/Videos */}
                   {(sandboxResult.image_url || sandboxResult.result_url || sandboxResult.video_url) && (
-                    <div className="w-full rounded-lg overflow-hidden border border-[var(--border-default)] bg-black flex items-center justify-center p-2 max-h-[320px]">
+                    <div className="w-full rounded-shape-md overflow-hidden border border-[var(--border-default)] bg-black flex items-center justify-center p-2 max-h-[320px]">
                       {sandboxResult.video_url || (sandboxResult.result_url && sandboxResult.result_url.endsWith('.mp4')) ? (
                         <video
                           src={sandboxResult.video_url || sandboxResult.result_url}
@@ -1689,7 +1689,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                   )}
 
                   {sandboxResult.error && (
-                    <div className="p-3 rounded bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-mono">
+                    <div className="p-3 rounded bg-[var(--status-danger-subtle)] border border-[var(--fg-danger)]/20 text-[var(--fg-danger)] text-xs font-mono">
                       {sandboxResult.error}
                     </div>
                   )}
@@ -1730,8 +1730,8 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
 
       {/* Delete Confirmation Modal */}
       {deleteModal && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-lg bg-surface-card border border-[var(--border-default)] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-base">
+          <div className="w-full max-w-sm rounded-shape-md bg-surface-card border border-[var(--border-default)] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-base">
             <div className="w-12 h-12 rounded-full bg-[var(--fg-danger)]/10 text-[var(--fg-danger)] flex items-center justify-center mx-auto mb-3">
               <Trash2 size={24} />
             </div>
@@ -1763,8 +1763,8 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
 
       {/* Inspecting Job Modal */}
       {inspectingJob && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-2xl rounded-lg bg-surface-card border border-[var(--border-default)] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-base">
+          <div className="w-full max-w-2xl rounded-shape-md bg-surface-card border border-[var(--border-default)] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
             <div className="p-5 border-b border-[var(--border-default)] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <Cpu size={18} className="text-accent" />
@@ -1782,7 +1782,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
 
             <div className="p-6 overflow-y-auto space-y-5 flex-1 text-xs">
               {/* Status Header */}
-              <div className="p-4 rounded-lg bg-surface-subtle border border-[var(--border-default)] flex items-center justify-between gap-4">
+              <div className="p-4 rounded-shape-md bg-surface-subtle border border-[var(--border-default)] flex items-center justify-between gap-4">
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold text-text-muted uppercase block">
                     {isRtl ? "حالة المهمة" : "Execution Status"}
@@ -1803,7 +1803,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
 
               {/* Grid Metadata */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-surface-subtle/50 rounded-md border border-[var(--border-default)]/50">
+                <div className="p-3 bg-surface-subtle/50 rounded-shape-sm border border-[var(--border-default)]/50">
                   <span className="text-[10px] font-bold text-text-muted uppercase block mb-1">
                     {isRtl ? "معرف المهمة" : "Job UUID"}
                   </span>
@@ -1811,7 +1811,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                     {inspectingJob.job_id}
                   </span>
                 </div>
-                <div className="p-3 bg-surface-subtle/50 rounded-md border border-[var(--border-default)]/50">
+                <div className="p-3 bg-surface-subtle/50 rounded-shape-sm border border-[var(--border-default)]/50">
                   <span className="text-[10px] font-bold text-text-muted uppercase block mb-1">
                     {isRtl ? "نوع المهمة" : "Task Type"}
                   </span>
@@ -1819,7 +1819,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                     {inspectingJob.task_type.replace(/_/g, " ")}
                   </span>
                 </div>
-                <div className="p-3 bg-surface-subtle/50 rounded-md border border-[var(--border-default)]/50">
+                <div className="p-3 bg-surface-subtle/50 rounded-shape-sm border border-[var(--border-default)]/50">
                   <span className="text-[10px] font-bold text-text-muted uppercase block mb-1">
                     {isRtl ? "مزود الخدمة المستهدف" : "Executed Node / Provider"}
                   </span>
@@ -1827,7 +1827,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                     {inspectingJob.provider_name || inspectingJob.provider_code || "Failover Pathway"}
                   </span>
                 </div>
-                <div className="p-3 bg-surface-subtle/50 rounded-md border border-[var(--border-default)]/50">
+                <div className="p-3 bg-surface-subtle/50 rounded-shape-sm border border-[var(--border-default)]/50">
                   <span className="text-[10px] font-bold text-text-muted uppercase block mb-1">
                     {isRtl ? "النموذج المستخدم" : "Model Identifier"}
                   </span>
@@ -1838,7 +1838,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
               </div>
 
               {/* User Attribution */}
-              <div className="p-3 bg-surface-subtle/30 rounded-md border border-[var(--border-default)]/50 flex justify-between items-center">
+              <div className="p-3 bg-surface-subtle/30 rounded-shape-sm border border-[var(--border-default)]/50 flex justify-between items-center">
                 <div>
                   <span className="text-[10px] font-bold text-text-muted uppercase block mb-0.5">
                     {isRtl ? "المستخدم" : "Attributed User"}
@@ -1870,10 +1870,10 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
               {/* Render Media Outputs or Error Messages */}
               {inspectingJob.status === "failed" && inspectingJob.error_message && (
                 <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold text-rose-500 uppercase block">
+                  <span className="text-[10px] font-bold text-[var(--fg-danger)] uppercase block">
                     {isRtl ? "تفاصيل الخطأ في خادم الحوسبة" : "Backend Job Error log"}
                   </span>
-                  <div className="p-3 rounded bg-rose-500/10 border border-rose-500/20 text-rose-500 font-mono text-[11px] whitespace-pre-wrap overflow-x-auto max-h-36 overflow-y-auto">
+                  <div className="p-3 rounded bg-[var(--status-danger-subtle)] border border-[var(--fg-danger)]/20 text-[var(--fg-danger)] font-mono text-[11px] whitespace-pre-wrap overflow-x-auto max-h-36 overflow-y-auto">
                     {inspectingJob.error_message}
                   </div>
                 </div>
@@ -1887,7 +1887,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                   </span>
 
                   {inspectingJob.result_url ? (
-                    <div className="w-full rounded-lg overflow-hidden border border-[var(--border-default)] bg-black flex items-center justify-center p-2 max-h-[300px]">
+                    <div className="w-full rounded-shape-md overflow-hidden border border-[var(--border-default)] bg-black flex items-center justify-center p-2 max-h-[300px]">
                       {inspectingJob.task_type === 'video_gen' || inspectingJob.result_url.endsWith('.mp4') ? (
                         <video
                           src={inspectingJob.result_url}
@@ -1916,7 +1916,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
               <button
                 onClick={() => handleDeleteSingleJob(inspectingJob)}
                 disabled={deletingJobId === inspectingJob.job_id}
-                className="px-3.5 py-2 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 text-xs font-bold transition-theme flex items-center gap-1.5 disabled:opacity-50"
+                className="px-3.5 py-2 rounded bg-[var(--status-danger-subtle)] hover:bg-[var(--fg-danger)]/20 text-[var(--fg-danger)] border border-[var(--fg-danger)]/30 text-xs font-bold transition-theme flex items-center gap-1.5 disabled:opacity-50"
               >
                 <Trash2 size={13} className={deletingJobId === inspectingJob.job_id ? "animate-spin" : ""} />
                 <span>{isRtl ? "حذف هذا السجل نهائياً" : "Delete This Record"}</span>
@@ -1935,11 +1935,11 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
 
       {/* Purge / Clean Jobs Modal */}
       {isPurgeModalOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-lg bg-surface-card border border-[var(--border-default)] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-base">
+          <div className="w-full max-w-lg rounded-shape-md bg-surface-card border border-[var(--border-default)] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-base flex flex-col">
             <div className="p-5 border-b border-[var(--border-default)] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <Trash2 size={18} className="text-rose-500" />
+                <Trash2 size={18} className="text-[var(--fg-danger)]" />
                 <div>
                   <h3 className="text-base font-black text-text-primary">
                     {isRtl ? "تنظيف وتطهير سجل مهام الحوسبة" : "Clean & Purge GPU Jobs Queue"}
@@ -1959,7 +1959,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
 
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               {/* Summary Stats Banner */}
-              <div className="p-3.5 rounded-lg bg-surface-subtle border border-[var(--border-default)] flex items-center justify-between">
+              <div className="p-3.5 rounded-shape-md bg-surface-subtle border border-[var(--border-default)] flex items-center justify-between">
                 <div>
                   <span className="text-[10px] font-bold uppercase text-text-muted block">
                     {isRtl ? "إجمالي السجلات في قاعدة البيانات" : "Total Database Records"}
@@ -1987,7 +1987,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                 </label>
 
                 {/* Option 1: Selected Jobs */}
-                <label className={`p-3 rounded-lg border transition-theme cursor-pointer flex items-start gap-3 ${
+                <label className={`p-3 rounded-shape-md border transition-theme cursor-pointer flex items-start gap-3 ${
                   purgeMode === 'selected' 
                     ? 'border-accent bg-accent/5' 
                     : 'border-[var(--border-default)] hover:bg-surface-subtle'
@@ -2019,9 +2019,9 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                 </label>
 
                 {/* Option 2: Purge All */}
-                <label className={`p-3 rounded-lg border transition-theme cursor-pointer flex items-start gap-3 ${
+                <label className={`p-3 rounded-shape-md border transition-theme cursor-pointer flex items-start gap-3 ${
                   purgeMode === 'all' 
-                    ? 'border-rose-500/50 bg-rose-500/5' 
+                    ? 'border-[var(--fg-danger)]/50 bg-[var(--fg-danger)]/5' 
                     : 'border-[var(--border-default)] hover:bg-surface-subtle'
                 }`}>
                   <input
@@ -2034,10 +2034,10 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                   />
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-rose-500">
+                      <span className="text-xs font-bold text-[var(--fg-danger)]">
                         {isRtl ? "مسح الكل (تصفير سجل مهام الحوسبة بالكامل)" : "Purge All Records (Complete Wipe)"}
                       </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[var(--status-danger-subtle)] text-[var(--fg-danger)] border border-[var(--fg-danger)]/20">
                         {isRtl ? "تفريغ شامل" : "Full Wipe"}
                       </span>
                     </div>
@@ -2050,7 +2050,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                 </label>
 
                 {/* Option 3: By Status */}
-                <label className={`p-3 rounded-lg border transition-theme cursor-pointer flex items-start gap-3 ${
+                <label className={`p-3 rounded-shape-md border transition-theme cursor-pointer flex items-start gap-3 ${
                   purgeMode === 'status' 
                     ? 'border-accent bg-accent/5' 
                     : 'border-[var(--border-default)] hover:bg-surface-subtle'
@@ -2079,7 +2079,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                         <select
                           value={purgeStatus}
                           onChange={(e) => setPurgeStatus(e.target.value)}
-                          className="bg-surface-card border border-[var(--border-default)] text-xs font-bold rounded-md px-3 py-1.5 focus:outline-none focus:border-accent text-text-primary"
+                          className="bg-surface-card border border-[var(--border-default)] text-xs font-bold rounded-shape-sm px-3 py-1.5 focus:outline-none focus:border-accent text-text-primary"
                         >
                           <option value="completed">{isRtl ? "المهام المكتملة فقط (Completed)" : "Completed Jobs Only"}</option>
                           <option value="failed">{isRtl ? "المهام الفاشلة فقط (Failed)" : "Failed Jobs Only"}</option>
@@ -2091,7 +2091,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                 </label>
 
                 {/* Option 4: Older Than */}
-                <label className={`p-3 rounded-lg border transition-theme cursor-pointer flex items-start gap-3 ${
+                <label className={`p-3 rounded-shape-md border transition-theme cursor-pointer flex items-start gap-3 ${
                   purgeMode === 'older_than' 
                     ? 'border-accent bg-accent/5' 
                     : 'border-[var(--border-default)] hover:bg-surface-subtle'
@@ -2120,7 +2120,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
                         <select
                           value={purgeDays}
                           onChange={(e) => setPurgeDays(Number(e.target.value))}
-                          className="bg-surface-card border border-[var(--border-default)] text-xs font-bold rounded-md px-3 py-1.5 focus:outline-none focus:border-accent text-text-primary"
+                          className="bg-surface-card border border-[var(--border-default)] text-xs font-bold rounded-shape-sm px-3 py-1.5 focus:outline-none focus:border-accent text-text-primary"
                         >
                           <option value={1}>{isRtl ? "أقدم من 24 ساعة (يوم واحد)" : "Older than 24 hours (1 day)"}</option>
                           <option value={3}>{isRtl ? "أقدم من 3 أيام" : "Older than 3 days"}</option>
@@ -2135,7 +2135,7 @@ export const GpuInfrastructureView: React.FC<GpuInfrastructureViewProps> = ({
               </div>
 
               {/* Warning notice */}
-              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[11px] flex items-start gap-2">
+              <div className="p-3 rounded-shape-md bg-[var(--status-warning-subtle)] border border-[var(--fg-warning)]/20 text-[var(--fg-warning)] text-[11px] flex items-start gap-2">
                 <AlertCircle size={15} className="shrink-0 mt-0.5" />
                 <span>
                   {isRtl

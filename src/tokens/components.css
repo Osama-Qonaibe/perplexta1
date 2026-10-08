@@ -76,3 +76,30 @@
     --comp-button-primary-hover: color-mix(in srgb, var(--sys-color-primary) 85%, white);
   }
 }
+
+/* Mandatory M3 Touch Target (Minimum 44x44px bounding area) */
+.touch-target-44 {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.touch-target-44-expanded {
+  position: relative;
+}
+
+.touch-target-44-expanded::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 44px;
+  min-height: 44px;
+  width: 100%;
+  height: 100%;
+}
+

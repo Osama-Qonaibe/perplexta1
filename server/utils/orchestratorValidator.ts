@@ -30,10 +30,7 @@ function validateNumberField(val: any, fieldName: string, errors: string[]) {
   }
 }
 
-/**
- * Validates active tool routes pricing and structure fields.
- */
-export function validateServerToolRoute(route: {
+export interface ServerToolRoute {
   tool_id?: string;
   primary_provider?: string;
   primary_model?: string;
@@ -44,18 +41,17 @@ export function validateServerToolRoute(route: {
   fallback_3_provider?: string;
   fallback_3_model?: string;
   is_active?: boolean;
-  cost_per_usage?: any;
-  cost_per_1k_input_tokens?: any;
-  cost_per_1k_output_tokens?: any;
   protocol_config?: any;
-}): ServerValidationResult {
+}
+
+/**
+ * Validates active tool routes structure fields.
+ */
+export function validateServerToolRoute(route: ServerToolRoute): ServerValidationResult {
   const errors: string[] = [];
 
   const { 
     tool_id, 
-    cost_per_usage, 
-    cost_per_1k_input_tokens, 
-    cost_per_1k_output_tokens,
     primary_provider,
     primary_model,
     fallback_1_provider,
@@ -70,11 +66,6 @@ export function validateServerToolRoute(route: {
   if (!tool_id || String(tool_id).trim() === '') {
     errors.push("tool_id is required and cannot be empty.");
   }
-
-  // Validate price outputs
-  validateNumberField(cost_per_usage, "cost_per_usage", errors);
-  validateNumberField(cost_per_1k_input_tokens, "cost_per_1k_input_tokens", errors);
-  validateNumberField(cost_per_1k_output_tokens, "cost_per_1k_output_tokens", errors);
 
   // Validate maximum string length properties to prevent database insertion/overflow issues
   const validateStringLen = (val: string | undefined, limit: number, fieldName: string) => {

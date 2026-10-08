@@ -49,23 +49,7 @@ router.post('/render', (req, res) => {
  */
 router.get('/render', authenticateAdmin, (req, res) => {
   try {
-    let data = [...recentMetrics];
-    if (data.length === 0) {
-      const sampleComponents = ['BlogPage', 'ChatPage', 'AdminDashboard', 'Header', 'Sidebar', 'CommunityPage', 'BulletinBoardPage'];
-      const now = Date.now();
-      for (let i = 0; i < 30; i++) {
-        const comp = sampleComponents[Math.floor(Math.random() * sampleComponents.length)];
-        data.push({
-          id: `sample-${i}`,
-          componentName: comp,
-          renderCount: Math.floor(Math.random() * 6) + 1,
-          timeSinceMount: Math.floor(Math.random() * 20000) + 100,
-          renderDuration: Math.floor(Math.random() * 50) + 3,
-          timestamp: new Date(now - (30 - i) * 45000).toISOString(),
-          sessionId: `session-node-${Math.floor(Math.random() * 4) + 1}`
-        });
-      }
-    }
+    const data = [...recentMetrics];
     res.json({ success: true, metrics: data });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

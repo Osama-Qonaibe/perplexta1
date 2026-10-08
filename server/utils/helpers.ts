@@ -279,3 +279,41 @@ export function normalizeArabicNumerals(text: string): string {
     .replace(/[٨8]/g, '8')
     .replace(/[٩9]/g, '9');
 }
+
+export function extractImmediateChatTitle(text: string, lang = 'en'): string {
+  if (!text || !text.trim()) {
+    return lang === 'ar' ? 'محادثة جديدة' : 'New Session';
+  }
+  
+  // Clean markdown headers, code fences, inline codes, blockquotes, markdown links, HTML tags, bold/italic symbols
+  let cleaned = text
+    .replace(/^#+\s+/gm, '') // remove markdown headings #, ##
+    .replace(/```[\s\S]*?```/g, '') // remove code blocks
+    .replace(/`([^`]+)`/g, '$1') // remove inline code backticks
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // remove markdown links [label](url)
+    .replace(/<[^>]*>/g, '') // remove html tags
+    .replace(/[*_~>#]/g, '') // remove bold, italic, blockquotes
+    .replace(/\s+/g, ' ') // normalize whitespace
+    .trim();
+
+  if (!cleaned) {
+    return lang === 'ar' ? 'محادثة جديدة' : 'New Session';
+  }
+
+  // Take the first line / sentence
+  const firstSentence = cleaned.split(/[\n.!?؟]/)[0]?.trim() || cleaned;
+  const candidate = firstSentence.length > 0 ? firstSentence : cleaned;
+
+  if (candidate.length <= 48) {
+    return candidate;
+  }
+
+  // Trim to nearest word boundary under 48 chars
+  const truncated = candidate.substring(0, 48);
+  const lastSpace = truncated.lastIndexOf(' ');
+  if (lastSpace > 25) {
+    return truncated.substring(0, lastSpace).trim() + '...';
+  }
+  return truncated.trim() + '...';
+}
+

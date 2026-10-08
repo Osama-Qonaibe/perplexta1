@@ -116,3 +116,41 @@ export const showErrorToast = (dir: 'rtl' | 'ltr', msgAr: string, msgEn: string)
 export const showInfoToast = (dir: 'rtl' | 'ltr', msgAr: string, msgEn: string) => {
   toast.info(dir === 'rtl' ? msgAr : msgEn);
 };
+
+export function extractImmediateChatTitle(text: string, lang: 'ar' | 'en' = 'en'): string {
+  if (!text || !text.trim()) {
+    return lang === 'ar' ? 'محادثة جديدة' : 'New Session';
+  }
+  
+  // Clean markdown headers, code fences, inline codes, blockquotes, markdown links, HTML tags, bold/italic symbols
+  let cleaned = text
+    .replace(/^#+\s+/gm, '') // remove markdown headings #, ##
+    .replace(/```[\s\S]*?```/g, '') // remove code blocks
+    .replace(/`([^`]+)`/g, '$1') // remove inline code backticks
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // remove markdown links [label](url)
+    .replace(/<[^>]*>/g, '') // remove html tags
+    .replace(/[*_~>#]/g, '') // remove bold, italic, blockquotes
+    .replace(/\s+/g, ' ') // normalize whitespace
+    .trim();
+
+  if (!cleaned) {
+    return lang === 'ar' ? 'محادثة جديدة' : 'New Session';
+  }
+
+  // Take the first line / sentence
+  const firstSentence = cleaned.split(/[\n.!?؟]/)[0]?.trim() || cleaned;
+  const candidate = firstSentence.length > 0 ? firstSentence : cleaned;
+
+  if (candidate.length <= 45) {
+    return candidate;
+  }
+
+  // Trim to nearest word boundary under 45 chars
+  const truncated = candidate.substring(0, 45);
+  const lastSpace = truncated.lastIndexOf(' ');
+  if (lastSpace > 20) {
+    return truncated.substring(0, lastSpace).trim() + '...';
+  }
+  return truncated.trim() + '...';
+}
+

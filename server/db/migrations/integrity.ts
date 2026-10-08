@@ -1,12 +1,13 @@
-import { pool, ledgerPool, externalPool, securityPool, createInternalPool } from "../index.js";
+import crypto from "crypto";
+import { pool, ledgerPool, externalPool, securityPool, mediaPool, createInternalPool, isMediaPoolDistinct } from "../index.js";
 import { ensureColumnsBulk } from "./helpers.js";
 import { decrypt } from "../../utils/crypto.js";
 import { getIo } from "./maintenance.js";
-import { initDb } from "./index.js";
 import { CORE_INDEXES } from "./core.schema.js";
 import { LEDGER_INDEXES } from "./ledger.schema.js";
 import { EXTERNAL_INDEXES } from "./external.schema.js";
 import { SECURITY_INDEXES } from "./security.schema.js";
+import { MEDIA_INDEXES } from "./media.schema.js";
 
 function safelyDecryptConnectionString(encrypted: string): string {
   try {
@@ -66,6 +67,14 @@ export async function monitorDatabases() {
         else if (reg.id === 'ledger') connectionString = process.env.LEDGER_DATABASE_URL || process.env.DATABASE_URL || '';
         else if (reg.id === 'external') connectionString = process.env.EXTERNAL_DATABASE_URL || process.env.DATABASE_URL || '';
         else if (reg.id === 'security') connectionString = process.env.SECURITY_DATABASE_URL || process.env.DATABASE_URL || '';
+        else if (reg.id === 'media') connectionString = process.env.MEDIA_DATABASE_URL || process.env.DATABASE_URL || '';
+      }
+
+      // If core is remote and this database URL points to localhost/127.0.0.1, fallback to Core DB
+      const coreEnv = process.env.DATABASE_URL || '';
+      const isCoreRemote = coreEnv && !coreEnv.includes('localhost') && !coreEnv.includes('127.0.0.1');
+      if (isCoreRemote && (connectionString.includes('localhost') || connectionString.includes('127.0.0.1'))) {
+        connectionString = coreEnv;
       }
 
       if (!connectionString.startsWith('postgres')) continue;
@@ -94,11 +103,148 @@ export async function monitorDatabases() {
   }
 }
 
-export async function verifySchemaIntegrity() {
+export async function migrateMediaAssetsData() {
+  if (!isMediaPoolDistinct()) {
+    console.log('[Media Migration] Core and Media share the same database pool. Verified: no cross-database transfer required.');
+    return;
+  }
+  const targetMediaPool = mediaPool;
+
+  console.log('[Media Migration] Detected distinct Core and Media databases. Initiating high-precision data transfer verification...');
+  try {
+    const coreTableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'media_assets'
+      )
+    `);
+    if (coreTableCheck.rows[0].exists) {
+      const coreAssets = await pool.query('SELECT * FROM media_assets');
+      if (coreAssets.rows.length > 0) {
+        console.log(`[Media Migration] Found ${coreAssets.rows.length} media_assets in Core DB. Transferring to Media DB...`);
+        let migratedCount = 0;
+        let updatedBinaryCount = 0;
+        
+        for (const row of coreAssets.rows) {
+          try {
+            const existingInMedia = await targetMediaPool.query(
+              'SELECT id, file_data FROM media_assets WHERE id = $1 OR stored_path = $2 OR sha256_hash = $3 LIMIT 1',
+              [row.id, row.stored_path, row.sha256_hash]
+            );
+
+            if (existingInMedia.rows.length > 0) {
+              const exRow = existingInMedia.rows[0];
+              if (!exRow.file_data && row.file_data) {
+                await targetMediaPool.query(
+                  'UPDATE media_assets SET file_data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+                  [row.file_data, exRow.id]
+                );
+                updatedBinaryCount++;
+              }
+            } else {
+              await targetMediaPool.query(`
+                INSERT INTO media_assets (
+                  id, stored_path, original_filename, context, format, width, height, size_bytes,
+                  sha256_hash, is_public, user_id, metadata, created_at, updated_at, file_data
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                ON CONFLICT (id) DO UPDATE SET
+                  file_data = COALESCE(EXCLUDED.file_data, media_assets.file_data),
+                  updated_at = CURRENT_TIMESTAMP
+              `, [
+                row.id, row.stored_path, row.original_filename, row.context || 'general',
+                row.format || 'webp', row.width || 0, row.height || 0, row.size_bytes || 0,
+                row.sha256_hash, row.is_public ?? false, row.user_id || null,
+                typeof row.metadata === 'object' ? JSON.stringify(row.metadata) : (row.metadata || '{}'),
+                row.created_at || new Date(), row.updated_at || new Date(), row.file_data || null
+              ]);
+              migratedCount++;
+            }
+          } catch (rowErr: any) {
+            console.warn(`[Media Migration] Row transfer notice for ${row.stored_path}:`, rowErr.message);
+          }
+        }
+        console.log(`[Media Migration] Media assets transfer complete. Inserted: ${migratedCount}, Updated binary: ${updatedBinaryCount}.`);
+      }
+    }
+
+    // Also migrate any eligible media stored in user_files that is not yet in media_assets
+    try {
+      const userFilesMediaCheck = await pool.query(`
+        SELECT id, user_id, file_name, file_url, file_size, mime_type, file_type, metadata, file_data, created_at
+        FROM user_files
+        WHERE mime_type LIKE 'image/%' OR mime_type LIKE 'video/%' OR mime_type LIKE 'audio/%' OR mime_type = 'application/pdf'
+      `);
+
+      if (userFilesMediaCheck.rows.length > 0) {
+        let userFilesMigrated = 0;
+        for (const uFile of userFilesMediaCheck.rows) {
+          const storedPath = uFile.file_url?.startsWith('uploads/') ? uFile.file_url : (uFile.file_url?.startsWith('/uploads/') ? uFile.file_url.substring(1) : `uploads/${uFile.file_url}`);
+          const shaHash = uFile.file_data ? crypto.createHash('sha256').update(uFile.file_data).digest('hex') : crypto.createHash('sha256').update(storedPath).digest('hex');
+          
+          const exists = await targetMediaPool.query(
+            'SELECT id, file_data FROM media_assets WHERE stored_path = $1 OR sha256_hash = $2 LIMIT 1',
+            [storedPath, shaHash]
+          );
+
+          if (exists.rows.length === 0) {
+            let mContext = 'general';
+            if (uFile.mime_type?.startsWith('image/')) mContext = 'image';
+            else if (uFile.mime_type?.startsWith('video/')) mContext = 'video';
+            else if (uFile.mime_type?.startsWith('audio/')) mContext = 'audio';
+            else if (uFile.mime_type === 'application/pdf') mContext = 'document';
+
+            const integrityAssetId = crypto.randomUUID();
+            await targetMediaPool.query(`
+              INSERT INTO media_assets (
+                id, stored_path, original_filename, context, format, width, height, size_bytes,
+                sha256_hash, is_public, user_id, metadata, file_data, created_at
+              ) VALUES ($1, $2, $3, $4, $5, 0, 0, $6, $7, true, $8, $9, $10, $11)
+              ON CONFLICT (stored_path) DO NOTHING
+            `, [
+              integrityAssetId, storedPath, uFile.file_name || 'media', mContext, uFile.file_type || 'general',
+              uFile.file_size || 0, shaHash, uFile.user_id || null,
+              typeof uFile.metadata === 'object' ? JSON.stringify(uFile.metadata) : (uFile.metadata || '{}'),
+              uFile.file_data || null, uFile.created_at || new Date()
+            ]);
+            userFilesMigrated++;
+          } else if (!exists.rows[0].file_data && uFile.file_data) {
+            await targetMediaPool.query(
+              'UPDATE media_assets SET file_data = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+              [uFile.file_data, exists.rows[0].id]
+            );
+          }
+        }
+        if (userFilesMigrated > 0) {
+          console.log(`[Media Migration] Transferred ${userFilesMigrated} files from user_files to media_assets in Media DB.`);
+        }
+      }
+    } catch (uErr: any) {
+      console.warn('[Media Migration] user_files media scan notice:', uErr.message);
+    }
+
+    const mediaCountCheck = await targetMediaPool.query('SELECT COUNT(*) FROM media_assets');
+    const finalMediaCount = parseInt(mediaCountCheck.rows[0].count, 10);
+    console.log(`[Media Migration] Sovereign media verification complete. Total media assets verified in Media DB: ${finalMediaCount}.`);
+  } catch (err: any) {
+    console.error('[Media Migration] ❌ Error executing media migration transfer:', err?.message || err);
+  }
+}
+
+let lastIntegrityCheck = 0;
+const INTEGRITY_COOLDOWN = 1000 * 60 * 5; // 5 minutes
+
+export async function verifySchemaIntegrity(force = false) {
   if (!pool) {
     console.warn('[Schema Integrity] Skipping validation: No core pool initialized.');
     return;
   }
+
+  const now = Date.now();
+  if (!force && (now - lastIntegrityCheck < INTEGRITY_COOLDOWN)) {
+    console.log('[Schema Integrity] Skipping comprehensive audit (recently verified).');
+    return;
+  }
+  
   console.log('[Schema Integrity] Starting comprehensive database schema audit...');
 
   const report: {
@@ -118,6 +264,7 @@ export async function verifySchemaIntegrity() {
   };
 
   const queryColumns = async (p: any, schemaName = 'public'): Promise<Record<string, Set<string>>> => {
+    if (!p) return {};
     try {
       const res = await p.query(`
         SELECT table_name, column_name 
@@ -134,20 +281,39 @@ export async function verifySchemaIntegrity() {
       }
       return tables;
     } catch (error) {
-      throw new Error(`Failed to query information_schema: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.warn(`[Schema Integrity] Failed to query information_schema for a secondary pool, skipping that pool.`);
+      return {};
     }
+  };
+
+  // Parallelize pool queries
+  const [coreTables, ledgerTables, externalTables, securityTables, mediaTables] = await Promise.all([
+    queryColumns(pool),
+    queryColumns(ledgerPool),
+    queryColumns(externalPool),
+    queryColumns(securityPool),
+    queryColumns(mediaPool)
+  ]);
+
+  const dbTables: Record<string, Record<string, Set<string>>> = {
+    core: coreTables,
+    ledger: ledgerTables,
+    external: externalTables,
+    security: securityTables,
+    media: mediaTables
   };
 
   const expectedSchema: Record<string, Record<string, { columns: string[]; repairCols?: Record<string, string | { type: string; default?: any }> }>> = {
     core: {
       users: {
-        columns: ['id', 'name', 'email', 'password_hash', 'role', 'status', 'kyc_status', 'kyc_required', 'kyc_rejection_reason', 'kyc_submitted_at', 'referred_by', 'language', 'theme', 'memory', 'support_notes', 'custom_instructions', 'last_active_at', 'created_at', 'updated_at', 'provider', 'avatar', 'referral_code', 'email_notifications', 'avatar_asset_id', 'media_muted'],
+        columns: ['id', 'name', 'email', 'password_hash', 'role', 'status', 'kyc_status', 'kyc_required', 'kyc_rejection_reason', 'kyc_submitted_at', 'referred_by', 'language', 'theme', 'memory', 'support_notes', 'custom_instructions', 'last_active_at', 'created_at', 'updated_at', 'provider', 'avatar', 'referral_code', 'email_notifications', 'avatar_asset_id', 'media_muted', 'data_saver'],
         repairCols: {
           email_notifications: { type: 'BOOLEAN', default: 'true' },
           avatar: { type: 'TEXT' },
           referral_code: { type: 'VARCHAR(6)' },
           avatar_asset_id: { type: 'UUID' },
-          media_muted: { type: 'BOOLEAN', default: 'true' }
+          media_muted: { type: 'BOOLEAN', default: 'true' },
+          data_saver: { type: 'BOOLEAN', default: 'false' }
         }
       },
       user_sessions: {
@@ -167,7 +333,7 @@ export async function verifySchemaIntegrity() {
         columns: ['id', 'provider', 'encrypted_key', 'daily_budget', 'used_today', 'last_reset_date', 'models', 'model_list', 'is_active', 'created_at', 'updated_at', 'url_key', 'protocol_config']
       },
       tool_orchestrator: {
-        columns: ['id', 'tool_id', 'primary_provider', 'primary_model', 'fallback_1_provider', 'fallback_1_model', 'fallback_2_provider', 'fallback_2_model', 'fallback_3_provider', 'fallback_3_model', 'task_description', 'task_description_ar', 'is_active', 'cost_per_usage', 'updated_at', 'protocol_config', 'max_history_depth', 'cost_per_1k_input_tokens', 'cost_per_1k_output_tokens']
+        columns: ['id', 'tool_id', 'primary_provider', 'primary_model', 'fallback_1_provider', 'fallback_1_model', 'fallback_2_provider', 'fallback_2_model', 'fallback_3_provider', 'fallback_3_model', 'task_description', 'task_description_ar', 'is_active', 'updated_at', 'protocol_config', 'max_history_depth']
       },
       subscriptions: {
         columns: ['id', 'user_id', 'plan_id', 'stripe_customer_id', 'stripe_subscription_id', 'status', 'billing_period', 'current_period_end', 'last_period_start', 'updated_at', 'created_at']
@@ -308,14 +474,6 @@ export async function verifySchemaIntegrity() {
       google_tool_connections: {
         columns: ['id', 'user_id', 'tool_id', 'is_connected', 'config', 'access_token', 'refresh_token', 'expires_at', 'scopes', 'last_connected_at', 'created_at', 'updated_at']
       },
-      media_assets: {
-        columns: ['id', 'stored_path', 'original_filename', 'context', 'format', 'width', 'height', 'size_bytes', 'sha256_hash', 'is_public', 'user_id', 'metadata', 'created_at', 'updated_at'],
-        repairCols: {
-          context: { type: 'TEXT', default: "'general'" },
-          format: { type: 'TEXT', default: "'webp'" },
-          metadata: { type: 'JSONB', default: "'{}'" }
-        }
-      },
       advertisements: {
         columns: ['id', 'title_ar', 'title_en', 'description_ar', 'description_en', 'image_url', 'video_url', 'poster_url', 'target_url', 'sponsor_name', 'badge_text_ar', 'badge_text_en', 'position', 'format', 'display_order', 'is_active', 'meta_title_ar', 'meta_title_en', 'meta_description_ar', 'meta_description_en', 'keywords_ar', 'keywords_en', 'click_count', 'impression_count', 'start_date', 'end_date', 'created_at', 'updated_at'],
         repairCols: {
@@ -433,6 +591,51 @@ export async function verifySchemaIntegrity() {
           created_at: { type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP' },
           completed_at: { type: 'TIMESTAMP' }
         }
+      },
+      admin_theme_customizations: {
+        columns: ['id', 'theme_mode', 'tokens', 'updated_at']
+      },
+      email_logs: {
+        columns: ['id', 'user_id', 'recipient_email', 'template_name', 'subject', 'status', 'is_sent', 'retry_count', 'last_error', 'sent_at', 'metadata', 'created_at', 'updated_at']
+      },
+      bulletin_ad_muted_notifications: {
+        columns: ['id', 'user_id', 'ad_id', 'created_at']
+      },
+      bulletin_comment_likes: {
+        columns: ['id', 'user_id', 'comment_id', 'created_at']
+      },
+      bulletin_hashtags: {
+        columns: ['id', 'tag', 'use_count', 'created_at', 'updated_at']
+      },
+      platform_categories: {
+        columns: ['id', 'name_ar', 'name_en', 'group_id', 'group_ar', 'group_en', 'icon', 'audience_reach', 'keywords', 'is_featured', 'created_at']
+      },
+      push_tokens: {
+        columns: ['id', 'user_id', 'platform', 'token', 'device_name', 'app_version', 'created_at', 'updated_at', 'is_active']
+      },
+      api_performance_logs: {
+        columns: ['id', 'endpoint', 'method', 'status_code', 'duration_ms', 'user_id', 'ip_address', 'user_agent', 'created_at']
+      },
+      forms: {
+        columns: ['id', 'title', 'slug', 'description', 'fields', 'settings', 'status', 'submissions_count', 'created_by', 'created_at', 'updated_at']
+      },
+      form_submissions: {
+        columns: ['id', 'form_id', 'user_id', 'data', 'created_at']
+      },
+      map_providers: {
+        columns: ['id', 'provider_key', 'name', 'api_key_encrypted', 'is_enabled', 'is_primary', 'priority', 'capabilities', 'config', 'status', 'last_tested_at', 'last_error', 'latency_ms', 'created_at', 'updated_at']
+      },
+      cached_locations: {
+        columns: ['id', 'place_id', 'title', 'city', 'state', 'country', 'country_code', 'lat', 'lon', 'full_address', 'category_label', 'raw_type', 'flag', 'source', 'hits', 'created_at', 'updated_at']
+      },
+      studio_workspaces: {
+        columns: ['id', 'user_id', 'title', 'framework_mode', 'files', 'created_at', 'updated_at']
+      },
+      studio_snapshots: {
+        columns: ['id', 'workspace_id', 'version_name', 'files', 'created_at']
+      },
+      og_preview_cache: {
+        columns: ['id', 'route_path', 'title', 'description', 'image_url', 'meta_data', 'created_at', 'updated_at']
       }
     },
     ledger: {
@@ -671,6 +874,45 @@ export async function verifySchemaIntegrity() {
           created_at: { type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP' }
         }
       }
+    },
+    media: {
+      media_assets: {
+        columns: ['id', 'stored_path', 'original_filename', 'context', 'format', 'width', 'height', 'size_bytes', 'sha256_hash', 'is_public', 'user_id', 'metadata', 'file_data', 'created_at', 'updated_at'],
+        repairCols: {
+          context: { type: 'TEXT', default: "'general'" },
+          format: { type: 'TEXT', default: "'webp'" },
+          size_bytes: { type: 'BIGINT', default: 0 },
+          is_public: { type: 'BOOLEAN', default: true },
+          metadata: { type: 'JSONB', default: "'{}'" },
+          file_data: { type: 'BYTEA' }
+        }
+      },
+      canvas_sessions: {
+        columns: ['id', 'user_id', 'session_name', 'dimensions', 'state', 'thumbnail_url', 'is_active', 'created_at', 'updated_at'],
+        repairCols: {
+          dimensions: { type: 'JSONB', default: "'{\"width\": 800, \"height\": 600}'" },
+          state: { type: 'JSONB', default: "'{}'" },
+          is_active: { type: 'BOOLEAN', default: true }
+        }
+      },
+      canvas_history: {
+        columns: ['id', 'session_id', 'action_type', 'undo_state', 'redo_state', 'created_at'],
+        repairCols: {
+          undo_state: { type: 'JSONB', default: "'{}'" },
+          redo_state: { type: 'JSONB', default: "'{}'" }
+        }
+      },
+      user_audio_library: {
+        columns: ['id', 'user_id', 'user_name', 'user_avatar', 'title', 'artist', 'duration', 'audio_url', 'audio_type', 'category', 'source', 'source_ad_id', 'usage_count', 'likes_count', 'is_trending', 'is_public', 'license', 'metadata', 'created_at', 'updated_at'],
+        repairCols: {
+          audio_type: { type: 'VARCHAR(50)', default: "'music'" },
+          category: { type: 'VARCHAR(50)', default: "'trending'" },
+          source: { type: 'VARCHAR(50)', default: "'manual_upload'" },
+          is_public: { type: 'BOOLEAN', default: true },
+          license: { type: 'TEXT', default: "'Creative Commons CC0'" },
+          metadata: { type: 'JSONB', default: "'{}'" }
+        }
+      }
     }
   };
 
@@ -678,13 +920,14 @@ export async function verifySchemaIntegrity() {
     core: CORE_INDEXES,
     ledger: LEDGER_INDEXES,
     external: EXTERNAL_INDEXES,
-    security: SECURITY_INDEXES
+    security: SECURITY_INDEXES,
+    media: MEDIA_INDEXES
   };
 
-  const verifyDbGroup = async (groupName: 'core' | 'ledger' | 'external' | 'security', targetPoolObj: any) => {
+  const verifyDbGroup = async (groupName: 'core' | 'ledger' | 'external' | 'security' | 'media', targetPoolObj: any, initialActiveTables: Record<string, Set<string>>) => {
     if (!targetPoolObj) return;
     try {
-      let activeTables = await queryColumns(targetPoolObj);
+      let activeTables = initialActiveTables;
       const expectedTables = expectedSchema[groupName];
       let repairedSomething = false;
 
@@ -696,7 +939,8 @@ export async function verifySchemaIntegrity() {
 
           try {
             console.log(`[Schema Integrity] Attempting table reconstruction for ${tableName}...`);
-            await initDb('additive', pool, ledgerPool, externalPool, securityPool);
+            const { initDb } = await import("./index.js");
+            await initDb('additive', pool, ledgerPool, externalPool, securityPool, mediaPool);
             report.repairedTables.push(tableName);
             repairedSomething = true;
             console.log(`[Schema Integrity] Table ${tableName} reconstructed successfully.`);
@@ -756,12 +1000,17 @@ export async function verifySchemaIntegrity() {
     }
   };
 
-  await verifyDbGroup('core', pool);
-  await verifyDbGroup('ledger', ledgerPool || pool);
-  await verifyDbGroup('external', externalPool || pool);
-  await verifyDbGroup('security', securityPool || pool);
+  await verifyDbGroup('core', pool, coreTables);
+  await verifyDbGroup('ledger', ledgerPool || pool, ledgerTables);
+  await verifyDbGroup('external', externalPool || pool, externalTables);
+  await verifyDbGroup('security', securityPool || pool, securityTables);
+  await verifyDbGroup('media', mediaPool || pool, mediaTables);
+
+  // Transfer any legacy media_assets data if running separate media database
+  await migrateMediaAssetsData();
 
   if (report.passed) {
+    lastIntegrityCheck = Date.now();
     console.log('[Schema Integrity] All expected tables and columns verified successfully across all active pools!');
   } else {
     console.warn(`[Schema Integrity] Schema verification detected deviations:`, {
@@ -793,4 +1042,30 @@ export async function verifySchemaIntegrity() {
   } catch (dbErr) {
     console.error('[Schema Integrity] Failed to write audit record to migration_security_audit:', dbErr instanceof Error ? dbErr.message : 'Unknown error');
   }
+
+  // ===== VERIFY FK CONSTRAINTS =====
+  try {
+    const fkCheck = await pool.query(`
+      SELECT conname, conrelid::regclass AS table_name
+      FROM pg_constraint
+      WHERE contype = 'f' AND convalidated = false
+    `);
+
+    if (fkCheck.rows.length > 0) {
+      throw new Error(
+        `[Integrity] ${fkCheck.rows.length} FK constraints not validated: ` +
+        fkCheck.rows.map((r: any) => `${r.conname} on ${r.table_name}`).join(', ')
+      );
+    }
+    console.log(`[Integrity] ✅ All FK constraints validated`);
+  } catch (fkErr: any) {
+    if (fkErr?.message && fkErr.message.includes('[Integrity]')) {
+      throw fkErr;
+    }
+    console.warn(`[Integrity] FK verification notice:`, fkErr?.message || fkErr);
+  }
+  // =================================
 }
+
+export const ensureIntegrity = verifySchemaIntegrity;
+

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { ProgressiveImage } from './ProgressiveImage';
 import { getMediaUrl } from '../utils/mediaUtils';
 import { motion, AnimatePresence } from 'motion/react';
+import { SCROLL_STYLES } from '../styles/scrollStyles';
 
 export interface Advertisement {
   id: number;
@@ -123,7 +124,7 @@ export const SponsoredSidebar: React.FC<{ className?: string }> = ({ className =
   const isRtl = language === 'ar';
 
   return (
-    <div className={`hidden xl:flex flex-col h-full w-72 p-4 pt-16 space-y-4 shrink-0 overflow-y-auto scrollbar-none transition-theme ${className}`}>
+    <div className={`hidden xl:flex flex-col h-full w-72 p-4 pt-16 space-y-4 shrink-0 ${SCROLL_STYLES.sidebar} transition-theme ${className}`}>
       <div className="flex items-center justify-between px-1 mb-1">
         <span className="text-[11px] font-bold tracking-wider text-[var(--text-muted)] uppercase">
           {isRtl ? 'إعلانات ممولة مقترحة' : 'Sponsored Ads'}
@@ -151,7 +152,7 @@ export const SponsoredSidebar: React.FC<{ className?: string }> = ({ className =
               <button
                 onClick={(e) => handleDismissAd(ad.id, e)}
                 title={isRtl ? 'إخفاء الإعلان' : 'Hide Ad'}
-                className="absolute top-2 end-2 z-10 w-5 h-5 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] hover:bg-red-600 text-[var(--text-muted)] hover:text-white flex items-center justify-center opacity-80 group-hover:opacity-100 transition-theme border border-[var(--border-default)] cursor-pointer"
+                className="absolute top-2 end-2 z-10 w-5 h-5 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] hover:bg-[var(--status-danger)] text-[var(--text-muted)] hover:text-white flex items-center justify-center opacity-80 group-hover:opacity-100 transition-theme border border-[var(--border-default)] cursor-pointer"
               >
                 <X size={12} />
               </button>
@@ -160,7 +161,7 @@ export const SponsoredSidebar: React.FC<{ className?: string }> = ({ className =
                 <ProgressiveImage
                   src={getMediaUrl(ad.image_url)}
                   alt={title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-slow"
                 />
                 {badge && (
                   <span className="absolute bottom-1.5 start-1.5 z-10 bg-[var(--surface-card)] text-[var(--fg-accent)] text-[10px] font-bold px-1.5 py-0.5 rounded-[var(--radius-xs)] border border-[var(--border-accent)]/40 tracking-tight">

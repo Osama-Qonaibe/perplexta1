@@ -6,12 +6,10 @@ import { executeTaskLogic } from '../services/orchestrator.js';
 import { pool } from '../db/index.js';
 import { io } from '../config/socket.js';
 import { User, Subscription } from '../db/types.js';
-import { getUserWallet } from '../services/wallet.js';
 import { getProviderKey } from '../services/ai.js';
 import { getCachedOrchestratorConfig } from '../db/queries.js';
 import { saveGeneratedAudioToDisk } from '../services/files.js';
 import { checkAndIncrementQuota } from '../services/quota.js';
-import { applyUpfrontHold, reconcileHold, refundExecutionHold } from '../services/billing.js';
 
 const router = express.Router();
 
@@ -59,28 +57,24 @@ router.post("/execute-task", authenticateToken, chatLimiter, verifyBillingFunds,
     const subRes = (await pool.query(`
       SELECT s.status, u.role
       FROM users u 
-      LEFT JOIN subscriptions s ON u.id = s.user_id 
+      LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active' AND (s.current_period_end IS NULL OR s.current_period_end > CURRENT_TIMESTAMP)
       WHERE u.id = $1
-      ORDER BY CASE WHEN s.status = 'active' THEN 0 ELSE 1 END, s.current_period_end DESC NULLS LAST
+      ORDER BY s.current_period_end DESC NULLS LAST
       LIMIT 1
     `, [userId])) as { rows: { status: Subscription['status'] | null; role: User['role'] }[] };
     
     const row = subRes.rows[0];
     const role = row?.role;
     
-    let points = 0;
-    let balance = 0;
-    try {
-      const wallet = await getUserWallet(userId);
-      points = Number(wallet.points || 0);
-      balance = Number(wallet.balance || 0);
-    } catch (err) {
-      console.warn('[ToolsRoute] Failed to fetch user wallet:', err);
-    }
-
-    const hasActiveSub = (role === 'admin' || (row && row.status === 'active') || points > 0 || balance > 0);
+    const hasActiveSub = (role === 'admin' || (row && row.status === 'active'));
     if (!hasActiveSub) {
-      return res.status(403).json({ error: 'subscription_required', message: 'An active subscription or positive wallet balance is required to execute tools.' });
+      return res.status(403).json({ 
+        error: 'subscription_required', 
+        code: 'PLAN_REQUIRED',
+        message: 'يرجى اختيار باقة اشتراك لتنفيذ هذه الأداة.',
+        message_en: 'An active subscription is required to execute tools.',
+        redirect: '/subscription'
+      });
     }
 
     const { socketId } = req.body as ExecuteToolRequestBody;
@@ -167,7 +161,6 @@ router.post("/execute-task", authenticateToken, chatLimiter, verifyBillingFunds,
  */
 router.post("/generate-music", authenticateToken, chatLimiter, verifyBillingFunds, async (req: express.Request & { user?: any }, res: express.Response) => {
   const userId = req.user?.id;
-  let holdPointsResult: any = null;
   try {
     const { prompt, model, lyrics: userLyrics } = req.body;
     if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
@@ -177,48 +170,44 @@ router.post("/generate-music", authenticateToken, chatLimiter, verifyBillingFund
     const subRes = (await pool.query(`
       SELECT s.status, u.role
       FROM users u 
-      LEFT JOIN subscriptions s ON u.id = s.user_id 
+      LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active' AND (s.current_period_end IS NULL OR s.current_period_end > CURRENT_TIMESTAMP)
       WHERE u.id = $1
-      ORDER BY CASE WHEN s.status = 'active' THEN 0 ELSE 1 END, s.current_period_end DESC NULLS LAST
+      ORDER BY s.current_period_end DESC NULLS LAST
       LIMIT 1
     `, [userId])) as { rows: { status: Subscription['status'] | null; role: User['role'] }[] };
     
     const row = subRes.rows[0];
     const role = row?.role;
     
-    let points = 0;
-    let balance = 0;
-    try {
-      const wallet = await getUserWallet(userId);
-      points = Number(wallet.points || 0);
-      balance = Number(wallet.balance || 0);
-    } catch (err) {
-      console.warn('[GenerateMusicRoute] Failed to fetch user wallet:', err);
-    }
-
-    const hasActiveSub = (role === 'admin' || (row && row.status === 'active') || points > 0 || balance > 0);
+    const hasActiveSub = (role === 'admin' || (row && row.status === 'active'));
     if (!hasActiveSub) {
-      return res.status(403).json({ error: 'subscription_required', message: 'An active subscription or positive wallet balance is required to execute tools.' });
+      return res.status(403).json({ 
+        error: 'subscription_required', 
+        code: 'PLAN_REQUIRED',
+        message: 'يرجى اختيار باقة اشتراك لتوليد الموسيقى.',
+        message_en: 'An active subscription is required to generate music.',
+        redirect: '/subscription'
+      });
     }
 
     const quotaCheck = await checkAndIncrementQuota(userId, 'perplexta_music');
-    holdPointsResult = null;
     if (!quotaCheck.allowed) {
-      try {
-        holdPointsResult = await applyUpfrontHold(userId, 'perplexta_music', prompt);
-        io?.to(`user_${userId}`).emit('user_profile_updated');
-        io?.to(`user_${userId}`).emit('wallet_charge_notice', {
-          toolId: 'perplexta_music', charged: 'points', amount: holdPointsResult.heldPoints, isHold: true,
-        });
-      } catch (chargeErr) {
-        const period = quotaCheck.period || 'daily';
-        const periodEn = period === 'daily' ? 'Daily' : 'Monthly';
-        const periodAr = period === 'daily' ? 'يومي' : 'شهري';
-        return res.status(402).json({
-          error: `Premium Credits Required: You have reached your complimentary ${periodEn} limit. Please recharge your digital wallet to continue.`,
-          error_ar: `تتطلب هذه العملية رصيداً إضافياً: لقد تجاوزت الحد ال${periodAr} المسموح به لأداة الموسيقى والأغاني. يرجى شحن محفظتك الرقمية للاستمرار.`
+      if (quotaCheck.period === 'plan_required') {
+        return res.status(403).json({
+          error: 'Please select a subscription plan to generate music.',
+          error_ar: 'يرجى اختيار باقة اشتراك لتوليد الموسيقى والأغاني.',
+          type: 'PLAN_REQUIRED',
+          redirect: '/subscription'
         });
       }
+      const period = quotaCheck.period || 'daily';
+      const periodEn = period === 'daily' ? 'Daily' : 'Monthly';
+      const periodAr = period === 'daily' ? 'اليومي' : 'الشهري';
+      return res.status(402).json({
+        error: `You have reached the ${periodEn} limit for Music & Songs`,
+        error_ar: `لقد استنفدت الحد ${periodAr} المتاح لأداة الموسيقى والأغاني`,
+        redirect: '/subscription'
+      });
     }
 
     const config = await getCachedOrchestratorConfig('perplexta_music');
@@ -231,6 +220,19 @@ router.post("/generate-music", authenticateToken, chatLimiter, verifyBillingFund
     
     let provider = config.primary_provider;
     let modelName = config.primary_model;
+    
+    if ((!provider || !modelName) && config.fallback_1_provider && config.fallback_1_model) {
+       provider = config.fallback_1_provider;
+       modelName = config.fallback_1_model;
+    }
+
+    if (!provider || !modelName) {
+      return res.status(400).json({
+        error: 'Tool perplexta_music has no provider or model configured in Orchestrator settings.',
+        error_ar: 'أداة الموسيقى (perplexta_music) غير مقترنة بمزود أو نموذج في إعدادات الأوركسترا.'
+      });
+    }
+
     let apiKey = await getProviderKey(provider);
     
     if (!apiKey && config.fallback_1_provider) {
@@ -287,17 +289,6 @@ router.post("/generate-music", authenticateToken, chatLimiter, verifyBillingFund
       throw new Error("No audio track was produced by the Google Lyria API. Please check your prompt instructions.");
     }
 
-    if (holdPointsResult) {
-      try {
-        const inputTokens = Math.max(50, Math.ceil(prompt.length / 4));
-        const outputTokens = userLyrics ? Math.max(100, Math.ceil(userLyrics.length / 4)) : 500;
-        await reconcileHold(userId, 'perplexta_music', holdPointsResult.heldPoints, inputTokens, outputTokens);
-        io?.to(`user_${userId}`).emit('user_profile_updated');
-      } catch (recErr) {
-        console.error('[GenerateMusicRoute] Reconcile hold failed:', recErr);
-      }
-    }
-
     res.json({
       success: true,
       audioBase64,
@@ -307,14 +298,6 @@ router.post("/generate-music", authenticateToken, chatLimiter, verifyBillingFund
     });
 
   } catch (error: any) {
-    if (holdPointsResult) {
-      try {
-        await refundExecutionHold(userId, 'perplexta_music', holdPointsResult.heldPoints);
-        io?.to(`user_${userId}`).emit('user_profile_updated');
-      } catch (refErr) {
-        console.error('[GenerateMusicRoute] Refund hold failed on error catch:', refErr);
-      }
-    }
     console.error('[GenerateMusicRoute] Critical failure in music generation:', error);
     res.status(500).json({ 
       error: error.message || 'Music generation service encountered an unexpected error.',

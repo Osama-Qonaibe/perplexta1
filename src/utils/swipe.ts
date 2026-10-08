@@ -172,3 +172,5 @@ export function useSwipeNavigation({
   }, [isOpen, onOpen, onClose, threshold, dir, isMobile]);
 }
 
+export * from '../hooks/usePWASwipeNavigation';
+

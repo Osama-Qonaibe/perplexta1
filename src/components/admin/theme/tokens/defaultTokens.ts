@@ -1,250 +1,254 @@
 import { ThemeTokensMap } from '../types';
 
 export const DEFAULT_LIGHT_TOKENS: ThemeTokensMap = {
-  // Surfaces & Canvases (Perplexta Rule 1)
-  '--surface-page': '#f8fafc',       // Slate-50 Deep Canvas Light
-  '--surface-canvas': '#f8fafc',
-  '--surface-card': '#ffffff',       // Pure White Card (95% layer)
+  '--surface-page': '#ffffff',
+  '--surface-canvas': '#ffffff',
+  '--surface-card': '#ffffff',
   '--surface-raised': '#ffffff',
-  '--surface-subtle': '#f1f5f9',     // Slate-100 Panel / Inset
-  '--surface-inset': '#f1f5f9',
-  '--surface-sidebar': '#ffffff',    // White Sidebar
-  '--surface-code': '#070a10',       // Monolith Terminal Dark
-  '--surface-overlay': 'rgba(15, 23, 42, 0.4)',
+  '--surface-subtle': '#f6f8fa',
+  '--surface-inset': '#f6f8fa',
+  '--surface-sidebar': '#ffffff',
+  '--surface-code': '#161b22',
+  '--surface-overlay': 'rgba(31, 35, 40, 0.4)',
 
-  // Typography & Foreground (Perplexta Rule 5)
-  '--fg-primary': '#0f172a',         // Slate-900 Primary Text
-  '--fg-secondary': '#334155',       // Slate-700
-  '--fg-muted': '#64748b',           // Slate-500
-  '--fg-disabled': '#cbd5e1',
-  '--fg-on-emphasis': '#020617',     // Slate-950 on Cyan CTA
-  '--font-display': '"Tajawal", "Inter", sans-serif',
-  '--font-sans': '"Tajawal", "Inter", ui-sans-serif, system-ui, sans-serif',
-  '--font-mono': '"JetBrains Mono", ui-monospace, monospace',
+  '--fg-primary': '#1f2328',
+  '--fg-secondary': '#32383f',
+  '--fg-muted': '#656d76',
+  '--fg-disabled': '#afb8c1',
+  '--fg-on-emphasis': '#ffffff',
+  '--font-display': '"Tajawal", "Cairo", system-ui, sans-serif',
+  '--font-sans': '"Tajawal", "Cairo", system-ui, -apple-system, sans-serif',
+  '--font-mono': '"JetBrains Mono", "Geist Mono", monospace',
 
-  // Brand & Accent (Perplexta Rule 3 - Cyan)
-  '--accent': '#06b6d4',             // Cyan-500 Primary
-  '--accent-hover': '#22d3ee',       // Cyan-400 Hover
-  '--fg-accent': '#06b6d4',
-  '--bg-accent-emphasis': '#06b6d4',
-  '--bg-accent-muted': 'rgba(6, 182, 212, 0.12)',
-  '--border-accent-emphasis': '#06b6d4',
-  '--focus-outline': '#06b6d4',
+  '--accent': '#0969da',
+  '--accent-hover': '#0550ae',
+  '--fg-accent': '#0969da',
+  '--bg-accent-emphasis': '#1a7f37',
+  '--bg-accent-muted': 'rgba(9, 105, 218, 0.12)',
+  '--border-accent-emphasis': '#0969da',
+  '--focus-outline': '#0969da',
 
-  // Borders & Dividers
-  '--border-default': '#e2e8f0',     // Slate-200
-  '--border-outer-input': '#cbd5e1',
-  '--border-inner-input': '#e2e8f0',
-  '--border-subtle': 'rgba(226, 232, 240, 0.8)',
-  '--border-strong': '#94a3b8',
-  '--border-accent': '#06b6d4',
+  '--border-default': '#d0d7de',
+  '--border-outer-input': '#d0d7de',
+  '--border-inner-input': '#d0d7de',
+  '--border-subtle': 'rgba(208, 215, 222, 0.8)',
+  '--border-strong': '#656d76',
+  '--border-accent': '#0969da',
 
-  // Buttons & Controls (Perplexta Rule 2 & 3)
-  '--bg-btn-primary': '#06b6d4',     // Cyan-500
-  '--fg-btn-primary': '#020617',     // Slate-950 Bold Text
-  '--bg-btn-secondary': '#f1f5f9',   // Slate-100
-  '--border-btn-secondary': '#e2e8f0', // Slate-200
-  '--fg-btn-secondary': '#334155',
-  '--bg-btn-danger': '#e11d48',      // Rose-600
+  '--bg-btn-primary': '#1a7f37',
+  '--fg-btn-primary': '#ffffff',
+  '--bg-btn-secondary': '#f6f8fa',
+  '--border-btn-secondary': '#d0d7de',
+  '--fg-btn-secondary': '#1f2328',
+  '--bg-btn-danger': '#cf222e',
   '--fg-btn-danger': '#ffffff',
-  '--bg-btn-success': '#059669',     // Emerald-600
+  '--bg-btn-success': '#1a7f37',
   '--fg-btn-success': '#ffffff',
-  '--bg-btn-page': '#f1f5f9',
-  '--fg-btn-page': '#0f172a',
-  '--border-btn-page': '#e2e8f0',
+  '--bg-btn-page': '#f6f8fa',
+  '--fg-btn-page': '#1f2328',
+  '--border-btn-page': '#d0d7de',
   '--bg-followup-btn': 'transparent',
-  '--fg-followup-btn': '#64748b',
+  '--fg-followup-btn': '#656d76',
   '--border-followup-btn': 'transparent',
   '--bg-followup-btn-hover': '#ffffff',
-  '--fg-followup-btn-hover': '#0f172a',
-  '--border-followup-btn-hover': '#e2e8f0',
-  '--control-active-bg': '#06b6d4',
-  '--control-active-fg': '#020617',
+  '--fg-followup-btn-hover': '#1f2328',
+  '--border-followup-btn-hover': '#d0d7de',
+  '--control-active-bg': '#1a7f37',
+  '--control-active-fg': '#ffffff',
+  '--comp-button-primary-bg': '#1a7f37',
+  '--comp-button-primary-fg': '#ffffff',
 
-  // Zone-Specific Buttons (Perplexta Rule 2 Dimensions: h-8 / 32px, rounded-lg / 8px)
   '--btn-header-size': '32px',
   '--btn-header-radius': '8px',
-  '--btn-header-border': '#e2e8f0',
+  '--btn-header-border': '#d0d7de',
   '--btn-header-bg': 'transparent',
-  '--btn-header-hover': '#f1f5f9',
+  '--btn-header-hover': '#f6f8fa',
 
   '--btn-input-size': '32px',
   '--btn-input-radius': '8px',
-  '--btn-input-border': '#e2e8f0',
+  '--btn-input-border': '#d0d7de',
   '--btn-input-bg': 'transparent',
-  '--btn-input-hover': '#f1f5f9',
+  '--btn-input-hover': '#f6f8fa',
 
   '--btn-tool-size': '32px',
   '--btn-tool-radius': '8px',
-  '--btn-tool-border': '#e2e8f0',
+  '--btn-tool-border': '#d0d7de',
   '--btn-tool-bg': 'transparent',
-  '--btn-tool-hover': '#f1f5f9',
+  '--btn-tool-hover': '#f6f8fa',
 
   '--btn-action-size': '32px',
   '--btn-action-radius': '8px',
-  '--btn-action-border': '#e2e8f0',
+  '--btn-action-border': '#d0d7de',
   '--btn-action-bg': 'transparent',
-  '--btn-action-hover': '#f1f5f9',
+  '--btn-action-hover': '#f6f8fa',
 
-  // Inputs & Forms
   '--bg-input': '#ffffff',
-  '--border-focus': '#06b6d4',
+  '--border-focus': '#0969da',
 
-  // Admin & Layout
   '--admin-nav-bg': '#ffffff',
-  '--admin-nav-item-active': '#f1f5f9',
+  '--admin-nav-item-active': '#f6f8fa',
   '--admin-header-bg': '#ffffff',
-  '--admin-card-border': '#e2e8f0',
-  '--admin-table-header-bg': '#f8fafc',
-  '--admin-table-row-hover': '#f1f5f9',
+  '--admin-card-border': '#d0d7de',
+  '--admin-table-header-bg': '#f6f8fa',
+  '--admin-table-row-hover': '#f6f8fa',
 
-  // Chat & Messaging
-  '--chat-bubble-user': '#f1f5f9',
+  '--chat-bubble-user': '#f6f8fa',
   '--chat-bubble-assistant': 'transparent',
-  '--chat-bubble-user-text': '#0f172a',
-  '--chat-bubble-assistant-text': '#0f172a',
+  '--chat-bubble-user-text': '#1f2328',
+  '--chat-bubble-assistant-text': '#1f2328',
 
-  // Status & Alerts
-  '--fg-success': '#059669',
-  '--fg-warning': '#d97706',
-  '--fg-danger': '#e11d48',
-  '--fg-info': '#06b6d4',
-  '--status-success-subtle': 'rgba(5, 150, 105, 0.12)',
-  '--status-warning-subtle': 'rgba(217, 119, 6, 0.12)',
-  '--status-danger-subtle': 'rgba(225, 29, 72, 0.12)',
-  '--status-info-subtle': 'rgba(6, 182, 212, 0.12)',
+  '--fg-success': '#1a7f37',
+  '--fg-warning': '#bc4c00',
+  '--fg-danger': '#cf222e',
+  '--fg-info': '#0969da',
+  '--status-success': '#1a7f37',
+  '--status-warning': '#bc4c00',
+  '--status-danger': '#cf222e',
+  '--status-info': '#0969da',
+  '--status-success-subtle': 'rgba(26, 127, 55, 0.12)',
+  '--status-warning-subtle': 'rgba(188, 76, 0, 0.12)',
+  '--status-danger-subtle': 'rgba(207, 34, 46, 0.10)',
+  '--status-info-subtle': 'rgba(9, 105, 218, 0.12)',
 
-  // Geometry & Elevation (Perplexta M3 Scale)
+  '--github-green': '#1a7f37',
+  '--github-purple': '#8250df',
+  '--github-blue': '#0969da',
+  '--github-orange': '#bc4c00',
+  '--github-pink': '#bf3989',
+
+  '--radius': '12px',
   '--radius-xs': '4px',
-  '--radius-sm': '8px',              // Standard Button/Input Radius
-  '--radius-md': '12px',             // Standard Card Radius
-  '--radius-lg': '16px',             // Dialog / Modal Radius
+  '--radius-sm': '8px',
+  '--radius-md': '12px',
+  '--radius-lg': '16px',
   '--radius-xl': '16px',
   '--radius-full': '9999px',
-  '--shadow-sm': 'none',
-  '--shadow-md': 'none',
-  '--shadow-lg': 'none'
+  '--shadow-sm': '0 1px 3px 0 rgba(0, 0, 0, 0.08)',
+  '--shadow-md': '0 2px 6px 0 color-mix(in oklab, var(--github-green) 30%, transparent)',
+  '--shadow-lg': '0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.25)'
 };
 
 export const DEFAULT_DARK_TOKENS: ThemeTokensMap = {
-  // Surfaces & Canvases (Perplexta Rule 1 - Deep Midnight Palette)
-  '--surface-page': '#080c14',       // Perplexta Deep Canvas Dark
-  '--surface-canvas': '#080c14',
-  '--surface-card': '#0d131f',       // Perplexta Card Dark
-  '--surface-raised': '#0d131f',
-  '--surface-subtle': '#090d16',     // Perplexta Sidebar & Panel Dark
-  '--surface-inset': '#070a10',      // Perplexta Code & Terminal Monolith
-  '--surface-sidebar': '#090d16',
-  '--surface-code': '#070a10',
-  '--surface-overlay': 'rgba(8, 12, 20, 0.92)',
+  '--surface-page': '#0d1117',
+  '--surface-canvas': '#0d1117',
+  '--surface-card': '#161b22',
+  '--surface-raised': '#161b22',
+  '--surface-subtle': '#161b22',
+  '--surface-inset': '#010409',
+  '--surface-sidebar': '#0d1117',
+  '--surface-code': '#010409',
+  '--surface-overlay': 'rgba(1, 4, 9, 0.88)',
 
-  // Typography & Foreground (Perplexta Rule 5)
-  '--fg-primary': '#f8fafc',         // Slate-50 Primary Text Dark
-  '--fg-secondary': '#cbd5e1',       // Slate-300
-  '--fg-muted': '#94a3b8',           // Slate-400
-  '--fg-disabled': '#475569',
-  '--fg-on-emphasis': '#020617',     // Slate-950 on Cyan CTA
-  '--font-display': '"Tajawal", "Inter", sans-serif',
-  '--font-sans': '"Tajawal", "Inter", ui-sans-serif, system-ui, sans-serif',
-  '--font-mono': '"JetBrains Mono", ui-monospace, monospace',
+  '--fg-primary': '#e6edf3',
+  '--fg-secondary': '#8b949e',
+  '--fg-muted': '#8b949e',
+  '--fg-disabled': '#484f58',
+  '--fg-on-emphasis': '#ffffff',
+  '--font-display': '"Tajawal", "Cairo", system-ui, sans-serif',
+  '--font-sans': '"Tajawal", "Cairo", system-ui, -apple-system, sans-serif',
+  '--font-mono': '"JetBrains Mono", "Geist Mono", monospace',
 
-  // Brand & Accent (Perplexta Rule 3 - Cyan)
-  '--accent': '#06b6d4',             // Cyan-500
-  '--accent-hover': '#22d3ee',       // Cyan-400
-  '--fg-accent': '#22d3ee',
-  '--bg-accent-emphasis': '#06b6d4',
-  '--bg-accent-muted': 'rgba(34, 211, 238, 0.15)',
-  '--border-accent-emphasis': '#06b6d4',
-  '--focus-outline': '#22d3ee',
+  '--accent': '#58a6ff',
+  '--accent-hover': '#79c0ff',
+  '--fg-accent': '#58a6ff',
+  '--bg-accent-emphasis': '#238636',
+  '--bg-accent-muted': 'rgba(88, 166, 255, 0.15)',
+  '--border-accent-emphasis': '#58a6ff',
+  '--focus-outline': '#58a6ff',
 
-  // Borders & Dividers
-  '--border-default': '#1e293b',     // Slate-800
-  '--border-outer-input': '#1e293b',
-  '--border-inner-input': '#1e293b',
-  '--border-subtle': 'rgba(30, 41, 59, 0.8)',
-  '--border-strong': '#475569',
-  '--border-accent': '#06b6d4',
+  '--border-default': '#3d444d',
+  '--border-outer-input': '#3d444d',
+  '--border-inner-input': '#3d444d',
+  '--border-subtle': 'rgba(61, 68, 77, 0.6)',
+  '--border-strong': '#8b949e',
+  '--border-accent': '#58a6ff',
 
-  // Buttons & Controls (Perplexta Rule 2 & 3)
-  '--bg-btn-primary': '#06b6d4',     // Cyan-500
-  '--fg-btn-primary': '#020617',     // Slate-950 Bold Text
-  '--bg-btn-secondary': '#0f172a',   // Slate-900/90
-  '--border-btn-secondary': '#1e293b', // Slate-800
-  '--fg-btn-secondary': '#cbd5e1',
-  '--bg-btn-danger': '#e11d48',      // Rose-600
+  '--bg-btn-primary': '#238636',
+  '--fg-btn-primary': '#ffffff',
+  '--bg-btn-secondary': '#161b22',
+  '--border-btn-secondary': '#3d444d',
+  '--fg-btn-secondary': '#e6edf3',
+  '--bg-btn-danger': '#f85149',
   '--fg-btn-danger': '#ffffff',
-  '--bg-btn-success': '#059669',     // Emerald-600
+  '--bg-btn-success': '#238636',
   '--fg-btn-success': '#ffffff',
-  '--bg-btn-page': '#090d16',
-  '--fg-btn-page': '#f8fafc',
-  '--border-btn-page': '#1e293b',
+  '--bg-btn-page': '#161b22',
+  '--fg-btn-page': '#e6edf3',
+  '--border-btn-page': '#3d444d',
   '--bg-followup-btn': 'transparent',
-  '--fg-followup-btn': '#94a3b8',
+  '--fg-followup-btn': '#8b949e',
   '--border-followup-btn': 'transparent',
-  '--bg-followup-btn-hover': '#0d131f',
-  '--fg-followup-btn-hover': '#f8fafc',
-  '--border-followup-btn-hover': '#1e293b',
-  '--control-active-bg': '#06b6d4',
-  '--control-active-fg': '#020617',
+  '--bg-followup-btn-hover': '#161b22',
+  '--fg-followup-btn-hover': '#e6edf3',
+  '--border-followup-btn-hover': '#3d444d',
+  '--control-active-bg': '#238636',
+  '--control-active-fg': '#ffffff',
+  '--comp-button-primary-bg': '#238636',
+  '--comp-button-primary-fg': '#ffffff',
 
-  // Zone-Specific Buttons (Perplexta Rule 2 Dimensions: h-8 / 32px, rounded-lg / 8px)
   '--btn-header-size': '32px',
   '--btn-header-radius': '8px',
-  '--btn-header-border': '#1e293b',
+  '--btn-header-border': '#3d444d',
   '--btn-header-bg': 'transparent',
-  '--btn-header-hover': '#090d16',
+  '--btn-header-hover': '#161b22',
 
   '--btn-input-size': '32px',
   '--btn-input-radius': '8px',
-  '--btn-input-border': '#1e293b',
+  '--btn-input-border': '#3d444d',
   '--btn-input-bg': 'transparent',
-  '--btn-input-hover': '#090d16',
+  '--btn-input-hover': '#161b22',
 
   '--btn-tool-size': '32px',
   '--btn-tool-radius': '8px',
-  '--btn-tool-border': '#1e293b',
+  '--btn-tool-border': '#3d444d',
   '--btn-tool-bg': 'transparent',
-  '--btn-tool-hover': '#090d16',
+  '--btn-tool-hover': '#161b22',
 
   '--btn-action-size': '32px',
   '--btn-action-radius': '8px',
-  '--btn-action-border': '#1e293b',
+  '--btn-action-border': '#3d444d',
   '--btn-action-bg': 'transparent',
-  '--btn-action-hover': '#090d16',
+  '--btn-action-hover': '#161b22',
 
-  // Inputs & Forms
-  '--bg-input': '#0d131f',
-  '--border-focus': '#22d3ee',
+  '--bg-input': '#21262d',
+  '--border-focus': '#58a6ff',
 
-  // Admin & Layout
-  '--admin-nav-bg': '#090d16',
-  '--admin-nav-item-active': '#080c14',
-  '--admin-header-bg': '#080c14',
-  '--admin-card-border': '#1e293b',
-  '--admin-table-header-bg': '#090d16',
-  '--admin-table-row-hover': '#0d131f',
+  '--admin-nav-bg': '#0d1117',
+  '--admin-nav-item-active': '#161b22',
+  '--admin-header-bg': '#0d1117',
+  '--admin-card-border': '#3d444d',
+  '--admin-table-header-bg': '#161b22',
+  '--admin-table-row-hover': '#161b22',
 
-  // Chat & Messaging
-  '--chat-bubble-user': '#090d16',
+  '--chat-bubble-user': '#161b22',
   '--chat-bubble-assistant': 'transparent',
-  '--chat-bubble-user-text': '#f8fafc',
-  '--chat-bubble-assistant-text': '#f8fafc',
+  '--chat-bubble-user-text': '#e6edf3',
+  '--chat-bubble-assistant-text': '#e6edf3',
 
-  // Status & Alerts
-  '--fg-success': '#34d399',
-  '--fg-warning': '#fbbf24',
-  '--fg-danger': '#f87171',
-  '--fg-info': '#22d3ee',
-  '--status-success-subtle': 'rgba(52, 211, 153, 0.15)',
-  '--status-warning-subtle': 'rgba(251, 191, 36, 0.12)',
-  '--status-danger-subtle': 'rgba(248, 113, 113, 0.15)',
-  '--status-info-subtle': 'rgba(34, 211, 238, 0.15)',
+  '--fg-success': '#238636',
+  '--fg-warning': '#db6d28',
+  '--fg-danger': '#f85149',
+  '--fg-info': '#58a6ff',
+  '--status-success': '#238636',
+  '--status-warning': '#db6d28',
+  '--status-danger': '#f85149',
+  '--status-info': '#58a6ff',
+  '--status-success-subtle': 'rgba(35, 134, 54, 0.15)',
+  '--status-warning-subtle': 'rgba(219, 109, 40, 0.12)',
+  '--status-danger-subtle': 'rgba(248, 81, 73, 0.15)',
+  '--status-info-subtle': 'rgba(88, 166, 255, 0.15)',
 
-  // Geometry & Elevation (Perplexta M3 Scale)
+  '--github-green': '#238636',
+  '--github-purple': '#a371f7',
+  '--github-blue': '#58a6ff',
+  '--github-orange': '#db6d28',
+  '--github-pink': '#db61a2',
+
+  '--radius': '12px',
   '--radius-xs': '4px',
-  '--radius-sm': '8px',              // Standard Button/Input Radius
-  '--radius-md': '12px',             // Standard Card Radius
-  '--radius-lg': '16px',             // Dialog / Modal Radius
+  '--radius-sm': '8px',
+  '--radius-md': '12px',
+  '--radius-lg': '16px',
   '--radius-xl': '16px',
   '--radius-full': '9999px',
   '--shadow-sm': 'none',

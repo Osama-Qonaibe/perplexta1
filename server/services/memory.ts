@@ -19,34 +19,53 @@ export interface ExtractedFact {
 }
 
 /**
- * 🧠 High-Precision Deterministic Intent & Fact Extractor (Zero AI / Zero Quota)
- * Recognizes Arabic and English patterns for durable facts, preferences, identity, and project context.
+ * 🧠 High-Precision Autonomous Local Memory Engine (Zero AI / Zero Quota)
+ * Recognizes Arabic and English multi-dialect patterns for durable facts, negative constraints,
+ * user identity, tech stack, and project contexts with dynamic limits and non-destructive compaction.
  */
 export function extractDirectUserMemories(prompt: string): ExtractedFact[] {
   if (!prompt || typeof prompt !== 'string' || prompt.trim().length < 4) return [];
   const results: ExtractedFact[] = [];
   const trimmed = prompt.trim();
 
-  // Arabic explicit and implicit memory patterns
+  // Arabic multi-dialect explicit, implicit, and negative constraint memory patterns
   const arPatterns = [
+    // Direct Reminders
     { regex: /(?:تذكر\s+(?:أن|ان|دائماً|دائما)?|احفظ\s+(?:أن|ان|عندي|لديك)?|لا\s+تنسى\s+(?:أن|ان)?|خزن\s+(?:أن|ان)?|سجل\s+(?:أن|ان)?)\s*[:،,-]?\s*(.+)/i, category: 'preference' as const },
-    { regex: /(?:اسمي\s+هو|اسمي|أنا\s+ادعى|انا\s+ادعى)\s+([^\.\n،]+)/i, category: 'identity' as const, template: (m: string) => `اسم المستخدم: ${m.trim()}` },
-    { regex: /(?:أنا\s+أعمل\s+(?:كـ|ك|في)?|انا\s+اعمل\s+(?:كـ|ك|في)?|مهنتي\s+هي|وظيفتي\s+هي|تخصصي\s+هو)\s+([^\.\n،]+)/i, category: 'professional' as const, template: (m: string) => `تخصص/مهنة المستخدم: ${m.trim()}` },
-    { regex: /(?:أعيش\s+في|اعيش\s+في|أنا\s+من|انا\s+من|بلدي\s+هو|دولتي\s+هي|مدينتي\s+هي)\s+([^\.\n،]+)/i, category: 'identity' as const, template: (m: string) => `مكان الإقامة: ${m.trim()}` },
-    { regex: /(?:مشروعي\s+(?:الحالي|الجديد|القادم)?\s*(?:هو|عبارة عن)?)\s+([^\.\n،]+)/i, category: 'project' as const, template: (m: string) => `مشروع المستخدم: ${m.trim()}` },
-    { regex: /(?:أفضل\s+(?:دائماً|دائما)?|افضل\s+(?:دائماً|دائما)?|أحب\s+استخدام|احب\s+استخدام|استخدم\s+دائماً|استخدم\s+دائما)\s+([^\.\n،]+)/i, category: 'preference' as const, template: (m: string) => `تفضيل: ${m.trim()}` },
-    { regex: /(?:لغة\s+البرمجة\s+(?:المفضلة|الأساسية)?|أبرمج\s+بـ|ابرمج\s+بـ|أعمل\s+بتقنية|اعمل\s+بتقنية)\s+([^\.\n،]+)/i, category: 'technical' as const, template: (m: string) => `التقنية/لغة البرمجة: ${m.trim()}` }
+    // Negative Constraints & Rules
+    { regex: /(?:تجنب\s+(?:استخدام|كتابة|إظهار)?|لا\s+تستخدم|لا\s+تكتب|ما\s+بدي|يُمنع\s+استخدام|امتنع\s+عن)\s*[:،,-]?\s*([^\.\n،]+)/i, category: 'preference' as const, template: (m: string) => `قيد/توجيه سلبي: تجنب ${m.trim()}` },
+    // Identity & Name
+    { regex: /(?:اسمي\s+هو|اسمي|أنا\s+ادعى|انا\s+ادعى|أدعى|ادعى)\s+([^\.\n،]+)/i, category: 'identity' as const, template: (m: string) => `اسم المستخدم: ${m.trim()}` },
+    // Location & Residence
+    { regex: /(?:أعيش\_في|اعيش\s+في|أنا\s+من|انا\s+من|من\s+سكان|بلدي\s+هو|دولتي\s+هي|مدينتي\s+هي)\s+([^\.\n،]+)/i, category: 'identity' as const, template: (m: string) => `مكان الإقامة: ${m.trim()}` },
+    // Profession & Role
+    { regex: /(?:أعمل\s+(?:كـ|ك|في)?|اعمل\s+(?:كـ|ك|في)?|مهنتي\s+هي|وظيفتي\s+هي|تخصصي\s+هو|طبيعة\s+شغلي)\s+([^\.\n،]+)/i, category: 'professional' as const, template: (m: string) => `تخصص/مهنة المستخدم: ${m.trim()}` },
+    // Projects & Scope
+    { regex: /(?:مشروعي\s+(?:الحالي|الجديد|القادم)?|تطبيقي|نعمل\s+على\s+مشروع|بنبني\s+تطبيق)\s*(?:هو|عبارة عن)?\s*([^\.\n،]+)/i, category: 'project' as const, template: (m: string) => `مشروع المستخدم: ${m.trim()}` },
+    // Preferences & Work Style
+    { regex: /(?:أفضل\s+(?:دائماً|دائما)?|افضل\s+(?:دائماً|دائما)?|أحب\s+استخدام|احب\s+استخدام|طريقتي\s+في\s+العمل|أسلوبي)\s+([^\.\n،]+)/i, category: 'preference' as const, template: (m: string) => `تفضيل: ${m.trim()}` },
+    // Technical Stack
+    { regex: /(?:لغة\s+البرمجة\s+(?:المفضلة|الأساسية)?|أبرمج\s+بـ|ابرمج\s+بـ|نستخدم\s+تقنية|اعمل\s+بتقنية|بيئة\s+العمل\s+التقنية)\s+([^\.\n،]+)/i, category: 'technical' as const, template: (m: string) => `التقنية/لغة البرمجة: ${m.trim()}` }
   ];
 
-  // English explicit and implicit memory patterns
+  // English multi-pattern explicit, implicit, and negative constraint memory patterns
   const enPatterns = [
+    // Direct Reminders
     { regex: /(?:remember\s+(?:that|always)?|save\s+(?:that|this)?|keep\s+in\s+mind\s+(?:that)?|don't\s+forget\s+(?:that)?|note\s+(?:that)?)\s*[:,-]?\s*(.+)/i, category: 'preference' as const },
+    // Negative Constraints & Rules
+    { regex: /(?:don't\s+use|do\s+not\s+use|avoid\s+using|never\s+use|avoid)\s*[:,-]?\s*([^\.\n,]+)/i, category: 'preference' as const, template: (m: string) => `Constraint: Avoid ${m.trim()}` },
+    // Identity & Name
     { regex: /(?:my\s+name\s+is|i\s+am|i'm\s+called)\s+([^\.\n,]+)/i, category: 'identity' as const, template: (m: string) => `User's name: ${m.trim()}` },
-    { regex: /(?:i\s+work\s+as\s+(?:a|an)?|my\s+profession\s+is|my\s+job\s+is|my\s+specialty\s+is)\s+([^\.\n,]+)/i, category: 'professional' as const, template: (m: string) => `User's profession: ${m.trim()}` },
-    { regex: /(?:i\s+live\s+in|i'm\s+from|i\s+am\s+from|my\s+country\s+is|my\s+city\s+is)\s+([^\.\n,]+)/i, category: 'identity' as const, template: (m: string) => `User's location: ${m.trim()}` },
-    { regex: /(?:my\s+project\s+is|i\s+am\s+building|currently\s+working\s+on)\s+([^\.\n,]+)/i, category: 'project' as const, template: (m: string) => `User's project: ${m.trim()}` },
+    // Location & Residence
+    { regex: /(?:i\s+live\s+in|i'm\s+from|i\s+am\s+from|located\s+in|based\s+in|my\s+city\s+is)\s+([^\.\n,]+)/i, category: 'identity' as const, template: (m: string) => `User's location: ${m.trim()}` },
+    // Profession & Role
+    { regex: /(?:i\s+work\s+as\s+(?:a|an)?|my\s+profession\s+is|my\s+job\s+is|my\s+specialty\s+is|my\s+role\s+is)\s+([^\.\n,]+)/i, category: 'professional' as const, template: (m: string) => `User's profession: ${m.trim()}` },
+    // Projects & Scope
+    { regex: /(?:my\s+project\s+is|i\s+am\s+building|currently\s+working\s+on|we\s+are\s+developing)\s+([^\.\n,]+)/i, category: 'project' as const, template: (m: string) => `User's project: ${m.trim()}` },
+    // Preferences
     { regex: /(?:i\s+prefer\s+always|i\s+like\s+to\s+use|always\s+use|my\s+preference\s+is)\s+([^\.\n,]+)/i, category: 'preference' as const, template: (m: string) => `Preference: ${m.trim()}` },
-    { regex: /(?:my\s+stack\s+is|i\s+code\s+in|my\s+primary\s+language\s+is|technology\s+stack\s+is)\s+([^\.\n,]+)/i, category: 'technical' as const, template: (m: string) => `Tech stack: ${m.trim()}` }
+    // Technical Stack
+    { regex: /(?:my\s+stack\s+is|i\s+code\s+in|my\s+primary\s+language\s+is|technology\s+stack\s+is|we\s+use\s+tech)\s+([^\.\n,]+)/i, category: 'technical' as const, template: (m: string) => `Tech stack: ${m.trim()}` }
   ];
 
   for (const p of [...arPatterns, ...enPatterns]) {
@@ -159,7 +178,7 @@ export async function getUserMemories(userId: string | number) {
 }
 
 /**
- * ➕ Add Memory with Saturation Check (Max 50)
+ * ➕ Add Memory with Dynamic Saturation Check & Smart Upsert
  */
 export async function addMemory(
   userId: string | number,
@@ -171,9 +190,30 @@ export async function addMemory(
   if (!pool) throw new Error('Database initializing');
   
   const cleanId = typeof userId === 'string' ? parseInt(userId, 10) : userId;
+  const sysSettings = await getCachedSystemSettings().catch(() => ({ memory_limit_per_user: 50 }));
+  const maxLimit = sysSettings?.memory_limit_per_user || 50;
+
   const countRes = await pool.query('SELECT count(*) FROM chat_memories WHERE user_id = $1', [cleanId]);
-  if (parseInt(countRes.rows[0].count, 10) >= 50) {
-    throw new Error('Memory limit reached (50)');
+  const currentCount = parseInt(countRes.rows[0].count, 10);
+
+  // Smart Upsert Check: If fact shares a key prefix (e.g., "اسم المستخدم:", "مكان الإقامة:", "User's name:"), update existing entry
+  const prefixMatch = fact.split(':')[0];
+  if (prefixMatch && prefixMatch.length > 3) {
+    const existing = await pool.query(
+      `SELECT id FROM chat_memories WHERE user_id = $1 AND category = $2 AND fact LIKE $3 LIMIT 1`,
+      [cleanId, category, `${prefixMatch}:%`]
+    );
+    if (existing.rows.length > 0) {
+      const updated = await pool.query(
+        `UPDATE chat_memories SET fact = $1, source = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *`,
+        [fact, source, existing.rows[0].id]
+      );
+      return updated.rows[0];
+    }
+  }
+
+  if (currentCount >= maxLimit) {
+    throw new Error(`Memory limit reached (${maxLimit})`);
   }
 
   const result = await pool.query(
@@ -238,9 +278,8 @@ export async function pruneMemories(userId: string | number) {
 }
 
 /**
- * 🧩 Pure Deterministic Fact Consolidation Algorithm (Zero AI, Zero Tokens)
- * Synthesizes a list of facts by grouping categories, removing exact and sub-string redundancies,
- * and creating a dense, structured composite statement.
+ * 🧩 Pure Deterministic Non-Destructive Fact Consolidation Algorithm (Zero AI, Zero Tokens)
+ * Synthesizes facts by grouping categories and removing redundancies without truncating mid-word.
  */
 export function distillFactsDeterministically(facts: { fact: string; category: string }[]): string {
   if (!facts || facts.length === 0) return '';
@@ -250,7 +289,6 @@ export function distillFactsDeterministically(facts: { fact: string; category: s
     const cat = f.category || 'general';
     if (!categoryMap[cat]) categoryMap[cat] = [];
     const cleanFact = f.fact.trim().replace(/^[-•*]\s*/, '');
-    // Avoid redundant duplicates within category
     if (!categoryMap[cat].some(existing => existing.toLowerCase() === cleanFact.toLowerCase() || cleanFact.toLowerCase().includes(existing.toLowerCase()))) {
       categoryMap[cat].push(cleanFact);
     }
@@ -266,11 +304,7 @@ export function distillFactsDeterministically(facts: { fact: string; category: s
     parts.push(`[${label}: ${items.join(' | ')}]`);
   }
 
-  let result = parts.join(' ');
-  if (result.length > 250) {
-    result = result.substring(0, 247) + '...';
-  }
-  return result;
+  return parts.join(' ');
 }
 
 /**
@@ -404,18 +438,21 @@ export async function consolidateAllUserMemories(options?: {
 export async function getMemoryDiagnostics(userId?: string | number, isAdmin?: boolean) {
   if (!pool) throw new Error('Database initializing');
 
+  const sysSettings = await getCachedSystemSettings().catch(() => ({ memory_limit_per_user: 50 }));
+  const bufferLimit = sysSettings?.memory_limit_per_user || 50;
+
   if (isAdmin) {
     const totalMemoriesRes = await pool.query('SELECT count(*) FROM chat_memories');
     const activeSessionsRes = await pool.query("SELECT id, user_id, title, updated_at FROM chats WHERE context_summary IS NOT NULL AND trim(context_summary) != '' ORDER BY updated_at DESC LIMIT 50");
     const userMemoryCountsRes = await pool.query('SELECT user_id, count(*) as count FROM chat_memories GROUP BY user_id');
     
     return {
-      engine: 'Perplexta Deterministic Sovereign Memory Engine v3.0 (Zero-AI / Zero-Latency)',
+      engine: 'Perplexta Autonomous Sovereign Memory Engine v4.0 (Zero-AI / Zero-Latency)',
       mode: 'system-wide-admin',
       totalMemories: parseInt(totalMemoriesRes.rows[0].count, 10),
       activeContextSessions: activeSessionsRes.rows,
       userMemoryCounts: userMemoryCountsRes.rows,
-      bufferLimit: 50,
+      bufferLimit,
       timestamp: new Date().toISOString()
     };
   } else {
@@ -425,12 +462,12 @@ export async function getMemoryDiagnostics(userId?: string | number, isAdmin?: b
     
     const count = parseInt(userMemoriesRes.rows[0].count, 10);
     return {
-      engine: 'Perplexta Deterministic Sovereign Memory Engine v3.0 (Zero-AI / Zero-Latency)',
+      engine: 'Perplexta Autonomous Sovereign Memory Engine v4.0 (Zero-AI / Zero-Latency)',
       mode: 'user-isolated',
       userId: cleanId,
       memoryCount: count,
-      memorySaturationPercent: Math.round((count / 50) * 100),
-      bufferLimit: 50,
+      memorySaturationPercent: Math.round((count / bufferLimit) * 100),
+      bufferLimit,
       activeContextSessions: userSessionsRes.rows,
       timestamp: new Date().toISOString()
     };

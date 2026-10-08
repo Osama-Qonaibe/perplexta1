@@ -30,7 +30,7 @@ export const Icon: React.FC<IconProps> = ({
     <LucideComponent
       size={pixelSize}
       strokeWidth={strokeWidth}
-      className={`shrink-0 inline-block transition-colors duration-150 ${className}`}
+      className={`shrink-0 inline-block transition-colors duration-fast ${className}`}
       {...props}
     />
   );

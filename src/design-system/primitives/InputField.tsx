@@ -1,8 +1,8 @@
 /**
- * 📝 PERPLEXTA DESIGN SYSTEM — INPUT FIELD PRIMITIVE
+ * 📝 PERPLEXTA DESIGN SYSTEM — INPUT FIELD PRIMITIVE (v4.0.0)
  * 
  * Standardized form text input with label, leading/trailing icons, error state,
- * and rounded-lg (8px) geometry.
+ * 1.5px border, and Brand Focus Ring (3px box-shadow with var(--github-blue) 18%).
  */
 
 import React, { forwardRef } from 'react';
@@ -31,16 +31,16 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(({
   const inputId = id || (label ? `input-${String(label).toLowerCase().replace(/\s+/g, '-')}` : undefined);
 
   return (
-    <div className={`flex flex-col gap-1 w-full ${containerClassName}`}>
+    <div className={`flex flex-col gap-1.5 w-full ${containerClassName}`}>
       {label && (
-        <label htmlFor={inputId} className="text-xs font-semibold text-slate-300 select-none">
+        <label htmlFor={inputId} className="text-xs font-semibold text-[var(--foreground)] select-none">
           {label}
         </label>
       )}
       
       <div className="relative flex items-center w-full">
         {icon && (
-          <div className="absolute left-3 inset-y-0 flex items-center pointer-events-none text-slate-400 shrink-0">
+          <div className="absolute left-3 inset-y-0 flex items-center pointer-events-none text-[var(--muted-foreground)] shrink-0">
             {icon}
           </div>
         )}
@@ -51,30 +51,31 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(({
           disabled={disabled}
           className={`
             w-full h-9 px-3 text-xs sm:text-sm font-medium
-            bg-[#0d131f] text-slate-100 placeholder-slate-500
-            border border-slate-800/90 rounded-lg
-            focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40
+            bg-[var(--surface-page)] text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]
+            border-[1.5px] border-[var(--border)] rounded-[10px]
+            focus:outline-none focus:border-[var(--github-blue)]
+            focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--github-blue)_18%,transparent)]
             transition-all duration-150 ease-out
             disabled:opacity-50 disabled:cursor-not-allowed
             ${icon ? 'pl-9' : ''}
             ${trailingIcon ? 'pr-9' : ''}
-            ${error ? 'border-rose-500/80 focus:border-rose-500 focus:ring-rose-500/30' : ''}
+            ${error ? 'border-[var(--destructive)] focus:border-[var(--destructive)] focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--destructive)_18%,transparent)]' : ''}
             ${className}
           `}
           {...props}
         />
 
         {trailingIcon && (
-          <div className="absolute right-3 inset-y-0 flex items-center text-slate-400 shrink-0">
+          <div className="absolute right-3 inset-y-0 flex items-center text-[var(--muted-foreground)] shrink-0">
             {trailingIcon}
           </div>
         )}
       </div>
 
       {error ? (
-        <span className="text-[11px] font-medium text-rose-400">{error}</span>
+        <span className="text-[11px] font-medium text-[var(--destructive)]">{error}</span>
       ) : helperText ? (
-        <span className="text-[11px] font-medium text-slate-400">{helperText}</span>
+        <span className="text-[11px] font-medium text-[var(--muted-foreground)]">{helperText}</span>
       ) : null}
     </div>
   );

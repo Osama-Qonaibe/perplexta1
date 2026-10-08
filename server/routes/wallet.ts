@@ -64,6 +64,31 @@ router.post("/deposit-manual", authenticateToken, async (req: any, res) => {
       proofPayload,
       'pending'
     ]);
+
+    try {
+      const { createNotification } = await import('../services/notifications.js');
+      await createNotification(
+        req.user.id,
+        'deposit_submitted',
+        'Deposit Request Received',
+        'تم استلام طلب الإيداع بنجاح',
+        `Your deposit request of $${Number(amount).toFixed(2)} USD via ${method} has been received and is pending admin verification.`,
+        `تم استلام طلب شحن رصيد بقيمة $${Number(amount).toFixed(2)} دولار عبر ${method} وهو قيد المراجعة والتدقيق الفوري.`
+      );
+    } catch {}
+
+    try {
+      const { io } = await import('../config/socket.js');
+      io?.emit('admin_new_financial_request', {
+        type: 'deposit',
+        id: result.rows[0].id,
+        userId: req.user.id,
+        amount: Number(amount),
+        method,
+        timestamp: new Date().toISOString()
+      });
+    } catch {}
+
     res.json({ success: true, request: result.rows[0] });
   } catch (error: any) {
     console.error('[Wallet] Deposit Manual Error:', error);
@@ -121,24 +146,65 @@ router.post("/hide", authenticateToken, async (req: any, res) => {
 router.post("/convert-points", authenticateToken, async (req: any, res) => {
   try {
     const { amountPoints } = req.body;
-    if (!amountPoints || isNaN(amountPoints)) return res.status(400).json({ error: 'Invalid amount' });
-    const result = await import('../services/wallet.js').then(s => s.convertPointsToBalance(req.user.id, Number(amountPoints)));
+    if (!amountPoints || isNaN(amountPoints) || Number(amountPoints) <= 0) {
+      return res.status(400).json({ 
+        error: 'Invalid points amount to convert.',
+        error_ar: 'يرجى تحديد عدد نقاط صحيح وأكبر من الصفر للتحويل.'
+      });
+    }
+    const result = await import('../services/wallet.js').then(s => s.convertPointsToBalance(req.user.id, Math.floor(Number(amountPoints))));
     res.json(result);
   } catch (error: any) {
     console.error('[Wallet] Conversion Error:', error);
-    res.status(400).json({ error: error.message || 'Failed to convert points' });
+    const msg = error.message || 'Failed to convert points';
+    let errorAr = 'فشل في تحويل النقاط إلى رصيد، يرجى المحاولة لاحقاً.';
+    if (msg.includes('Insufficient points')) {
+      errorAr = 'رصيد النقاط غير كافٍ لإتمام عملية التحويل المطلوبة.';
+    } else if (msg.includes('Wallet not found')) {
+      errorAr = 'المحفظة غير موجودة، يرجى تحديث الصفحة.';
+    }
+    res.status(400).json({ error: msg, error_ar: errorAr });
   }
 });
 
 router.post("/withdraw", authenticateToken, async (req: any, res) => {
   try {
     const { amountUSD, method, details } = req.body;
-    if (!amountUSD || !method || !details) return res.status(400).json({ error: 'Missing information' });
+    if (!amountUSD || !method || !details) {
+      return res.status(400).json({ 
+        error: 'Missing required withdrawal details (amount, payout method, or account details).',
+        error_ar: 'بيانات السحب غير مكتملة. يرجى تحديد المبلغ وطريقة السحب وبيانات الحساب.'
+      });
+    }
+
     const result = await import('../services/wallet.js').then(s => s.requestWithdrawal(req.user.id, Number(amountUSD), method, details));
     res.json(result);
   } catch (error: any) {
     console.error('[Wallet] Withdrawal Error:', error);
-    res.status(400).json({ error: error.message || 'Failed to request withdrawal' });
+    const msg = error.message || 'Failed to request withdrawal';
+    
+    let errorAr = 'فشل تقديم طلب السحب، يرجى المحاولة لاحقاً أو التواصل مع الإدارة المالية.';
+    if (msg.includes('Insufficient USD balance') || msg.includes('Insufficient balance') || error.code === 'INSUFFICIENT_BALANCE') {
+      errorAr = 'رصيد محفظتك غير كافٍ لإتمام طلب السحب بالمبلغ المحدد.';
+    } else if (msg.includes('Minimum withdrawal is') || error.code === 'MINIMUM_WITHDRAWAL_LIMIT') {
+      const match = msg.match(/\$([0-9.]+)/);
+      const minAmount = match ? match[1] : '20';
+      errorAr = `مبلغ السحب أقل من الحد الأدنى المسموح به (${minAmount}$ دولار).`;
+    } else if (msg.includes('greater than zero') || error.code === 'INVALID_AMOUNT') {
+      errorAr = 'يجب أن يكون مبلغ السحب رقماً موجباً أكبر من الصفر.';
+    } else if (msg.includes('Invalid withdrawal method') || error.code === 'INVALID_WITHDRAWAL_METHOD') {
+      errorAr = 'طريقة السحب المحددة غير مدعومة. القنوات المعتمدة: PayPal، الحساب البنكي، أو USDT.';
+    } else if (msg.includes('Wallet not found') || error.code === 'WALLET_NOT_FOUND') {
+      errorAr = 'لم يتم العثور على محفظة مفعلة لحسابك، يرجى تحديث الصفحة أو الاتصال بالدعم.';
+    } else if (msg.includes('Ledger database not available')) {
+      errorAr = 'قاعدة البيانات المالية غير متاحة حالياً، يرجى إعادة المحاولة بعد لحظات.';
+    }
+
+    res.status(error.statusCode || 400).json({ 
+      error: msg,
+      error_ar: errorAr,
+      code: error.code || 'WITHDRAWAL_FAILED'
+    });
   }
 });
 

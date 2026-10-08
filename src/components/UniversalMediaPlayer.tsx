@@ -61,7 +61,7 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
   resourceId,
   format = 'auto',
   aspectRatio = 'auto',
-  fitMode = 'cover',
+  fitMode = 'contain',
   posterUrl,
   title,
   autoPlay = false,
@@ -123,6 +123,44 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
   const lastClickRef = useRef<number>(0);
   const clickTimeoutRef = useRef<number | null>(null);
   const loopCountRef = useRef<number>(0);
+
+  // Proximity-based lazy loading of video resource to free up decoder memory
+  const [isNearViewport, setIsNearViewport] = useState(autoPlay);
+  const [hasBeenNearViewport, setHasBeenNearViewport] = useState(autoPlay);
+
+  useEffect(() => {
+    if (isNearViewport) {
+      setHasBeenNearViewport(true);
+    }
+  }, [isNearViewport]);
+
+  useEffect(() => {
+    setHasBeenNearViewport(autoPlay);
+  }, [url, autoPlay]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsNearViewport(true);
+          } else {
+            // Unload if scrolled far away to free up resources
+            setIsNearViewport(false);
+          }
+        });
+      },
+      { rootMargin: '450px 0px 450px 0px', threshold: 0.01 }
+    );
+
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   // Track media drop-off when player component is unmounted
   useEffect(() => {
@@ -409,19 +447,20 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
       const ratioNum = naturalWidth / naturalHeight;
       let calculatedRatio: MediaAspectRatio = '16:9';
 
-      if (ratioNum >= 2.0) {
+      if (ratioNum >= 1.9) {
         calculatedRatio = '21:9';
-      } else if (ratioNum >= 1.5) {
+      } else if (ratioNum > 1.15) {
         calculatedRatio = '16:9';
-      } else if (ratioNum >= 0.95 && ratioNum <= 1.05) {
+      } else if (ratioNum >= 0.92) {
         calculatedRatio = '1:1';
-      } else if (ratioNum >= 0.75 && ratioNum <= 0.85) {
+      } else if (ratioNum > 0.68) {
         calculatedRatio = '4:5';
-      } else if (ratioNum <= 0.65) {
+      } else {
         calculatedRatio = '9:16';
       }
 
-      if (aspectRatio === 'auto') {
+      // If aspectRatio is auto, or if default 16:9 was passed but the video is actually vertical or square, adapt dynamically
+      if (!aspectRatio || aspectRatio === 'auto' || (aspectRatio === '16:9' && (calculatedRatio === '9:16' || calculatedRatio === '4:5' || calculatedRatio === '1:1'))) {
         setDetectedRatio(calculatedRatio);
       }
 
@@ -639,7 +678,7 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
         aspectRatio={detectedRatio}
         fitMode={fitMode}
         maxHeight={maxHeight}
-        className={`rounded-2xl border border-gray-200/40 dark:border-gray-800 ${className}`}
+        className={`rounded-shape-lg border border-[var(--border-default)] ${className}`}
       >
         <iframe
           src={videoInfo.embedUrl}
@@ -647,7 +686,7 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
         />
-        <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-md text-accent text-[11px] font-bold border border-accent/20 flex items-center gap-1 pointer-events-none">
+        <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-shape-sm bg-black/75 backdrop-blur-md text-[var(--fg-accent)] text-[11px] font-bold border border-[var(--border-accent)]/20 flex items-center gap-1 pointer-events-none">
           <Film size={12} />
           <span>{videoInfo.type.toUpperCase()}</span>
         </div>
@@ -656,7 +695,11 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
   }
 
   const directVideoUrl = getMediaUrl(videoInfo.directUrl || url);
-  const isVertical = detectedRatio === '9:16' || format === 'reel' || format === 'story' || aspectRatio === '9:16';
+  const isVertical = detectedRatio === '9:16' || detectedRatio === '4:5' || format === 'reel' || format === 'story' || aspectRatio === '9:16' || aspectRatio === '4:5';
+
+  // For vertical media (Reels/Stories) embedded in feed cards, default container ratio to 4:5 (Facebook/Instagram standard feed aspect ratio).
+  // This guarantees clean viewport presence without clipping, and keeps all top and bottom controls 100% visible inside the visible frame.
+  const effectiveRatio: MediaAspectRatio = isVertical ? '4:5' : detectedRatio;
 
   return (
     <div
@@ -664,11 +707,11 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
       onMouseMove={resetHideTimer}
       onMouseEnter={() => setShowOverlayControls(true)}
       onMouseLeave={() => isPlaying && setShowOverlayControls(false)}
-      className={`w-full overflow-hidden ${isVertical ? 'max-h-[520px] mx-auto' : ''}`}
+      className="w-full relative flex items-center justify-center bg-black select-none"
     >
       <UniversalMediaContainer
-        aspectRatio={detectedRatio}
-        fitMode={fitMode}
+        aspectRatio={effectiveRatio}
+        fitMode={fitMode || (isVertical ? 'cover' : 'contain')}
         maxHeight={maxHeight}
         backdropUrl={posterUrl}
         className={`w-full group select-none ${className}`}
@@ -677,7 +720,7 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
             {showControls ? (
               <div
                 onClick={(e) => e.stopPropagation()}
-                className={`absolute bottom-0 inset-x-0 z-20 px-3 py-2.5 bg-gradient-to-t from-black/90 via-black/60 to-transparent flex flex-col gap-2 transition-opacity duration-300 pointer-events-auto ${
+                className={`absolute bottom-0 inset-x-0 z-30 px-3 pt-6 pb-2.5 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col gap-1.5 transition-opacity duration-200 pointer-events-auto ${
                   showOverlayControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
                 }`}
               >
@@ -704,28 +747,25 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
                       left: `${Math.max(8, Math.min(92, hoverPosition.percent))}%`,
                       transform: 'translateX(-50%)'
                     }}
-                    className="absolute bottom-full mb-2.5 z-30 pointer-events-none flex flex-col items-center animate-in fade-in zoom-in-95 duration-150"
+                    className="absolute bottom-full mb-2 z-30 pointer-events-none flex flex-col items-center animate-in fade-in zoom-in-95 duration-fast"
                   >
-                    <div className="px-2.5 py-1.5 rounded-xl bg-zinc-900/95 backdrop-blur-md border border-white/20 shadow-2xl text-white text-[11px] font-mono flex items-center gap-2 whitespace-nowrap">
-                      <span className="font-bold text-accent">
+                    <div className="px-2 py-0.5 rounded-shape-xs bg-neutral-900/95 backdrop-blur-md border border-white/20 shadow-xl text-white text-[10px] font-mono flex items-center gap-1.5 whitespace-nowrap">
+                      <span className="font-bold text-[var(--fg-accent)]">
                         {formatTime(hoverPosition.time)}
                       </span>
-                      <span className="text-gray-400 text-[10px]">
+                      <span className="text-gray-400 text-[9px]">
                         / {formatTime(duration)}
                       </span>
                       {videoResolution && (
-                        <div className="flex items-center gap-1 ps-1.5 border-s border-white/20">
-                          <span className="px-1.5 py-0.5 rounded-md bg-accent/20 text-accent font-bold text-[9px] uppercase tracking-wider">
+                        <div className="flex items-center gap-1 ps-1 border-s border-white/20">
+                          <span className="px-1.5 py-0.5 rounded-shape-xs bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] font-bold text-[8px] uppercase tracking-wider">
                             {videoResolution.qualityLabel}
-                          </span>
-                          <span className="text-gray-400 text-[9px]">
-                            {videoResolution.width}×{videoResolution.height}
                           </span>
                         </div>
                       )}
                     </div>
                     {/* Tiny triangle caret */}
-                    <div className="w-2 h-2 rotate-45 bg-zinc-900 border-r border-b border-white/20 -mt-1" />
+                    <div className="w-1.5 h-1.5 rotate-45 bg-neutral-900 border-r border-b border-white/20 -mt-0.5" />
                   </div>
                 )}
 
@@ -739,31 +779,31 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
                     seekSession(val, videoRef.current);
                     lastPlaybackTimeRef.current = val;
                   }}
-                  className="w-full h-1 bg-white/30 hover:h-1.5 rounded-lg appearance-none cursor-pointer accent-accent transition-all duration-150"
+                  className="w-full h-1.5 bg-white/30 hover:h-2 rounded-shape-xs appearance-none cursor-pointer accent-[var(--accent)] transition-all duration-fast"
                 />
               </div>
 
               <div className="flex items-center justify-between text-white text-xs font-mono">
                 {/* Play/Pause & Mute & Time */}
-                <div className="flex items-center gap-1 sm:gap-2">
+                <div className="flex items-center gap-1.5">
                   <button
                     onClick={togglePlay}
-                    className="p-2 sm:p-1.5 rounded-lg hover:bg-white/20 text-white transition-colors cursor-pointer min-w-[38px] min-h-[38px] flex items-center justify-center"
+                    className="w-7 h-7 min-w-[28px] min-h-[28px] rounded-shape-xs bg-transparent hover:bg-white/20 text-white transition-all cursor-pointer flex items-center justify-center active:scale-90"
                     title={isPlaying ? (isRtl ? 'إيقاف مؤقت' : 'Pause') : (isRtl ? 'تشغيل' : 'Play')}
                   >
-                    {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+                    {isPlaying ? <Pause size={14} /> : <Play size={14} className="ms-0.5 fill-current" />}
                   </button>
 
-                  {/* Volume Button with Expandable Interactive Slider */}
-                  <div className="relative flex items-center group/volume">
+                  {/* Compact Minimalist Volume Control */}
+                  <div className="relative flex items-center group/volume bg-transparent hover:bg-white/10 px-1 py-0.5 rounded-shape-xs transition-all">
                     <button
                       onClick={toggleMute}
-                      className="p-2 sm:p-1.5 rounded-lg hover:bg-white/20 text-white transition-colors cursor-pointer min-w-[38px] min-h-[38px] flex items-center justify-center"
+                      className="w-6 h-6 flex items-center justify-center text-white/90 hover:text-white transition-colors cursor-pointer"
                       title={isMuted ? (isRtl ? 'تشغيل الصوت' : 'Unmute') : (isRtl ? 'كتم الصوت' : 'Mute')}
                     >
-                      {isMuted || volume === 0 ? <VolumeX size={18} className="text-red-400" /> : <Volume2 size={18} />}
+                      {isMuted || volume === 0 ? <VolumeX size={14} className="text-red-400 animate-pulse" /> : <Volume2 size={14} />}
                     </button>
-                    <div className="overflow-hidden transition-all duration-200 ease-out flex items-center max-w-0 group-hover/volume:max-w-[70px] focus-within/volume:max-w-[70px] opacity-0 group-hover/volume:opacity-100 focus-within/volume:opacity-100 ps-1">
+                    <div className="overflow-hidden transition-all duration-200 ease-out flex items-center max-w-0 group-hover/volume:max-w-[65px] focus-within/volume:max-w-[65px] opacity-0 group-hover/volume:opacity-100 focus-within/volume:opacity-100 ps-1">
                       <input
                         type="range"
                         min={0}
@@ -771,30 +811,19 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
                         step={0.05}
                         value={isMuted ? 0 : volume}
                         onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                        className="w-14 h-1 bg-white/30 hover:h-1.5 rounded-lg appearance-none cursor-pointer accent-accent"
+                        className="w-13 h-1 bg-white/40 hover:h-1.5 rounded-shape-xs appearance-none cursor-pointer accent-[var(--accent)]"
                         title={isRtl ? `مستوى الصوت: ${Math.round(volume * 100)}%` : `Volume: ${Math.round(volume * 100)}%`}
                       />
                     </div>
                   </div>
 
-                  <span className="text-[11px] text-gray-300 font-mono select-none">
+                  <span className="text-[10px] text-white/90 font-mono select-none font-bold tabular-nums ms-0.5">
                     {formatTime(currentTime)} / {formatTime(duration)}
                   </span>
                 </div>
 
-                {/* Right Side: Fullscreen / Reels Expand / Diagnostics HUD */}
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowDiagnostics(prev => !prev);
-                    }}
-                    className={`p-2 sm:p-1.5 rounded-lg hover:bg-white/20 transition-colors cursor-pointer min-w-[38px] min-h-[38px] flex items-center justify-center ${showDiagnostics ? 'text-[var(--fg-success)] bg-white/10' : 'text-white'}`}
-                    title={isRtl ? 'لوحة الفحص والتشخيص' : 'Diagnostics HUD'}
-                  >
-                    <Activity size={18} />
-                  </button>
-
+                {/* Right Side: Reels Maximize / Fullscreen Button (Icon Only - International Standard) */}
+                <div className="flex items-center">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -813,10 +842,11 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
                         detail: { adId, url, title }
                       }));
                     }}
-                    className="p-2 sm:p-1.5 rounded-lg hover:bg-white/20 text-white transition-colors cursor-pointer min-w-[38px] min-h-[38px] flex items-center justify-center"
-                    title={isRtl ? 'عرض ريلز بملء الشاشة' : 'Open Reels Fullscreen'}
+                    className="w-7 h-7 min-w-[28px] min-h-[28px] rounded-shape-xs bg-transparent hover:bg-white/20 text-white/90 hover:text-white transition-all cursor-pointer flex items-center justify-center active:scale-90"
+                    title={isRtl ? 'عرض بملء الشاشة' : 'Fullscreen'}
+                    aria-label={isRtl ? 'عرض بملء الشاشة' : 'Fullscreen'}
                   >
-                    <Maximize2 size={18} />
+                    <Maximize2 size={14} />
                   </button>
                 </div>
               </div>
@@ -825,7 +855,7 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
         </>
       }
       >
-        {directVideoUrl ? (
+        {directVideoUrl && hasBeenNearViewport ? (
           <>
             <video
               ref={setVideoRef}
@@ -941,25 +971,46 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
               ))}
             </AnimatePresence>
           </>
-        ) : posterUrl || autoPosterUrl ? (
-          <img
-            src={posterUrl || autoPosterUrl || undefined}
-            alt="Media Poster"
-            className={`w-full h-full relative z-10 ${
-              fitMode === 'cover'
-                ? 'object-cover'
-                : fitMode === 'contain'
-                ? 'object-contain'
-                : 'object-fill'
-            }`}
-          />
-        ) : null}
+        ) : (
+          <div 
+            className="w-full h-full relative cursor-pointer flex items-center justify-center bg-black overflow-hidden" 
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsNearViewport(true);
+              setHasBeenNearViewport(true);
+            }}
+          >
+            {posterUrl || autoPosterUrl ? (
+              <img
+                src={posterUrl || autoPosterUrl || undefined}
+                alt={title || "Media Poster"}
+                loading="lazy"
+                className={`w-full h-full filter brightness-75 ${
+                  fitMode === 'cover'
+                    ? 'object-cover'
+                    : fitMode === 'contain'
+                    ? 'object-contain'
+                    : 'object-fill'
+                }`}
+              />
+            ) : (
+              <div className="w-full h-full bg-neutral-900 flex items-center justify-center">
+                <Loader2 size={24} className="animate-spin text-gray-500" />
+              </div>
+            )}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/15 hover:bg-black/25 transition-all">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-shape-sm bg-black/40 hover:bg-black/60 backdrop-blur-xs flex items-center justify-center border border-white/20 transition-all scale-100 hover:scale-105 shadow-md">
+                <Play size={18} className="text-white fill-white ms-0.5" />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Soft Buffering Spinner Overlay (No flash / No stream abort) */}
         {isBuffering && isPlaying && !hasFatalError && (
           <div className="absolute inset-0 z-25 flex items-center justify-center pointer-events-none">
-            <div className="w-12 h-12 rounded-shape-sm bg-black/50 backdrop-blur-md flex items-center justify-center shadow-xl">
-              <Loader2 size={24} className="animate-spin text-accent" />
+            <div className="w-9 h-9 rounded-shape-sm bg-black/50 backdrop-blur-xs flex items-center justify-center shadow-md border border-white/15">
+              <Loader2 size={18} className="animate-spin text-[var(--fg-accent)]" />
             </div>
           </div>
         )}
@@ -986,7 +1037,7 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
                   } catch (_) {}
                 }
               }}
-              className="px-3.5 py-1.5 rounded-lg bg-accent text-white text-xs font-bold flex items-center gap-1 hover:opacity-90 shadow-lg cursor-pointer"
+              className="px-4 py-2 rounded-shape-sm bg-[var(--accent)] text-white text-xs font-bold flex items-center gap-1.5 hover:opacity-90 shadow-md border border-[var(--border-main)] cursor-pointer active:scale-95 transition-all"
             >
               <RotateCcw size={14} />
               <span>{isRtl ? 'إعادة المحاولة' : 'Retry'}</span>
@@ -998,10 +1049,10 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
         {!isPlaying && !isBuffering && !hasFatalError && directVideoUrl && (
           <button
             onClick={togglePlay}
-            className="absolute inset-0 z-20 m-auto w-16 h-16 sm:w-18 sm:h-18 rounded-shape-md bg-black/25 hover:bg-black/40 text-cyan-400 border border-white/20 hover:border-cyan-400/60 flex items-center justify-center shadow-[0_0_25px_rgba(6,182,212,0.35)] backdrop-blur-xs transition-all duration-200 hover:scale-110 active:scale-90 cursor-pointer group"
+            className="absolute inset-0 z-20 m-auto w-10 h-10 sm:w-11 sm:h-11 rounded-shape-sm bg-black/40 hover:bg-black/60 text-white border border-white/20 flex items-center justify-center shadow-lg backdrop-blur-xs transition-all duration-base hover:scale-105 active:scale-95 cursor-pointer group"
             title={isRtl ? 'تشغيل الفيديو' : 'Play Video'}
           >
-            <Play size={30} className="translate-x-0.5 fill-cyan-400 text-cyan-400 drop-shadow-[0_0_10px_rgba(6,182,212,0.8)] group-hover:scale-110 transition-transform" />
+            <Play size={18} className="ms-0.5 fill-white text-white group-hover:scale-105 transition-transform" />
           </button>
         )}
 
@@ -1013,7 +1064,7 @@ export const UniversalMediaPlayer: React.FC<UniversalMediaPlayerProps> = ({
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.7, opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-              className="absolute inset-0 m-auto w-fit h-fit z-35 pointer-events-none flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-black/85 backdrop-blur-md border border-white/20 text-white shadow-2xl"
+              className="absolute inset-0 m-auto w-fit h-fit z-35 pointer-events-none flex items-center gap-2 px-4 py-2.5 rounded-shape-lg bg-black/85 backdrop-blur-md border border-white/20 text-white shadow-2xl"
             >
               {muteFeedback.isMuted ? (
                 <div className="w-7 h-7 rounded-shape-xs bg-red-500/20 text-red-400 flex items-center justify-center">

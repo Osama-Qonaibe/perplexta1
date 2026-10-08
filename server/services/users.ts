@@ -72,12 +72,6 @@ const TOOL_INFO: Record<string, { name_en: string, name_ar: string, desc_en: str
     desc_en: 'Collaborative AI design and brainstorming.',
     desc_ar: 'تصميم وعصف ذهني تعاوني بالذكاء الاصطناعي.'
   },
-  'sovereign_memory': { 
-    name_en: 'Sovereign Memory', 
-    name_ar: 'الذاكرة السيادية',
-    desc_en: 'Unified sovereign system intelligence and long-term memory synthesis.',
-    desc_ar: 'ذاكرة النظام السيادية الموحدة وتركيب المعارف طويلة الأمد.'
-  },
   'sovereign_search': { 
     name_en: 'Sovereign Search', 
     name_ar: 'البحث السيادي',
@@ -103,15 +97,29 @@ const ABSOLUTE_TOOLS = new Set(['storage_mb']);
 export async function getUserUsage(userId: string | number) {
   if (!pool) throw new Error('Database initializing');
 
-  const planRes = await pool.query(`
-    SELECT u.role, p.id, p.name_en, p.name_ar, p.limits, p.color, s.status, s.billing_period, s.current_period_end, s.created_at as subscription_start
-    FROM users u
-    LEFT JOIN subscriptions s ON u.id = s.user_id
-    LEFT JOIN plans p ON p.id = s.plan_id
-    WHERE u.id = $1
-    ORDER BY CASE WHEN s.status = 'active' THEN 0 ELSE 1 END, s.current_period_end DESC NULLS LAST
-    LIMIT 1
-  `, [userId]);
+  const [planRes, dailyUsageRes, monthlyUsageRes, storageUsageMB] = await Promise.all([
+    pool.query(`
+      SELECT u.role, p.id, p.name_en, p.name_ar, p.limits, p.color, s.status, s.billing_period, s.current_period_end, s.cycle_credits, s.used_credits, s.created_at as subscription_start
+      FROM users u
+      LEFT JOIN subscriptions s ON u.id = s.user_id
+      LEFT JOIN plans p ON p.id = s.plan_id
+      WHERE u.id = $1
+      ORDER BY CASE WHEN s.status = 'active' THEN 0 ELSE 1 END, s.current_period_end DESC NULLS LAST
+      LIMIT 1
+    `, [userId]),
+    pool.query(`
+      SELECT tool_id, usage_count
+      FROM user_usage
+      WHERE user_id = $1 AND usage_date = CURRENT_DATE
+    `, [userId]),
+    pool.query(`
+      SELECT tool_id, SUM(usage_count) as total
+      FROM user_usage
+      WHERE user_id = $1 AND usage_date >= date_trunc('month', CURRENT_DATE)
+      GROUP BY tool_id
+    `, [userId]),
+    getUserStorageUsage(userId.toString())
+  ]);
 
   if (planRes.rows.length === 0) throw new Error('User profile not found');
   
@@ -148,30 +156,15 @@ export async function getUserUsage(userId: string | number) {
     };
   }
 
-  const dailyUsageRes = await pool.query(`
-    SELECT tool_id, usage_count
-    FROM user_usage
-    WHERE user_id = $1 AND usage_date = CURRENT_DATE
-  `, [userId]);
-
   const dailyUsageMap = dailyUsageRes.rows.reduce((acc: any, row: any) => {
     acc[row.tool_id] = parseInt(row.usage_count);
     return acc;
   }, {});
 
-  const monthlyUsageRes = await pool.query(`
-    SELECT tool_id, SUM(usage_count) as total
-    FROM user_usage
-    WHERE user_id = $1 AND usage_date >= date_trunc('month', CURRENT_DATE)
-    GROUP BY tool_id
-  `, [userId]);
-
   const monthlyUsageMap = monthlyUsageRes.rows.reduce((acc: any, row: any) => {
     acc[row.tool_id] = parseInt(row.total);
     return acc;
   }, {});
-
-  const storageUsageMB = await getUserStorageUsage(userId.toString());
 
   const ALLOWED_VISIBLE_TOOLS = [
     'chat_fast',
@@ -292,38 +285,100 @@ export async function getUserUsage(userId: string | number) {
   };
 }
 
+let columnsEnsured = false;
+export async function ensureUserProfileColumns() {
+  if (columnsEnsured || !pool) return;
+  try {
+    await pool.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_image TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS occupation TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS location TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS website_url TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_domain TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_domain_verified BOOLEAN DEFAULT FALSE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS social_links JSONB DEFAULT '{}';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_links JSONB DEFAULT '[]';
+    `);
+    columnsEnsured = true;
+  } catch (err: any) {
+    console.warn('[ensureUserProfileColumns] Notice/Warning while ensuring user profile columns:', err.message);
+  }
+}
+
 export async function getUserProfile(userId: string) {
   if (!pool) throw new Error('Database initializing');
+  await ensureUserProfileColumns();
   
-  const result = await pool.query(`
-    SELECT u.id, u.name, u.email, u.role, u.avatar, u.status, u.language, u.theme, u.custom_instructions, u.kyc_status, u.created_at, u.referral_code, u.media_muted,
-           s.plan_id, s.status as sub_status, s.current_period_end, p.name_en as plan_name_en, p.name_ar as plan_name_ar, p.color as plan_color, p.limits
-    FROM users u
-    LEFT JOIN subscriptions s ON u.id = s.user_id
-    LEFT JOIN plans p ON s.plan_id = p.id
-    WHERE u.id = $1
-    ORDER BY CASE WHEN s.status = 'active' THEN 0 ELSE 1 END, s.current_period_end DESC NULLS LAST
-    LIMIT 1
-  `, [userId]);
+  const [result, wallet] = await Promise.all([
+    pool.query(`
+      SELECT u.id, u.name, u.email, u.role, u.avatar, u.cover_image, u.bio, u.occupation, u.location, u.website_url, u.custom_domain, u.is_domain_verified, u.social_links, u.verified_links, u.status, u.language, u.theme, u.custom_instructions, u.kyc_status, u.created_at, u.referral_code, u.media_muted, u.data_saver,
+             s.plan_id, s.status as sub_status, s.billing_period, s.current_period_end, s.cycle_credits, s.used_credits, p.name_en as plan_name_en, p.name_ar as plan_name_ar, p.color as plan_color, p.limits, p.daily_credits, p.monthly_credits, p.annual_credits
+      FROM users u
+      LEFT JOIN subscriptions s ON u.id = s.user_id AND s.status = 'active' AND (s.current_period_end IS NULL OR s.current_period_end > CURRENT_TIMESTAMP)
+      LEFT JOIN plans p ON s.plan_id = p.id
+      WHERE u.id = $1
+      ORDER BY s.current_period_end DESC NULLS LAST
+      LIMIT 1
+    `, [userId]),
+    walletLoader.load(userId)
+  ]);
   
   if (result.rows.length === 0) return null;
   const row = result.rows[0];
-  
-  const wallet = await walletLoader.load(userId) || { balance: 0.0, points: 0, referral_activated: false };
+  const activeWallet = wallet || { balance: 0.0, points: 0, referral_activated: false };
   
   let subscription = null;
 
-  if (row.plan_id) {
+  if (row.plan_id && row.sub_status === 'active') {
     const rawLimits = typeof row.limits === 'object' && row.limits !== null ? row.limits : (typeof row.limits === 'string' ? JSON.parse(row.limits || '{}') : {});
+    const cycleCredits = parseInt(row.cycle_credits || 0, 10);
+    const usedCredits = parseInt(row.used_credits || 0, 10);
+    const remainingCredits = Math.max(0, cycleCredits - usedCredits);
+    const usagePercentage = cycleCredits > 0 ? Math.min(100, Math.round((usedCredits / cycleCredits) * 100)) : 0;
+
     subscription = {
       plan_id: row.plan_id,
       status: row.sub_status,
+      billing_period: row.billing_period || 'monthly',
       current_period_end: row.current_period_end,
       plan_name_en: row.plan_name_en,
       plan_name_ar: row.plan_name_ar,
       plan_color: row.plan_color,
+      cycle_credits: cycleCredits,
+      used_credits: usedCredits,
+      remaining_credits: remainingCredits,
+      usage_percentage: usagePercentage,
       limits: rawLimits
     };
+  } else {
+    try {
+      const freePlanRes = await pool.query(
+        "SELECT id, name_en, name_ar, color, monthly_credits, limits FROM plans WHERE is_active = true AND monthly_price = 0 ORDER BY id ASC LIMIT 1"
+      );
+      if (freePlanRes.rows.length > 0) {
+        const fp = freePlanRes.rows[0];
+        const rawLimits = typeof fp.limits === 'object' && fp.limits !== null ? fp.limits : (typeof fp.limits === 'string' ? JSON.parse(fp.limits || '{}') : {});
+        const cycleCredits = parseInt(fp.monthly_credits || 0, 10);
+        subscription = {
+          plan_id: fp.id,
+          status: 'active',
+          billing_period: 'monthly',
+          current_period_end: null,
+          plan_name_en: fp.name_en,
+          plan_name_ar: fp.name_ar,
+          plan_color: fp.color || '#334155',
+          cycle_credits: cycleCredits,
+          used_credits: 0,
+          remaining_credits: cycleCredits,
+          usage_percentage: 0,
+          limits: rawLimits,
+          is_free_tier: true
+        };
+      }
+    } catch (e: any) {
+      console.warn('[getUserProfile] Free plan fallback query error:', e.message);
+    }
   }
   
   return {
@@ -332,6 +387,15 @@ export async function getUserProfile(userId: string) {
     email: row.email,
     role: row.role,
     avatar: row.avatar,
+    cover_image: row.cover_image || null,
+    bio: row.bio || row.custom_instructions || '',
+    occupation: row.occupation || '',
+    location: row.location || '',
+    website_url: row.website_url || '',
+    custom_domain: row.custom_domain || '',
+    is_domain_verified: !!row.is_domain_verified,
+    social_links: typeof row.social_links === 'object' && row.social_links !== null ? row.social_links : (typeof row.social_links === 'string' ? JSON.parse(row.social_links || '{}') : {}),
+    verified_links: Array.isArray(row.verified_links) ? row.verified_links : (typeof row.verified_links === 'string' ? JSON.parse(row.verified_links || '[]') : []),
     status: row.status,
     language: row.language,
     theme: row.theme,
@@ -340,21 +404,82 @@ export async function getUserProfile(userId: string) {
     created_at: row.created_at,
     referral_code: row.referral_code,
     media_muted: row.media_muted !== undefined && row.media_muted !== null ? !!row.media_muted : true,
+    data_saver: row.data_saver !== undefined && row.data_saver !== null ? !!row.data_saver : false,
     custom_limits: {},
     subscription,
-    balance: wallet.balance,
-    points: parseInt(wallet.points),
-    referral_activated: !!wallet.referral_activated
+    balance: activeWallet.balance,
+    points: parseInt(activeWallet.points),
+    referral_activated: !!activeWallet.referral_activated
   };
 }
 
 export async function updateUserProfile(userId: string | number, data: any) {
   if (!pool) throw new Error('Database initializing');
+  await ensureUserProfileColumns();
   
-  const { name, avatar, language, theme, custom_instructions, password, email, email_notifications, media_muted } = data;
+  const {
+    name, avatar, cover_image, bio, occupation, location, website_url,
+    custom_domain, is_domain_verified, social_links, verified_links,
+    language, theme, custom_instructions, password, email,
+    email_notifications, media_muted, data_saver
+  } = data;
+
   const updates: string[] = [];
   const values: any[] = [];
   let idx = 1;
+
+  if (cover_image !== undefined) {
+    updates.push(`cover_image = $${idx++}`);
+    values.push(cover_image);
+  }
+
+  if (bio !== undefined) {
+    updates.push(`bio = $${idx++}`);
+    values.push(bio);
+    updates.push(`custom_instructions = $${idx++}`);
+    values.push(bio);
+  }
+
+  if (occupation !== undefined) {
+    updates.push(`occupation = $${idx++}`);
+    values.push(occupation);
+  }
+
+  if (location !== undefined) {
+    updates.push(`location = $${idx++}`);
+    values.push(location);
+  }
+
+  if (website_url !== undefined) {
+    updates.push(`website_url = $${idx++}`);
+    values.push(website_url);
+  }
+
+  if (custom_domain !== undefined) {
+    updates.push(`custom_domain = $${idx++}`);
+    values.push(custom_domain);
+  }
+
+  if (is_domain_verified !== undefined) {
+    updates.push(`is_domain_verified = $${idx++}`);
+    values.push(!!is_domain_verified);
+  }
+
+  if (social_links !== undefined) {
+    updates.push(`social_links = $${idx++}`);
+    values.push(typeof social_links === 'object' ? JSON.stringify(social_links) : social_links);
+  }
+
+  if (verified_links !== undefined) {
+    updates.push(`verified_links = $${idx++}`);
+    values.push(typeof verified_links === 'object' ? JSON.stringify(verified_links) : verified_links);
+  }
+
+  if (data_saver !== undefined) {
+    if (typeof data_saver !== 'boolean') throw new Error('Data saver preference must be a boolean');
+    updates.push(`data_saver = $${idx++}`);
+    values.push(data_saver);
+  }
 
   if (email_notifications !== undefined) {
     if (typeof email_notifications !== 'boolean') throw new Error('Email notifications must be a boolean');
@@ -401,7 +526,7 @@ export async function updateUserProfile(userId: string | number, data: any) {
     values.push(cleanTheme);
   }
 
-  if (custom_instructions !== undefined) {
+  if (custom_instructions !== undefined && bio === undefined) {
     if (custom_instructions !== null && typeof custom_instructions !== 'string') throw new Error('Custom instructions must be a string');
     updates.push(`custom_instructions = $${idx++}`);
     values.push(custom_instructions);

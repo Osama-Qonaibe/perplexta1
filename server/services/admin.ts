@@ -437,15 +437,15 @@ export async function initAllTools() {
     await client.query('BEGIN');
     for (const t of tools) {
       await client.query(`
-        INSERT INTO tool_orchestrator (tool_id, primary_provider, primary_model, is_active, cost_per_usage, task_description, task_description_ar)
-        VALUES ($1, '', '', true, $2, $3, $4)
+        INSERT INTO tool_orchestrator (tool_id, primary_provider, primary_model, is_active, task_description, task_description_ar)
+        VALUES ($1, '', '', true, $2, $3)
         ON CONFLICT (tool_id) DO UPDATE SET
           is_active = true,
           task_description = EXCLUDED.task_description,
           task_description_ar = EXCLUDED.task_description_ar,
           primary_provider = CASE WHEN tool_orchestrator.primary_provider IS NULL OR tool_orchestrator.primary_provider = '' THEN '' ELSE tool_orchestrator.primary_provider END,
           primary_model = CASE WHEN tool_orchestrator.primary_model IS NULL OR tool_orchestrator.primary_model = '' THEN '' ELSE tool_orchestrator.primary_model END
-      `, [t.id, t.cost, t.desc, t.descAr]);
+      `, [t.id, t.desc, t.descAr]);
     }
     await client.query('COMMIT');
     return { success: true, message: 'Tools initialized' };
@@ -462,7 +462,7 @@ export async function getAdminStats() {
     const safeQuery = async (p: any, sql: string, fallback: any = 0) => {
       try {
         const r = await p.query(sql);
-        return r.rows[0];
+        return r?.rows?.[0] || { count: fallback, total: fallback };
       } catch {
         return { count: fallback, total: fallback };
       }
@@ -545,4 +545,216 @@ export async function broadcastAdminStats() {
   } catch (error) {
     console.error('[Socket] Failed to broadcast admin stats:', error);
   }
+}
+
+export interface DatabaseHealthItem {
+  id: 'core' | 'ledger' | 'external' | 'security' | 'media';
+  name: string;
+  nameAr: string;
+  description: string;
+  descriptionAr: string;
+  status: 'connected' | 'disconnected' | 'not_configured';
+  latencyMs: number;
+  host: string;
+  port: string;
+  database: string;
+  version: string | null;
+  ssl: boolean;
+  error: string | null;
+  checkedAt: string;
+}
+
+export async function checkAllDatabasesHealth(): Promise<{
+  timestamp: string;
+  summary: {
+    total: number;
+    connected: number;
+    disconnected: number;
+    notConfigured: number;
+    averageLatencyMs: number;
+    healthStatus: 'healthy' | 'degraded' | 'critical';
+  };
+  databases: DatabaseHealthItem[];
+}> {
+  let registryOverrides: Record<string, string> = {};
+  try {
+    const regRes = await pool.query('SELECT id, connection_string FROM db_connections_registry');
+    for (const row of regRes.rows) {
+      if (row.connection_string) {
+        try {
+          registryOverrides[row.id] = decrypt(row.connection_string);
+        } catch {}
+      }
+    }
+  } catch {
+    // Core pool down or table uninitialized; proceed with env vars
+  }
+
+  const parseDbTarget = (url: string) => {
+    if (!url) return { host: 'None', port: '-', database: '-', ssl: false };
+    try {
+      const parsed = new URL(url.replace(/^postgres(ql)?:\/\//, 'http://'));
+      const isLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+      return {
+        host: parsed.hostname || 'localhost',
+        port: parsed.port || '5432',
+        database: (parsed.pathname || '').replace(/^\//, '') || 'postgres',
+        ssl: url.includes('sslmode=require') || url.includes('sslmode=verify') || (!isLocal && process.env.DB_SSL_REQUIRED !== 'false')
+      };
+    } catch {
+      return { host: 'Invalid URL', port: '-', database: '-', ssl: false };
+    }
+  };
+
+  const definitions: Array<{
+    id: 'core' | 'ledger' | 'external' | 'security' | 'media';
+    name: string;
+    nameAr: string;
+    description: string;
+    descriptionAr: string;
+    url: string;
+  }> = [
+    {
+      id: 'core',
+      name: 'Core Operational Database',
+      nameAr: 'قاعدة البيانات التشغيلية الأساسية (Core)',
+      description: 'Primary operational cluster for users, profiles, chats, tools and system config',
+      descriptionAr: 'القاعدة الرئيسية للمستخدمين والمحادثات وإعدادات النظام والنماذج',
+      url: registryOverrides['core'] || process.env.DATABASE_URL || ''
+    },
+    {
+      id: 'ledger',
+      name: 'Financial Ledger Vault',
+      nameAr: 'خزينة الدفتر المالي المقفلة (Ledger)',
+      description: 'Append-only ledger database for financial balances, wallets, payouts and referrals',
+      descriptionAr: 'سجل العمليات المالية التراكمي المقفل والمحافظ والعمولات والأرصدة',
+      url: registryOverrides['ledger'] || process.env.LEDGER_DATABASE_URL || ''
+    },
+    {
+      id: 'external',
+      name: 'External Integrations Hub',
+      nameAr: 'قاعدة التكاملات الخارجية (External)',
+      description: 'Isolated storage for external tool pipelines, oauth integrations and webhooks',
+      descriptionAr: 'قاعدة الاتصالات المعزولة للأدوات الخارجية والتكاملات والويب هوكس',
+      url: registryOverrides['external'] || process.env.EXTERNAL_DATABASE_URL || ''
+    },
+    {
+      id: 'security',
+      name: 'Security & Compliance Vault',
+      nameAr: 'خزينة الأمان والتدقيق والامتثال (Security)',
+      description: 'Dedicated immutable cluster for audit trails, security rate-limits and banned threats',
+      descriptionAr: 'سجلات التدقيق الإداري الصارمة، رادار الهجمات، ورصد محاولات الاختراق',
+      url: registryOverrides['security'] || process.env.SECURITY_DATABASE_URL || ''
+    },
+    {
+      id: 'media',
+      name: 'Media & Storage Cluster',
+      nameAr: 'قاعدة الوسائط والمحتوى المرئي (Media)',
+      description: 'Storage metadata for user uploaded attachments, ViralBook posts and video reels',
+      descriptionAr: 'بيانات وسائط المستخدمين ومنشورات فيرال بوك ومقاطع الفيديو والمرفقات',
+      url: registryOverrides['media'] || process.env.MEDIA_DATABASE_URL || ''
+    }
+  ];
+
+  const results: DatabaseHealthItem[] = await Promise.all(
+    definitions.map(async (def) => {
+      const target = parseDbTarget(def.url);
+      const checkedAt = new Date().toISOString();
+
+      if (!def.url || def.url.trim() === '') {
+        return {
+          id: def.id,
+          name: def.name,
+          nameAr: def.nameAr,
+          description: def.description,
+          descriptionAr: def.descriptionAr,
+          status: 'not_configured',
+          latencyMs: 0,
+          host: target.host,
+          port: target.port,
+          database: target.database,
+          version: null,
+          ssl: false,
+          error: 'Connection URL not defined in environment or registry',
+          checkedAt
+        };
+      }
+
+      const start = performance.now();
+      let testPool: any = null;
+      try {
+        testPool = createInternalPool(def.url, 1, 4000);
+        const qRes = await testPool.query('SELECT current_database() as db_name, version() as pg_version, NOW() as server_time');
+        const latencyMs = Math.round(performance.now() - start);
+        const versionStr = qRes.rows[0]?.pg_version ? qRes.rows[0].pg_version.split(' on ')[0] : 'PostgreSQL';
+
+        return {
+          id: def.id,
+          name: def.name,
+          nameAr: def.nameAr,
+          description: def.description,
+          descriptionAr: def.descriptionAr,
+          status: 'connected',
+          latencyMs,
+          host: target.host,
+          port: target.port,
+          database: qRes.rows[0]?.db_name || target.database,
+          version: versionStr,
+          ssl: target.ssl,
+          error: null,
+          checkedAt
+        };
+      } catch (err: any) {
+        const latencyMs = Math.round(performance.now() - start);
+        return {
+          id: def.id,
+          name: def.name,
+          nameAr: def.nameAr,
+          description: def.description,
+          descriptionAr: def.descriptionAr,
+          status: 'disconnected',
+          latencyMs,
+          host: target.host,
+          port: target.port,
+          database: target.database,
+          version: null,
+          ssl: target.ssl,
+          error: err?.message || 'Connection failed',
+          checkedAt
+        };
+      } finally {
+        if (testPool) {
+          try { await testPool.end(); } catch {}
+        }
+      }
+    })
+  );
+
+  const connectedCount = results.filter(r => r.status === 'connected').length;
+  const notConfiguredCount = results.filter(r => r.status === 'not_configured').length;
+  const disconnectedCount = results.filter(r => r.status === 'disconnected').length;
+  const connectedLatencies = results.filter(r => r.status === 'connected').map(r => r.latencyMs);
+  const averageLatencyMs = connectedLatencies.length > 0 
+    ? Math.round(connectedLatencies.reduce((a, b) => a + b, 0) / connectedLatencies.length) 
+    : 0;
+
+  let healthStatus: 'healthy' | 'degraded' | 'critical' = 'critical';
+  if (connectedCount === results.length) {
+    healthStatus = 'healthy';
+  } else if (connectedCount > 0) {
+    healthStatus = 'degraded';
+  }
+
+  return {
+    timestamp: new Date().toISOString(),
+    summary: {
+      total: results.length,
+      connected: connectedCount,
+      disconnected: disconnectedCount,
+      notConfigured: notConfiguredCount,
+      averageLatencyMs,
+      healthStatus
+    },
+    databases: results
+  };
 }

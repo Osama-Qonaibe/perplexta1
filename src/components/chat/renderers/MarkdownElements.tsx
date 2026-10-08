@@ -14,12 +14,12 @@ export const ThinkingSteps = ({ steps, dir, query }: { steps: any[], dir: 'ltr' 
   return (
     <div className="mb-4 sm:mb-6 space-y-2 sm:space-y-3" id="thinking-steps-container">
       <div className="flex items-center gap-2 mb-2 sm:mb-4 opacity-70">
-         <div className="w-1 h-3 sm:w-1.5 sm:h-4 bg-accent/60 rounded-[4px]" />
+         <div className="w-1 h-3 sm:w-1.5 sm:h-4 bg-[var(--fg-accent)]/60 rounded-[var(--radius-xs)]" />
          <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--text-muted)]">
            {dir === 'rtl' ? 'مراحل التحليل والبحث' : 'ANALYSIS & RESEARCH PHASES'}
          </span>
       </div>
-      <div className="space-y-1 sm:space-y-2 ps-2.5 sm:ps-5 border-s-2 border-accent/10 ml-0.5 sm:ml-2">
+      <div className="space-y-1 sm:space-y-2 ps-2.5 sm:ps-5 border-s-2 border-[var(--border-default)] ml-0.5 sm:ml-2">
         {steps.map((step, idx) => (
           <motion.div 
             initial={{ opacity: 0 }}
@@ -29,16 +29,16 @@ export const ThinkingSteps = ({ steps, dir, query }: { steps: any[], dir: 'ltr' 
             className="flex items-center gap-2 sm:gap-4 group"
           >
             {step.status === 'completed' ? (
-              <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-sm bg-accent/5 flex items-center justify-center text-accent/70">
+              <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--fg-accent)]">
                 <Check size={10} strokeWidth={3} />
               </div>
             ) : step.status === 'processing' ? (
-              <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-sm bg-accent/5 flex items-center justify-center">
-                <div className="w-1 h-1 rounded-[4px] bg-accent/60 animate-pulse" />
+              <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] flex items-center justify-center">
+                <div className="w-1 h-1 rounded-[var(--radius-full)] bg-[var(--fg-accent)] animate-pulse" />
               </div>
             ) : (
-              <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-sm bg-[var(--surface-card)] border border-[var(--border-default)] flex items-center justify-center">
-                <div className="w-1 h-1 rounded-[4px] bg-[var(--text-muted)]" />
+              <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-[var(--radius-xs)] bg-[var(--surface-card)] border border-[var(--border-default)] flex items-center justify-center">
+                <div className="w-1 h-1 rounded-[var(--radius-full)] bg-[var(--text-muted)]" />
               </div>
             )}
             <span className={`text-[10px] sm:text-[12px] font-medium ${step.status === 'completed' ? 'text-[var(--text-secondary)]' : 'text-[var(--text-muted)]/60'} transition-theme truncate`}>
@@ -88,11 +88,11 @@ export const CitationRow = ({ cite, idx, dir, query }: { cite: any, idx: number,
       href={cleanUrl || '#'}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-3.5 p-2.5 rounded-md hover:bg-accent/[0.03] transition-theme group min-w-0 cursor-pointer border-b border-[var(--border-default)]/30 last:border-0"
+      className="flex items-center gap-3.5 p-2.5 rounded-[var(--radius-xs)] hover:bg-[var(--surface-subtle)] transition-theme group min-w-0 cursor-pointer border-b border-[var(--border-default)]/30 last:border-0"
     >
       <div className="flex-shrink-0">
         <div 
-          className="w-7 h-7 rounded-[4px] flex items-center justify-center border border-[var(--border-default)]/60 bg-[var(--surface-card)] shadow-sm transition-theme group-hover:scale-105 group-hover:border-accent/20"
+          className="w-7 h-7 rounded-[var(--radius-xs)] flex items-center justify-center border border-[var(--border-default)]/60 bg-[var(--surface-card)] shadow-sm transition-theme group-hover:scale-105 group-hover:border-[var(--border-accent)]"
           style={{ color: brand ? brand.color : 'inherit' }}
         >
           {brand ? (
@@ -110,13 +110,13 @@ export const CitationRow = ({ cite, idx, dir, query }: { cite: any, idx: number,
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
-          <div className="w-4 h-4 rounded-[4px] bg-accent/10 flex items-center justify-center text-[9px] font-black text-accent shrink-0 group-hover:bg-accent group-hover:text-white transition-theme">
+          <div className="w-4 h-4 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] flex items-center justify-center text-[9px] font-black text-[var(--fg-accent)] shrink-0 group-hover:bg-[var(--fg-accent)] group-hover:text-white transition-theme">
             {cite.index || (idx + 1)}
           </div>
-          <span className="text-[11px] font-semibold text-[var(--text-primary)] truncate group-hover:text-accent transition-theme">
+          <span className="text-[11px] font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--fg-accent)] transition-theme">
             <HighlightText text={displayTitle} query={query} />
           </span>
-          <ExternalLink size={10} className="text-[var(--text-muted)] group-hover:text-accent transition-theme shrink-0 opacity-0 group-hover:opacity-100 transform translate-x-[-2px] group-hover:translate-x-0" />
+          <ExternalLink size={10} className="text-[var(--text-muted)] group-hover:text-[var(--fg-accent)] transition-theme shrink-0 opacity-0 group-hover:opacity-100 transform translate-x-[-2px] group-hover:translate-x-0" />
         </div>
 
         {displayDesc ? (
@@ -168,33 +168,34 @@ export const MarkdownLink = ({ href, children }: { href?: string, children: Reac
   const favicon = meta?.favicon || getFavicon(cleanUrl);
 
   return (
-    <span className="relative inline-block group/link align-middle">
+    <span className="relative inline-block group/link align-middle" style={{ unicodeBidi: 'isolate' }}>
       <a
         href={cleanUrl}
         target="_blank"
         rel="noopener noreferrer"
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
-        className="inline-flex items-center gap-1.5 px-2 py-0.5 mx-0.5 rounded bg-accent/[0.04] border border-accent/15 hover:border-accent/35 hover:bg-accent/[0.08] transition-theme text-accent font-semibold no-underline text-[12px] align-middle shadow-sm hover:cursor-pointer"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 mx-1 rounded-md bg-accent/[0.06] border border-accent/20 hover:border-accent/40 hover:bg-accent/[0.12] transition-theme text-accent font-semibold no-underline text-[12.5px] align-middle shadow-xs hover:cursor-pointer"
+        style={{ unicodeBidi: 'isolate' }}
       >
         <span className="shrink-0 flex items-center justify-center" style={{ color: brand ? brand.color : 'inherit' }}>
           {brand ? (
-            brand.icon("w-3 h-3")
+            brand.icon("w-3.5 h-3.5")
           ) : (
             <img
               src={favicon}
               alt=""
-              className="w-3 h-3 object-contain"
+              className="w-3.5 h-3.5 object-contain"
               onError={(e) => { (e.target as HTMLImageElement).src = 'https://www.google.com/s2/favicons?domain=google.com&sz=32'; }}
             />
           )}
         </span>
-        <span className="truncate max-w-[160px]">{displayTitle}</span>
-        <ExternalLink size={9} className="opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0" />
+        <span className="truncate max-w-[220px]" style={{ unicodeBidi: 'isolate' }}>{displayTitle}</span>
+        <ExternalLink size={10} className="opacity-0 group-hover/link:opacity-100 transition-opacity shrink-0" />
       </a>
 
       {showTooltip && (meta?.title || meta?.description) && (
-        <div className="absolute z-[9999] bottom-full left-1/2 -translate-x-1/2 mb-2 w-[280px] p-3 bg-[var(--surface-card)] rounded-xl shadow-xl border border-[var(--border-default)] flex flex-col gap-2 pointer-events-none transition-theme">
+        <div className="absolute z-[9999] bottom-full left-1/2 -translate-x-1/2 mb-2 w-[280px] p-3 bg-[var(--surface-card)] rounded-[var(--radius-md)] shadow-xl border border-[var(--border-default)] flex flex-col gap-2 pointer-events-none transition-theme">
           <div className="flex items-start gap-2 min-w-0">
             <div className="w-5.5 h-5.5 rounded overflow-hidden bg-[var(--surface-inset)] flex-shrink-0 flex items-center justify-center border border-[var(--border-default)]/40 text-accent">
               {brand ? brand.icon("w-3.5 h-3.5") : <img src={favicon} className="w-3.5 h-3.5 object-contain" alt="" />}
@@ -257,20 +258,20 @@ export const MarkdownCitationLink = ({ citation, index }: { citation: any, index
         rel="noopener noreferrer"
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
-        className="inline-flex items-center justify-center w-4 h-4 rounded-[4px] transition-theme transform hover:scale-110 cursor-pointer overflow-hidden border border-transparent hover:border-accent/20"
+        className="inline-flex items-center justify-center w-4 h-4 rounded-shape-xs transition-theme transform hover:scale-110 cursor-pointer overflow-hidden border border-transparent hover:border-[var(--border-accent)] relative before:absolute before:-inset-2.5 before:content-['']"
       >
         <span 
-          className="w-3.5 h-3.5 flex items-center justify-center shrink-0 text-gray-400 group-hover/cite:text-accent group-hover/cite: transition-theme"
+          className="w-3.5 h-3.5 flex items-center justify-center shrink-0 text-[var(--text-muted)] group-hover/cite:text-[var(--fg-accent)] transition-theme"
           style={{ color: brand ? brand.color : 'inherit' }}
         >
-          {brand ? brand.icon("w-3.5 h-3.5 rounded-[4px]") : <img src={favicon} className="w-3.5 h-3.5 object-contain rounded-[4px] bg-[var(--surface-card)]" alt="" />}
+          {brand ? brand.icon("w-3.5 h-3.5 rounded-[var(--radius-xs)]") : <img src={favicon} className="w-3.5 h-3.5 object-contain rounded-[var(--radius-xs)] bg-[var(--surface-card)]" alt="" />}
         </span>
       </a>
 
       {showTooltip && (displayTitle || displayDesc) && (
-        <div className="absolute z-[9999] bottom-full left-1/2 -translate-x-1/2 mb-2 w-[280px] p-3 bg-[var(--surface-card)] rounded-xl shadow-xl border border-[var(--border-default)] flex flex-col gap-2 pointer-events-none transition-theme">
+        <div className="absolute z-[9999] bottom-full left-1/2 -translate-x-1/2 mb-2 w-[280px] p-3 bg-[var(--surface-card)] rounded-[var(--radius-md)] shadow-xl border border-[var(--border-default)] flex flex-col gap-2 pointer-events-none transition-theme">
           <div className="flex items-start gap-2 min-w-0">
-            <div className="w-5.5 h-5.5 rounded overflow-hidden bg-[var(--surface-inset)] flex-shrink-0 flex items-center justify-center border border-[var(--border-default)]/40 text-accent">
+            <div className="w-5.5 h-5.5 rounded overflow-hidden bg-[var(--surface-inset)] flex-shrink-0 flex items-center justify-center border border-[var(--border-default)]/40 text-[var(--fg-accent)]">
               {brand ? brand.icon("w-3.5 h-3.5") : <img src={favicon} className="w-3.5 h-3.5 object-contain" alt="" />}
             </div>
             <div className="flex-1 min-w-0">
@@ -423,12 +424,13 @@ export const BlockquoteWithActions = ({ children, dir }: { children: React.React
   let cleanedChildren = children;
   const rawText = extractTextFromChildren(children).trim();
   
-  // Strip duplicate prefix like "ملاحظة أمان:" or "ملاحظة أمان" or "Safety Note:" from children if present
-  if (rawText.startsWith('ملاحظة أمان:') || rawText.startsWith('ملاحظة أمان')) {
-    // We can clean React node tree or parse string
+  const isSecurityNote = /^(ملاحظة أمان|تنبيه أمني|safety note|security note|\[security\]|\[safety\])/i.test(rawText);
+  
+  // Strip duplicate prefix like "ملاحظة أمان:" or "Safety Note:" from children if present
+  if (isSecurityNote) {
     const processNode = (node: React.ReactNode): React.ReactNode => {
       if (typeof node === 'string') {
-        return node.replace(/^ملاحظة أمان[:\s]*/, '').replace(/^Safety Note[:\s]*/, '');
+        return node.replace(/^(ملاحظة أمان|تنبيه أمني|safety note|security note|\[security\]|\[safety\])[:\s]*/i, '');
       }
       if (Array.isArray(node)) {
         return node.map(processNode);
@@ -445,13 +447,15 @@ export const BlockquoteWithActions = ({ children, dir }: { children: React.React
   }
 
   return (
-    <div className="relative group/bq my-2 select-text">
-      <blockquote className="relative py-2 px-3.5 border-s-3 border-[var(--sys-color-primary)] bg-[var(--surface-subtle)]/60 rounded-r-shape-md border-y-0 border-e-0 transition-all hover:bg-[var(--surface-subtle)] shadow-2xs flex flex-col gap-1">
-        <div className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--sys-color-primary)]"></span>
-          <span>{dir === 'rtl' ? 'ملاحظة أمان' : 'Security Note'}</span>
-        </div>
-        <div className="text-xs font-medium leading-relaxed text-[var(--text-secondary)] ps-3">
+    <div className="relative group/bq my-4 sm:my-5 select-text" style={{ unicodeBidi: 'isolate' }}>
+      <blockquote className="relative py-3 px-4 border-s-4 border-[var(--fg-accent)] bg-[var(--surface-subtle)]/70 rounded-r-shape-md border-y-0 border-e-0 transition-all hover:bg-[var(--surface-subtle)] shadow-xs flex flex-col gap-1.5">
+        {isSecurityNote && (
+          <div className="text-xs font-bold text-[var(--fg-accent)] flex items-center gap-1.5 mb-0.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--fg-accent)]"></span>
+            <span>{dir === 'rtl' ? 'ملاحظة أمان' : 'Security Note'}</span>
+          </div>
+        )}
+        <div className="text-[13.5px] sm:text-[14px] font-medium leading-[1.85] text-[var(--text-primary)]">
           {cleanedChildren}
         </div>
       </blockquote>

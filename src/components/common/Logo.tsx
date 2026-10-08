@@ -9,7 +9,8 @@ export interface LogoProps {
   className?: string;
   showName?: boolean;
   nameClassName?: string;
-  fallbackType?: 'cpu' | 'sparkles';
+  fallbackType?: 'cpu' | 'sparkles' | 'brand';
+  shape?: 'rounded' | 'circle' | 'none';
 }
 
 export const Logo: React.FC<LogoProps> = ({
@@ -17,49 +18,58 @@ export const Logo: React.FC<LogoProps> = ({
   className = '',
   showName = false,
   nameClassName = 'font-bold text-sm text-[var(--text-primary)] font-sans tracking-tight',
-  fallbackType = 'cpu'
+  fallbackType = 'brand',
+  shape = 'rounded',
 }) => {
   const { siteSettings, theme, language } = useAppContext();
   const isRtl = language === 'ar';
+  const shapeClass = shape === 'circle' 
+    ? 'rounded-full' 
+    : shape === 'none' 
+    ? '' 
+    : 'rounded-shape-sm';
 
   const rawLogo = (theme === 'light' && siteSettings?.logoLightBase64) 
     ? siteSettings?.logoLightBase64 
     : siteSettings?.logoBase64;
-  const logoUrl = rawLogo ? resolveImageUrl(rawLogo, 'general') : null;
+  
+  // Prefer custom uploaded logo, then official brand default-logo.svg
+  const logoUrl = rawLogo ? resolveImageUrl(rawLogo, 'general') : '/brand/default-logo.svg';
+  
   const displayName = isRtl 
     ? (siteSettings?.siteNameAr || siteSettings?.siteName || 'بيربليكستا') 
     : (siteSettings?.siteName || 'Perplexta');
 
-  const fallback = (
-    <div 
-      className="w-8 h-8 rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-center justify-center text-accent shadow-2xs shrink-0 box-border overflow-hidden"
-      style={{ width: `${size}px`, height: `${size}px` }}
-    >
-      {fallbackType === 'cpu' ? (
-        <Cpu size={Math.max(13, Math.round(size * 0.45))} className="text-accent" />
-      ) : (
-        <Sparkles size={Math.max(13, Math.round(size * 0.45))} className="text-accent" />
-      )}
-    </div>
+  // Simple icon fallback without nested box/borders
+  const iconFallback = fallbackType === 'cpu' ? (
+    <Cpu size={Math.max(14, Math.round(size * 0.5))} className="text-accent" />
+  ) : fallbackType === 'sparkles' ? (
+    <Sparkles size={Math.max(14, Math.round(size * 0.5))} className="text-accent" />
+  ) : (
+    <img
+      src="/brand/default-logo.svg"
+      alt={displayName}
+      width={size}
+      height={size}
+      className="w-full h-full object-contain block"
+      loading="eager"
+      decoding="async"
+    />
   );
 
   return (
-    <div className={`inline-flex items-center gap-2 shrink-0 box-border select-none ${className}`}>
+    <div className={`inline-flex items-center gap-2.5 shrink-0 select-none ${className}`}>
       <div 
-        className="w-8 h-8 rounded-shape-sm overflow-hidden border border-[var(--border-default)] bg-[var(--surface-subtle)] flex items-center justify-center shrink-0 box-border shadow-2xs relative"
+        className={`${shape === 'none' ? '' : `border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-2xs ${shapeClass}`} overflow-hidden flex items-center justify-center shrink-0 relative`}
         style={{ width: `${size}px`, height: `${size}px` }}
       >
-        {logoUrl ? (
-          <NotificationIconRenderer
-            src={logoUrl}
-            alt={displayName}
-            size={size}
-            className="w-full h-full object-contain block p-0.5"
-            fallbackIcon={fallback}
-          />
-        ) : (
-          fallback
-        )}
+        <NotificationIconRenderer
+          src={logoUrl}
+          alt={displayName}
+          size={size}
+          className="w-full h-full object-contain block"
+          fallbackIcon={iconFallback}
+        />
       </div>
       {showName && (
         <span className={nameClassName}>

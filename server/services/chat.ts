@@ -1,17 +1,22 @@
 import jwt from 'jsonwebtoken';
 import { pool } from '../db/index.js';
 import { executeTaskLogic, cleanAIOutput, updateChatContextSummary } from './orchestrator.js';
-import { extractFollowUps } from '../utils/helpers.js';
+import { extractFollowUps, extractImmediateChatTitle } from '../utils/helpers.js';
 import { io } from '../config/socket.js';
 import { callAIProvider } from './ai.js';
 import { decrypt } from '../utils/crypto.js';
 import { getAppName } from './system.js';
 import { buildSystemPrompt } from '../config/protocol.js';
 import { VideoResourceProvider } from './videoResourceProvider.js';
+import { delCache } from '../utils/cache.js';
 
 export async function createChat(userId: string | number, title?: string) {
   if (!pool) throw new Error('Database initializing');
-  const result = await pool.query('INSERT INTO chats (user_id, title) VALUES ($1, $2) RETURNING *', [userId, title || 'New Chat']);
+  const safeTitle = (title && title.trim()) ? title.trim().substring(0, 255) : 'New Chat';
+  const result = await pool.query('INSERT INTO chats (user_id, title) VALUES ($1, $2) RETURNING *', [userId, safeTitle]);
+  if (userId) {
+    delCache(`chats:user:${userId}`);
+  }
   return result.rows[0];
 }
 
@@ -211,27 +216,65 @@ export async function handleChatMessage(socket: any, data: any) {
   }
 }
 
-export async function generateChatTitle(chatId: string, firstMessageContent: string) {
+export async function generateChatTitle(chatId: string | number, firstMessageContent: string, userId?: string | number) {
   try {
-    if (!pool) return;
-    const routeResult = await pool.query('SELECT * FROM tool_orchestrator WHERE tool_id = $1 AND is_active = true', ['perplexta_analysis']);
+    if (!pool || !firstMessageContent) return;
+
+    // Fetch existing chat data to verify ownership and title status
+    const chatRes = await pool.query('SELECT title, user_id FROM chats WHERE id = $1', [chatId]);
+    if (chatRes.rows.length === 0) return;
+    const currentTitle = chatRes.rows[0].title || '';
+    const resolvedUserId = userId || chatRes.rows[0].user_id;
+
+    // Instant Zero-latency extraction: ensure chat has a meaningful title immediately if missing or generic
+    const immediateTitle = extractImmediateChatTitle(firstMessageContent);
+    const isGenericTitle = !currentTitle || currentTitle === 'New Chat' || currentTitle === 'محادثة جديدة' || currentTitle === 'New Session' || currentTitle === 'New Conversation';
+
+    if (isGenericTitle) {
+      await pool.query('UPDATE chats SET title = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [immediateTitle, chatId]);
+      if (resolvedUserId) {
+        delCache(`chats:user:${resolvedUserId}`);
+      }
+      if (io && resolvedUserId) {
+        io.to(`user_${resolvedUserId}`).emit('chat_title_updated', { chatId: String(chatId), title: immediateTitle });
+        io.to(`user_${resolvedUserId}`).emit('chat_updated', { chatId: String(chatId) });
+      }
+    }
+
+    // Attempt AI background title refinement asynchronously
+    const routeResult = await pool.query(
+      `SELECT * FROM tool_orchestrator 
+       WHERE is_active = true 
+       AND tool_id IN ('perplexta_analysis', 'chat_fast', 'perplexta_general') 
+       ORDER BY CASE WHEN tool_id = 'perplexta_analysis' THEN 1 WHEN tool_id = 'chat_fast' THEN 2 ELSE 3 END 
+       LIMIT 1`
+    );
     if (routeResult.rows.length === 0) return;
 
     const route = routeResult.rows[0];
-    const appName = getAppName('en');
-    const systemPrompt = buildSystemPrompt(appName) + "\n\nGenerate a professional title for this chat based on the user's first message. Keep it short (max 50 chars).";
-
-    const keyRes = await pool.query('SELECT encrypted_key FROM api_keys_vault WHERE provider = $1', [route.primary_provider]);
+    const keyRes = await pool.query('SELECT encrypted_key FROM api_keys_vault WHERE provider = $1 AND is_active = true LIMIT 1', [route.primary_provider]);
     if (keyRes.rows.length === 0) return;
 
     const key = decrypt(keyRes.rows[0].encrypted_key);
-    const title = await callAIProvider(route.primary_provider, route.primary_model, key, firstMessageContent, systemPrompt);
+    const systemPrompt = "You are a concise title generator. Generate a crisp, short title (3 to 6 words maximum, no quotes, no trailing punctuation, strictly in the same language as the user's prompt) summarizing the user's inquiry.";
+
+    const refinedTitle = await callAIProvider(route.primary_provider, route.primary_model, key, firstMessageContent.substring(0, 500), systemPrompt);
     
-    if (title) {
-      await pool.query('UPDATE chats SET title = $1 WHERE id = $2', [title.trim().substring(0, 50), chatId]);
+    if (refinedTitle && typeof refinedTitle === 'string') {
+      const cleanRefined = refinedTitle.replace(/["'«»`]/g, '').replace(/^(title|topic):\s*/i, '').trim().substring(0, 50);
+      if (cleanRefined.length > 2 && !cleanRefined.toLowerCase().startsWith('error') && !cleanRefined.toLowerCase().startsWith('{')) {
+        await pool.query('UPDATE chats SET title = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [cleanRefined, chatId]);
+        if (resolvedUserId) {
+          delCache(`chats:user:${resolvedUserId}`);
+        }
+        if (io && resolvedUserId) {
+          io.to(`user_${resolvedUserId}`).emit('chat_title_updated', { chatId: String(chatId), title: cleanRefined });
+          io.to(`user_${resolvedUserId}`).emit('chat_updated', { chatId: String(chatId) });
+        }
+      }
     }
   } catch (error) {
-    console.error('[ChatService] Title Generation Error:', error);
+    console.warn('[ChatService] Background title generation warning (non-fatal):', (error as any)?.message || error);
   }
 }
 

@@ -24,6 +24,7 @@ import {
   Info
 } from 'lucide-react';
 import { toast } from '@/design-system';
+import { resolveToken } from '@/utils/tokenResolver';
 import {
   ResponsiveContainer,
   BarChart,
@@ -54,7 +55,7 @@ const DEFAULT_DATASET = [
 const CHART_COLORS = ['#0891b2', '#06b6d4', '#3b82f6', '#10b981', '#f59e0b'];
 
 export function ArtifactAIAnalysis({ artifact }: ArtifactAIAnalysisProps) {
-  const { language, resolvedTheme } = useAppContext();
+  const { language } = useAppContext();
   const { updateArtifactContent, setActiveTab } = useArtifact();
   const [selectedChartType, setSelectedChartType] = useState<'bar' | 'line' | 'pie'>('bar');
   const [snapshotUrl, setSnapshotUrl] = useState<string | null>(null);
@@ -62,7 +63,12 @@ export function ArtifactAIAnalysis({ artifact }: ArtifactAIAnalysisProps) {
   const [copiedAnalysis, setCopiedAnalysis] = useState(false);
 
   const isAr = language === 'ar';
-  const isDark = resolvedTheme === 'dark';
+
+  const chartGridColor = resolveToken('--border-default', '#334155');
+  const chartTextColor = resolveToken('--text-secondary', '#94a3b8');
+  const chartTooltipBg = resolveToken('--surface-card', '#0f172a');
+  const chartTooltipBorder = resolveToken('--border-default', '#334155');
+  const snapshotBg = resolveToken('--surface-page', '#0b101b');
 
   // Structural inspection metrics
   const inspection = useMemo(() => {
@@ -108,7 +114,7 @@ export function ArtifactAIAnalysis({ artifact }: ArtifactAIAnalysisProps) {
       const dataUrl = await toPng(iframe.contentDocument.body, {
         cacheBust: true,
         quality: 0.95,
-        backgroundColor: isDark ? '#0b101b' : '#ffffff'
+        backgroundColor: snapshotBg
       });
 
       setSnapshotUrl(dataUrl);
@@ -136,7 +142,7 @@ export function ArtifactAIAnalysis({ artifact }: ArtifactAIAnalysisProps) {
 <!-- ==============================================
      PERPLEXTA INTERACTIVE DATA CHART COMPONENT
      ============================================== -->
-<div class="my-6 p-6 bg-[var(--surface-card)] rounded-xl border border-[var(--border-default)] shadow-sm font-sans">
+<div class="my-6 p-6 bg-[var(--surface-card)] rounded-[var(--radius-md)] border border-[var(--border-default)] shadow-sm font-sans">
   <div class="flex items-center justify-between mb-4">
     <div>
       <h3 class="text-base font-bold text-[var(--text-primary)]">مؤشرات الأداء والتحليل البياني</h3>
@@ -209,7 +215,7 @@ const dataMetrics = [
       <div className="bg-[var(--surface-card)] border border-[var(--border-default)] rounded-shape-md p-4 sm:p-5 shadow-sm transition-theme">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--border-default)] pb-4 mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-shape-sm bg-[var(--surface-inset)] border border-[var(--border-default)] flex items-center justify-center text-[var(--sys-color-primary)] shrink-0">
+            <div className="w-10 h-10 rounded-shape-sm bg-[var(--surface-inset)] border border-[var(--border-default)] flex items-center justify-center text-[var(--fg-accent)] shrink-0">
               <Logo size={22} fallbackType="cpu" />
             </div>
             <div>
@@ -273,7 +279,7 @@ const dataMetrics = [
               <Cpu size={12} />
               <span>{isAr ? 'مؤشر الكفاءة' : 'Efficiency Score'}</span>
             </div>
-            <div className="text-lg font-mono font-extrabold text-emerald-500 mt-1">
+            <div className="text-lg font-mono font-extrabold text-[var(--fg-success)] mt-1">
               {inspection.complexityScore}/100
             </div>
           </div>
@@ -299,7 +305,7 @@ const dataMetrics = [
       <div className="bg-[var(--surface-card)] border border-[var(--border-default)] rounded-shape-md p-4 sm:p-5 shadow-sm transition-theme">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border-default)] pb-3 mb-4">
           <div className="flex items-center gap-2">
-            <BarChart3 size={16} className="text-[var(--sys-color-primary)]" />
+            <BarChart3 size={16} className="text-[var(--fg-accent)]" />
             <h3 className="text-xs sm:text-sm font-bold text-[var(--text-primary)]">
               {isAr ? 'معاينة الرسوم البيانية المباشرة (Data Visualizer)' : 'Live Chart Visualization Sandbox'}
             </h3>
@@ -353,15 +359,16 @@ const dataMetrics = [
           <ResponsiveContainer width="100%" height="100%">
             {selectedChartType === 'bar' ? (
               <BarChart data={DEFAULT_DATASET} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#e2e8f0'} opacity={0.6} />
-                <XAxis dataKey="name" stroke={isDark ? '#94a3b8' : '#64748b'} fontSize={11} tickLine={false} />
-                <YAxis stroke={isDark ? '#94a3b8' : '#64748b'} fontSize={11} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} opacity={0.6} />
+                <XAxis dataKey="name" stroke={chartTextColor} fontSize={11} tickLine={false} />
+                <YAxis stroke={chartTextColor} fontSize={11} tickLine={false} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                    borderColor: isDark ? '#334155' : '#e2e8f0',
+                    backgroundColor: chartTooltipBg,
+                    borderColor: chartTooltipBorder,
                     borderRadius: '8px',
-                    fontSize: '11px'
+                    fontSize: '11px',
+                    color: resolveToken('--text-primary', '#e6edf3')
                   }}
                 />
                 <Bar dataKey="value" fill="#0891b2" radius={[4, 4, 0, 0]} />
@@ -369,15 +376,16 @@ const dataMetrics = [
               </BarChart>
             ) : selectedChartType === 'line' ? (
               <LineChart data={DEFAULT_DATASET} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#e2e8f0'} opacity={0.6} />
-                <XAxis dataKey="name" stroke={isDark ? '#94a3b8' : '#64748b'} fontSize={11} tickLine={false} />
-                <YAxis stroke={isDark ? '#94a3b8' : '#64748b'} fontSize={11} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} opacity={0.6} />
+                <XAxis dataKey="name" stroke={chartTextColor} fontSize={11} tickLine={false} />
+                <YAxis stroke={chartTextColor} fontSize={11} tickLine={false} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                    borderColor: isDark ? '#334155' : '#e2e8f0',
+                    backgroundColor: chartTooltipBg,
+                    borderColor: chartTooltipBorder,
                     borderRadius: '8px',
-                    fontSize: '11px'
+                    fontSize: '11px',
+                    color: resolveToken('--text-primary', '#e6edf3')
                   }}
                 />
                 <Line type="monotone" dataKey="value" stroke="#0891b2" strokeWidth={2.5} dot={{ r: 4 }} />
@@ -387,10 +395,11 @@ const dataMetrics = [
               <PieChart>
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                    borderColor: isDark ? '#334155' : '#e2e8f0',
+                    backgroundColor: chartTooltipBg,
+                    borderColor: chartTooltipBorder,
                     borderRadius: '8px',
-                    fontSize: '11px'
+                    fontSize: '11px',
+                    color: resolveToken('--text-primary', '#e6edf3')
                   }}
                 />
                 <Pie
@@ -433,7 +442,7 @@ const dataMetrics = [
         <div className="bg-[var(--surface-card)] border border-[var(--border-default)] rounded-shape-md p-4 sm:p-5 shadow-sm transition-theme">
           <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-3 mb-3">
             <div className="flex items-center gap-2">
-              <Camera size={16} className="text-emerald-500" />
+              <Camera size={16} className="text-[var(--fg-success)]" />
               <h3 className="text-xs sm:text-sm font-bold text-[var(--text-primary)]">
                 {isAr ? 'الصورة البصرية الملتقطة للكانفاس' : 'Captured Visual Canvas'}
               </h3>
@@ -463,11 +472,11 @@ const dataMetrics = [
             </div>
           </div>
 
-          <div className="relative rounded-shape-sm overflow-hidden border border-[var(--border-default)] max-h-72 flex items-center justify-center bg-black/5 dark:bg-black/40">
+          <div className="relative rounded-shape-sm overflow-hidden border border-[var(--border-default)] max-h-72 flex items-center justify-center bg-[var(--surface-subtle)]">
             <img
               src={snapshotUrl}
               alt="Artifact Snapshot"
-              className="max-h-72 w-auto object-contain rounded"
+              className="max-h-72 w-auto object-contain rounded-shape-xs"
             />
           </div>
         </div>
@@ -499,7 +508,7 @@ const dataMetrics = [
             className="flex items-center justify-between p-3 min-h-[44px] text-right rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:bg-[var(--surface-inset)] transition-theme cursor-pointer group"
           >
             <div className="flex items-center gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-[var(--sys-color-primary)]" />
+              <span className="w-2 h-2 rounded-full bg-[var(--fg-accent)]" />
               <span className="text-xs font-bold text-[var(--text-primary)]">
                 {isAr ? 'تحليل معماري وتدقيق أداء الكود' : 'Deep Architecture & Performance Audit'}
               </span>
@@ -517,7 +526,7 @@ const dataMetrics = [
             className="flex items-center justify-between p-3 min-h-[44px] text-right rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:bg-[var(--surface-inset)] transition-theme cursor-pointer group"
           >
             <div className="flex items-center gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-[var(--sys-color-info)]" />
+              <span className="w-2 h-2 rounded-full bg-[var(--fg-info)]" />
               <span className="text-xs font-bold text-[var(--text-primary)]">
                 {isAr ? 'مواءمة التصميم مع هوية Perplexta M3' : 'Align with Perplexta M3 Visual Identity'}
               </span>
@@ -535,7 +544,7 @@ const dataMetrics = [
             className="flex items-center justify-between p-3 min-h-[44px] text-right rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:bg-[var(--surface-inset)] transition-theme cursor-pointer group"
           >
             <div className="flex items-center gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-[var(--sys-color-success)]" />
+              <span className="w-2 h-2 rounded-full bg-[var(--fg-success)]" />
               <span className="text-xs font-bold text-[var(--text-primary)]">
                 {isAr ? 'تحويل إلى لوحة بيانات وإحصائيات متكاملة' : 'Convert into Full Analytics Dashboard'}
               </span>
@@ -553,7 +562,7 @@ const dataMetrics = [
             className="flex items-center justify-between p-3 min-h-[44px] text-right rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:bg-[var(--surface-inset)] transition-theme cursor-pointer group"
           >
             <div className="flex items-center gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-[var(--sys-color-warning)]" />
+              <span className="w-2 h-2 rounded-full bg-[var(--fg-warning)]" />
               <span className="text-xs font-bold text-[var(--text-primary)]">
                 {isAr ? 'فحص التوافقية وإمكانية الوصول WCAG' : 'Accessibility & WCAG AA Compliance Check'}
               </span>

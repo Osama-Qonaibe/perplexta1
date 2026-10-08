@@ -4,6 +4,7 @@ import { useAppContext } from '../../../context/AppContext';
 import { useArtifact } from '../../../context/ArtifactContext';
 import { toast } from '@/design-system';
 import { Search } from 'lucide-react';
+import DOMPurify from 'dompurify';
 import Prism from 'prismjs';
 import 'prismjs/themes/prism-tomorrow.css';
 import 'prismjs/components/prism-javascript';
@@ -89,14 +90,16 @@ export function ArtifactCode({ artifact }: ArtifactCodeProps) {
   // Highlighted code output
   const highlightedCode = useMemo(() => {
     const grammar = Prism.languages[prismLanguage] || Prism.languages.markup;
+    let rawHtml = '';
     try {
-      return Prism.highlight(codeValue, grammar, prismLanguage);
+      rawHtml = Prism.highlight(codeValue, grammar, prismLanguage);
     } catch (e) {
-      return codeValue
+      rawHtml = codeValue
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
     }
+    return DOMPurify.sanitize(rawHtml, { ALLOWED_TAGS: ['span'], ALLOWED_ATTR: ['class', 'style'] });
   }, [codeValue, prismLanguage]);
 
   const lines = useMemo(() => codeValue.split('\n'), [codeValue]);
@@ -166,7 +169,7 @@ export function ArtifactCode({ artifact }: ArtifactCodeProps) {
               spellCheck={false}
               autoCapitalize="off"
               autoComplete="off"
-              className="flex-1 h-full w-full p-4 font-mono text-[12px] leading-5 bg-transparent text-slate-100 focus:outline-none resize-none overflow-auto custom-scrollbar selection:bg-cyan-500/30"
+              className="flex-1 h-full w-full p-4 font-mono text-[12px] leading-5 bg-transparent text-slate-100 focus:outline-none resize-none overflow-auto custom-scrollbar selection:bg-[var(--bg-accent-muted)]"
               style={{ tabSize: 2 }}
             />
           </div>
@@ -186,12 +189,12 @@ export function ArtifactCode({ artifact }: ArtifactCodeProps) {
             <pre 
               dir="ltr" 
               style={{ direction: 'ltr', unicodeBidi: 'isolate', textAlign: 'left' }}
-              className="flex-1 p-4 font-mono text-[12px] leading-5 text-slate-100 overflow-auto custom-scrollbar m-0 select-text text-left dir-ltr"
+              className="flex-1 p-4 font-mono text-[12px] leading-5 text-slate-100 overflow-x-auto overflow-y-auto custom-scrollbar m-0 select-text text-left dir-ltr w-full max-w-full min-w-0"
             >
               <code
                 dir="ltr"
                 style={{ direction: 'ltr', unicodeBidi: 'isolate', textAlign: 'left' }}
-                className={`language-${prismLanguage}`}
+                className={`language-${prismLanguage} inline-block min-w-full w-max whitespace-pre font-mono pr-6`}
                 dangerouslySetInnerHTML={{ __html: highlightedCode }}
               />
             </pre>

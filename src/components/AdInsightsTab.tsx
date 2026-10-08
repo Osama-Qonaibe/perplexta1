@@ -133,8 +133,8 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
 
   if (loading) {
     return (
-      <div className="p-6 text-center text-xs text-[var(--text-muted)] flex flex-col items-center justify-center gap-2 bg-[var(--surface-card)] rounded-[12px] border border-[var(--border-default)] my-2">
-        <RefreshCw size={22} className="animate-spin text-accent" />
+      <div className="p-6 text-center text-xs text-[var(--text-muted)] flex flex-col items-center justify-center gap-2 bg-[var(--surface-card)] rounded-[var(--radius-lg)] border border-[var(--border-default)] my-2">
+        <RefreshCw size={22} className="animate-spin text-[var(--fg-accent)]" />
         <span className="font-bold text-[var(--text-primary)]">
           {isRtl ? 'جاري تحليل إحصائيات وصول الإعلان ومعدلات التفاعل...' : 'Analyzing ad reach & interaction rate data...'}
         </span>
@@ -144,11 +144,11 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
 
   if (error || !data) {
     return (
-      <div className="p-4 text-center text-xs text-red-500 bg-red-500/10 rounded-[12px] border border-red-500/20 my-2 flex items-center justify-between">
+      <div className="p-4 text-center text-xs text-red-500 bg-red-500/10 rounded-[var(--radius-lg)] border border-red-500/20 my-2 flex items-center justify-between">
         <span>{error || (isRtl ? 'تعذر جلب بيانات التحليلات' : 'Unable to fetch analytics data')}</span>
         <button
           onClick={fetchInsights}
-          className="px-2.5 py-1 rounded-[6px] bg-red-500 text-white font-bold text-[10px] flex items-center gap-1 cursor-pointer"
+          className="px-2.5 py-1 rounded-[var(--radius-xs)] bg-red-500 text-white font-bold text-[10px] flex items-center gap-1 cursor-pointer"
         >
           <RefreshCw size={11} />
           <span>{isRtl ? 'إعادة المحاولة' : 'Retry'}</span>
@@ -162,17 +162,17 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
-      className="p-3.5 sm:p-4 bg-[var(--surface-card)] text-[var(--text-primary)] rounded-[12px] border border-[var(--border-default)] space-y-4 my-2 overflow-hidden transition-theme"
+      className="p-3.5 sm:p-4 bg-[var(--surface-card)] text-[var(--text-primary)] rounded-[var(--radius-lg)] border border-[var(--border-default)] space-y-4 my-2 overflow-hidden transition-theme"
     >
       <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-2.5">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-[8px] bg-accent/20 text-[var(--fg-accent)] border border-accent/30">
+          <div className="p-1.5 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] text-[var(--fg-accent)] border border-[var(--border-accent)]">
             <BarChart2 size={16} />
           </div>
           <div>
             <h4 className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1">
               <span>{isRtl ? 'لوحة تحليلات ورؤى الإعلان' : 'Creator Ad Insights Panel'}</span>
-              <span className="text-[9px] px-2 py-0.5 rounded-[4px] bg-accent text-black font-extrabold">
+              <span className="text-[9px] px-2 py-0.5 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] text-[var(--fg-accent)] border border-[var(--border-accent)] font-extrabold">
                 Live Analytics
               </span>
             </h4>
@@ -185,7 +185,7 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={fetchInsights}
-            className="p-1.5 rounded-[8px] bg-[var(--surface-subtle)] hover:bg-[var(--surface-inset)] text-[var(--text-muted)] hover:text-[var(--text-primary)] text-[10px] flex items-center gap-1 border border-[var(--border-default)] cursor-pointer transition-theme"
+            className="p-1.5 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-inset)] text-[var(--text-muted)] hover:text-[var(--text-primary)] text-[10px] flex items-center gap-1 border border-[var(--border-default)] cursor-pointer transition-theme"
             title={isRtl ? 'تحديث' : 'Refresh'}
           >
             <RefreshCw size={12} />
@@ -193,7 +193,7 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1.5 rounded-[8px] bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 text-[10px] flex items-center gap-1 cursor-pointer transition-theme"
+              className="p-1.5 rounded-[var(--radius-sm)] bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 text-[10px] flex items-center gap-1 cursor-pointer transition-theme"
               title={isRtl ? 'إغلاق' : 'Close'}
             >
               <X size={14} />
@@ -205,7 +205,7 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
       {/* 4 Metric Cards Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {/* Metric 1: Impressions / View Counts */}
-        <div className="p-2.5 rounded-[8px] bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-1">
+        <div className="p-2.5 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-1">
           <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-bold">
             <span>{isRtl ? 'إجمالي المشاهدات' : 'Total Views'}</span>
             <Eye size={13} className="text-blue-500" />
@@ -222,7 +222,7 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
         </div>
 
         {/* Metric 2: Interaction Rate / CTR */}
-        <div className="p-2.5 rounded-[8px] bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-1">
+        <div className="p-2.5 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-1">
           <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-bold">
             <span>{isRtl ? 'معدل التفاعل (CTR)' : 'Interaction Rate'}</span>
             <TrendingUp size={13} className="text-[var(--fg-accent)]" />
@@ -239,7 +239,7 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
         </div>
 
         {/* Metric 3: Total Clicks & Inquiries */}
-        <div className="p-2.5 rounded-[8px] bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-1">
+        <div className="p-2.5 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-1">
           <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-bold">
             <span>{isRtl ? 'النقرات والتواصل' : 'Clicks & Leads'}</span>
             <MousePointerClick size={13} className="text-amber-500" />
@@ -256,7 +256,7 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
         </div>
 
         {/* Metric 4: Estimated Unique Reach */}
-        <div className="p-2.5 rounded-[8px] bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-1">
+        <div className="p-2.5 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-1">
           <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-bold">
             <span>{isRtl ? 'الوصول الفريد' : 'Current Reach'}</span>
             <Users size={13} className="text-purple-500" />
@@ -274,7 +274,7 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
       </div>
 
       {/* Engagement Breakdown Pills */}
-      <div className="grid grid-cols-4 gap-1 p-2 rounded-[8px] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[10px] text-center">
+      <div className="grid grid-cols-4 gap-1 p-2 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[10px] text-center">
         <div className="space-y-0.5">
           <span className="text-[var(--text-muted)] flex items-center justify-center gap-1">
             <Heart size={10} className="text-red-500" />
@@ -306,7 +306,7 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
       </div>
 
       {/* 7-Day Reach Trend Visual Chart */}
-      <div className="p-3 rounded-[8px] bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-2">
+      <div className="p-3 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-2">
         <div className="flex items-center justify-between text-[11px] font-bold text-[var(--text-primary)]">
           <span className="flex items-center gap-1">
             <Zap size={13} className="text-[var(--fg-accent)]" />
@@ -351,7 +351,7 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
       {/* Demographic & Geographic Reach Distribution */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* Geographic Top Cities */}
-        <div className="p-2.5 rounded-[8px] bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-2 text-[10px]">
+        <div className="p-2.5 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-2 text-[10px]">
           <div className="flex items-center justify-between font-bold text-[var(--text-primary)]">
             <span className="flex items-center gap-1">
               <MapPin size={12} className="text-[var(--fg-accent)]" />
@@ -369,7 +369,7 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
                 </div>
                 <div className="w-full bg-[var(--surface-inset)] h-1.5 rounded-full overflow-hidden">
                   <div
-                    className="bg-accent h-full rounded-full transition-theme"
+                    className="bg-[var(--fg-accent)] h-full rounded-full transition-theme"
                     style={{ width: `${loc.percentage}%` }}
                   />
                 </div>
@@ -379,7 +379,7 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
         </div>
 
         {/* Device Types */}
-        <div className="p-2.5 rounded-[8px] bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-2 text-[10px]">
+        <div className="p-2.5 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-2 text-[10px]">
           <div className="flex items-center justify-between font-bold text-[var(--text-primary)]">
             <span className="flex items-center gap-1">
               <Smartphone size={12} className="text-blue-500" />
@@ -390,15 +390,15 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
 
           <div className="space-y-2 pt-1">
             {data.devices.map((dev, idx) => (
-              <div key={`dev-insight-${idx}-${dev.device}`} className="flex items-center justify-between p-1.5 rounded-[6px] bg-[var(--surface-inset)] border border-[var(--border-default)]">
+              <div key={`dev-insight-${idx}-${dev.device}`} className="flex items-center justify-between p-1.5 rounded-[var(--radius-xs)] bg-[var(--surface-inset)] border border-[var(--border-default)]">
                 <span className="text-[var(--text-muted)] font-medium">{dev.device}</span>
-                <span className="font-bold text-[var(--fg-accent)] bg-accent/10 px-2 py-0.5 rounded-[4px] border border-accent/20">
+                <span className="font-bold text-[var(--fg-accent)] bg-[var(--surface-subtle)] px-2 py-0.5 rounded-[var(--radius-xs)] border border-[var(--border-accent)]">
                   {dev.percentage}%
                 </span>
               </div>
             ))}
 
-            <div className="p-2 rounded-[6px] bg-[var(--surface-inset)] border border-[var(--border-default)] text-[9.5px] text-[var(--fg-accent)] flex items-center gap-1 mt-2">
+            <div className="p-2 rounded-[var(--radius-xs)] bg-[var(--surface-inset)] border border-[var(--border-default)] text-[9.5px] text-[var(--fg-accent)] flex items-center gap-1 mt-2">
               <Sparkles size={13} className="shrink-0 text-[var(--fg-accent)]" />
               <span>
                 {isRtl
@@ -416,7 +416,7 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
           {data.recommendations.map((rec, idx) => (
             <div
               key={`rec-insight-${idx}-${rec.title_en || rec.title_ar}`}
-              className="p-2.5 rounded-[8px] bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-start justify-between gap-2"
+              className="p-2.5 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-start justify-between gap-2"
             >
               <div className="space-y-0.5 text-start">
                 <h5 className="text-[11px] font-bold text-[var(--fg-accent)] flex items-center gap-1">
@@ -431,7 +431,7 @@ export const AdInsightsTab: React.FC<AdInsightsTabProps> = ({
               {onBoostClick && !data.is_boosted && (
                 <button
                   onClick={onBoostClick}
-                  className="px-3 py-1.5 rounded-[var(--radius-xs)] bg-accent text-black hover:opacity-90 font-bold text-[10px] flex items-center gap-1 shrink-0 transition-theme cursor-pointer"
+                  className="px-3 py-1.5 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-page)] text-[var(--fg-accent)] border border-[var(--border-accent)] font-bold text-[10px] flex items-center gap-1 shrink-0 transition-theme cursor-pointer"
                 >
                   <Rocket size={11} />
                   <span>{isRtl ? 'ترقية التمويل' : 'Boost Now'}</span>

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { HighlightText } from '../../HighlightText';
 import { ThinkingStep } from '../types';
 import { AssistantIcon } from '@/design-system';
+import { CognitiveOrbitRing } from '../common/CognitiveOrbitRing';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -14,6 +15,7 @@ interface ThinkingStepsProps {
   dir: 'ltr' | 'rtl';
   query?: string;
   thinkingTime?: number | string | null;
+  tool?: string;
 }
 
 export const ThinkingSteps: React.FC<ThinkingStepsProps> = ({ 
@@ -22,7 +24,8 @@ export const ThinkingSteps: React.FC<ThinkingStepsProps> = ({
   isProcessing = false, 
   dir, 
   query, 
-  thinkingTime 
+  thinkingTime,
+  tool
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [liveSeconds, setLiveSeconds] = useState(0);
@@ -55,12 +58,25 @@ export const ThinkingSteps: React.FC<ThinkingStepsProps> = ({
   // Check if raw thinking trace is available either via prop or inside steps
   const extractedRaw = rawThinking || (steps && steps.find((s: any) => s.is_raw_trace)?.step);
 
-  const hasExplicitSteps = steps && steps.length > 0 && !steps[0]?.is_raw_trace;
-  const displaySteps = hasExplicitSteps ? steps : [
+  const isImageTool = tool === 'image';
+  const isVideoTool = tool === 'video';
+
+  const defaultSteps = isImageTool ? [
+    { step: dir === 'rtl' ? 'تحليل التوجيه الفني وتحديد التكوين البصري' : 'Prompt & Visual Composition Analysis', status: 'completed' as const },
+    { step: dir === 'rtl' ? 'معالجة الترددات والطبقات التوليدية العصبونية' : 'Neural Latent Diffusion & Sampling', status: 'completed' as const },
+    { step: dir === 'rtl' ? 'الرندرة النهائية وتطبيق فلاتر الدقة والوضوح' : 'High-Resolution Rendering & Polish', status: 'completed' as const }
+  ] : isVideoTool ? [
+    { step: dir === 'rtl' ? 'تحليل المشهد الزمني وتوليد الإطارات المفتاحية' : 'Keyframe Synthesis & Temporal Planning', status: 'completed' as const },
+    { step: dir === 'rtl' ? 'رندرة وتنعيم الحركة الحركية العصبونية' : 'Motion Flow Interpolation & Physics', status: 'completed' as const },
+    { step: dir === 'rtl' ? 'الترميز النهائي للملف عالي الوضوح' : 'High-Definition Video Encoding', status: 'completed' as const }
+  ] : [
     { step: dir === 'rtl' ? 'تحليل وسياق الاستفسار وتحديد المتطلبات' : 'Context & Query Requirement Analysis', status: 'completed' as const },
     { step: dir === 'rtl' ? 'البحث والتحقق من المعارف والمصادر المتخصصة' : 'Deep Knowledge & Fact Retrieval', status: 'completed' as const },
     { step: dir === 'rtl' ? 'صياغة الاستجابة الدقيقة وتنظيم التنسيق النهائي' : 'Synthesizing Precise Structured Response', status: 'completed' as const }
   ];
+
+  const hasExplicitSteps = steps && steps.length > 0 && !steps[0]?.is_raw_trace;
+  const displaySteps = hasExplicitSteps ? steps : defaultSteps;
 
   const isCurrentlyProcessing = isProcessing || (steps ? steps.some(s => s.status === 'processing') : false);
 
@@ -72,34 +88,46 @@ export const ThinkingSteps: React.FC<ThinkingStepsProps> = ({
 
   const formattedTime = `${displayedTimeVal}s`;
 
+  const headerLabel = isCurrentlyProcessing
+    ? (isImageTool 
+        ? (dir === 'rtl' ? 'جاري إنشاء وتوليد الصورة...' : 'Synthesizing & Rendering Image...') 
+        : isVideoTool 
+          ? (dir === 'rtl' ? 'جاري توليد الفيديو والمشاهد...' : 'Rendering Video Sequences...') 
+          : (dir === 'rtl' ? 'جاري التفكير والتحليل...' : 'Reasoning & Analyzing...'))
+    : (isImageTool 
+        ? (dir === 'rtl' ? 'تم إنشاء وتوليد الصورة بنجاح' : 'Image Generated Successfully') 
+        : isVideoTool 
+          ? (dir === 'rtl' ? 'تم توليد الفيديو بنجاح' : 'Video Generated Successfully') 
+          : (dir === 'rtl' ? 'تم التفكير والتحليل' : 'Reasoning & Analysis'));
+
   return (
     <div className="mb-3 bg-transparent border-0 overflow-hidden transition-all duration-200 select-none" id="thinking-steps-container">
       {/* Header Bar */}
       <button
         type="button"
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="group inline-flex items-center gap-2 py-1 px-2 rounded-shape-sm text-xs font-bold bg-[var(--surface-subtle)] hover:bg-[var(--surface-container-high)] border border-[var(--border-default)] transition-all cursor-pointer select-none"
+        className="group inline-flex items-center gap-2 h-8 px-2.5 sm:px-3 rounded-shape-sm text-xs font-medium bg-[var(--surface-card)] hover:bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:border-[var(--border-accent)]/60 transition-colors cursor-pointer select-none shadow-2xs"
       >
         <div className="flex items-center gap-1.5 min-w-0">
-          <div className="relative flex items-center justify-center shrink-0">
+          <div className="relative flex items-center justify-center shrink-0 w-[22px] h-[22px]">
             <AssistantIcon 
-              size={13} 
-              isSpinning={isCurrentlyProcessing} 
+              size={12} 
+              fallbackType="cpu"
+              isSpinning={false} 
               dir={dir} 
-              className="text-accent shrink-0" 
+              className="text-accent shrink-0 relative z-10" 
             />
-            {isCurrentlyProcessing && (
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 2.5, ease: 'linear' }}
-                className="absolute -inset-1 rounded-full border border-dashed border-accent/50 pointer-events-none"
-              />
-            )}
+            <CognitiveOrbitRing
+              isSpinning={isCurrentlyProcessing}
+              dir={dir}
+              size={24}
+              radius={10}
+              strokeWidth={1.5}
+              strokeDasharray="4.5 2.5"
+            />
           </div>
           <span className="font-bold text-xs text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">
-            {isCurrentlyProcessing
-              ? (dir === 'rtl' ? 'جاري التفكير والتحليل...' : 'Reasoning & Analyzing...')
-              : (dir === 'rtl' ? 'تم التفكير والتحليل' : 'Reasoning & Analysis')}
+            {headerLabel}
           </span>
           <span className="text-[10.5px] font-mono font-semibold text-[var(--text-muted)]">
             ({formattedTime})
@@ -144,7 +172,7 @@ export const ThinkingSteps: React.FC<ThinkingStepsProps> = ({
                     className="flex items-center gap-2.5 group"
                   >
                     {step.status === 'completed' || !isCurrentlyProcessing ? (
-                      <div className="w-4 h-4 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-500 shrink-0">
+                      <div className="w-4 h-4 rounded-full bg-[var(--status-success-subtle)] border border-[var(--fg-success)]/30 flex items-center justify-center text-[var(--fg-success)] shrink-0">
                         <Check size={10} strokeWidth={3} />
                       </div>
                     ) : step.status === 'processing' || isCurrentlyProcessing ? (

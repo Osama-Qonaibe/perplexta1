@@ -28,21 +28,21 @@ export const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
     }
   }, [src]);
 
-  const fallbackImage = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80';
+  const fallbackImage = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect width="400" height="300" fill="%23161b22"/><circle cx="200" cy="150" r="40" fill="%2310b981" opacity="0.3"/><path d="M185 150 L200 135 L215 150" stroke="%2310b981" stroke-width="3" fill="none"/></svg>';
   const activeSrc = isError ? (placeholderSrc || fallbackImage) : src;
 
   return (
-    <div className={`relative overflow-hidden bg-gray-100 dark:bg-gray-900 ${wrapperClassName}`}>
+    <div className={`relative overflow-hidden bg-gray-100 dark:bg-[var(--surface-card)] ${wrapperClassName}`}>
       {/* Low-res or blur placeholder */}
       {!isLoaded && !isError && (
-        <div className="absolute inset-0 bg-gray-200 dark:bg-gray-800 animate-pulse filter blur-xl scale-110" />
+        <div className="absolute inset-0 bg-gray-200 dark:bg-[var(--surface-subtle)] animate-pulse filter blur-xl scale-110" />
       )}
 
       {placeholderSrc && !isLoaded && !isError && (
         <img
           src={placeholderSrc}
           alt=""
-          className={`absolute inset-0 w-full h-full object-cover filter blur-lg scale-105 transition-opacity duration-500 ${
+          className={`absolute inset-0 w-full h-full object-cover filter blur-lg scale-105 transition-opacity duration-slow ${
             isLoaded ? 'opacity-0' : 'opacity-100'
           }`}
           aria-hidden="true"

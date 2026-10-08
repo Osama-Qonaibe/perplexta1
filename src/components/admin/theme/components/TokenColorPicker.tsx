@@ -49,7 +49,7 @@ export const TokenColorPicker: React.FC<TokenColorPickerProps> = ({
             className="flex items-center gap-1 text-[11px] font-mono bg-[var(--surface-inset)] hover:bg-[var(--surface-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] px-2 py-0.5 rounded border border-[var(--border-default)] transition-colors cursor-pointer"
             title={isAr ? 'نسخ كود المتغير' : 'Copy CSS variable'}
           >
-            {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+            {copied ? <Check size={12} className="text-[var(--fg-success)]" /> : <Copy size={12} />}
             <span>{definition.key}</span>
           </button>
         </div>

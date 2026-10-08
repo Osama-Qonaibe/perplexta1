@@ -4,10 +4,69 @@ import { safeStorageGet, safeStorageSet } from '../utils/safeStorage';
 export type PwaInstallState = 'idle' | 'installing' | 'installed' | 'dismissed';
 export type MobilePlatform = 'ios-safari' | 'ios-other' | 'android-chrome' | 'android-other' | 'desktop';
 
+export interface StandaloneWebviewDetection {
+  isStandalone: boolean;
+  isWebview: boolean;
+  isStandaloneWebview: boolean;
+  isStandardBrowser: boolean;
+}
+
+/**
+ * Detects if the user is running the app inside a standalone webview (Android/iOS WebView, TWA, standalone PWA, or in-app browser) vs a standard web browser.
+ */
+export function detectStandaloneWebview(): StandaloneWebviewDetection {
+  if (typeof window === 'undefined') {
+    return {
+      isStandalone: false,
+      isWebview: false,
+      isStandaloneWebview: false,
+      isStandardBrowser: true,
+    };
+  }
+
+  const ua = (window.navigator.userAgent || '').toLowerCase();
+  const nav = window.navigator as any;
+
+  // 1. PWA Standalone / TWA / Display-mode detection
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: fullscreen)').matches ||
+    window.matchMedia('(display-mode: minimal-ui)').matches ||
+    nav.standalone === true ||
+    (document.referrer ? document.referrer.includes('android-app://') : false);
+
+  // 2. Android & iOS Webview / In-App Browser detection
+  const isAndroidWebview = /android/i.test(ua) && (
+    /wv/i.test(ua) || 
+    (/version\/[\d.]+/i.test(ua) && !/chrome\/[\d.]+/i.test(ua))
+  );
+  
+  const isIosWebview = (
+    /(iphone|ipod|ipad).*applewebkit(?!.*safari)/i.test(ua) ||
+    nav.standalone === true
+  );
+
+  const isInAppBrowser = /fbav|instagram|line\/|twitter|micromessenger|snapchat|gsa|webview|tiktok/i.test(ua);
+
+  const isWebview = isAndroidWebview || isIosWebview || isInAppBrowser;
+  const isStandaloneWebview = isStandalone || isWebview;
+  const isStandardBrowser = !isStandaloneWebview;
+
+  return {
+    isStandalone,
+    isWebview,
+    isStandaloneWebview,
+    isStandardBrowser,
+  };
+}
+
 export interface UsePwaInstallReturn {
   installState: PwaInstallState;
   canInstall: boolean;
   isStandalone: boolean;
+  isWebview: boolean;
+  isStandaloneWebview: boolean;
+  isStandardBrowser: boolean;
   isIos: boolean;
   isIosSafari: boolean;
   isAndroid: boolean;
@@ -41,7 +100,8 @@ export function getDismissCooldownMs(count: number): number {
 export function usePwaInstall(): UsePwaInstallReturn {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [installState, setInstallState] = useState<PwaInstallState>('idle');
-  const [isStandalone, setIsStandalone] = useState<boolean>(false);
+  const [pwaDetection, setPwaDetection] = useState<StandaloneWebviewDetection>(detectStandaloneWebview());
+  const [isStandalone, setIsStandalone] = useState<boolean>(pwaDetection.isStandalone);
   const [isIos, setIsIos] = useState<boolean>(false);
   const [isIosSafari, setIsIosSafari] = useState<boolean>(false);
   const [isAndroid, setIsAndroid] = useState<boolean>(false);
@@ -49,9 +109,20 @@ export function usePwaInstall(): UsePwaInstallReturn {
   const [mobilePlatform, setMobilePlatform] = useState<MobilePlatform>('desktop');
   const [dismissCount, setDismissCount] = useState<number>(0);
 
-  // Detect browser, mobile OS & standalone mode
+  // Detect browser, mobile OS & standalone/webview mode
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    const updateDetection = () => {
+      const res = detectStandaloneWebview();
+      setPwaDetection(res);
+      setIsStandalone(res.isStandalone);
+    };
+
+    updateDetection();
+    window.addEventListener('resize', updateDetection);
+    const mql = window.matchMedia('(display-mode: standalone)');
+    mql.addEventListener?.('change', updateDetection);
 
     const ua = window.navigator.userAgent.toLowerCase();
     
@@ -80,11 +151,7 @@ export function usePwaInstall(): UsePwaInstallReturn {
     setIsAndroidChrome(androidChrome);
     setMobilePlatform(platform);
 
-    const checkStandalone = 
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true ||
-      document.referrer.includes('android-app://');
-
+    const checkStandalone = detectStandaloneWebview().isStandalone;
     setIsStandalone(checkStandalone);
 
     // Read dismissal metrics & cooldown
@@ -106,26 +173,45 @@ export function usePwaInstall(): UsePwaInstallReturn {
     }
 
     // Check if marked as installed
-    const wasInstalled = safeStorageGet(STORAGE_INSTALLED_KEY) === 'true';
+    const wasInstalled = safeStorageGet(STORAGE_INSTALLED_KEY) === 'true' ||
+      safeStorageGet('pwa_app_installed') === 'true';
+
     if (checkStandalone || wasInstalled) {
       setInstallState('installed');
     }
+
+    return () => {
+      window.removeEventListener('resize', updateDetection);
+      mql.removeEventListener?.('change', updateDetection);
+    };
   }, []);
 
   // Listen for native beforeinstallprompt, captured prompt, & appinstalled browser events
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    const isInstalledAlready = () => {
+      return (
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone === true ||
+        document.referrer.includes('android-app://') ||
+        safeStorageGet(STORAGE_INSTALLED_KEY) === 'true' ||
+        safeStorageGet('pwa_app_installed') === 'true'
+      );
+    };
+
     const handleCaptured = () => {
       if ((window as any).__deferredPwaPrompt) {
         setDeferredPrompt((window as any).__deferredPwaPrompt);
-        if (safeStorageGet(STORAGE_INSTALLED_KEY) !== 'true') {
+        if (!isInstalledAlready()) {
           const lastDismissedTime = safeStorageGet(STORAGE_DISMISSED_KEY);
           const savedCount = parseInt(safeStorageGet(STORAGE_DISMISS_COUNT_KEY) || '0', 10);
           const elapsed = lastDismissedTime ? Date.now() - Number(lastDismissedTime) : Infinity;
           if (elapsed >= getDismissCooldownMs(savedCount)) {
             setInstallState('idle');
           }
+        } else {
+          setInstallState('installed');
         }
       }
     };
@@ -134,13 +220,15 @@ export function usePwaInstall(): UsePwaInstallReturn {
       e.preventDefault();
       (window as any).__deferredPwaPrompt = e;
       setDeferredPrompt(e);
-      if (safeStorageGet(STORAGE_INSTALLED_KEY) !== 'true') {
+      if (!isInstalledAlready()) {
         const lastDismissedTime = safeStorageGet(STORAGE_DISMISSED_KEY);
         const savedCount = parseInt(safeStorageGet(STORAGE_DISMISS_COUNT_KEY) || '0', 10);
         const elapsed = lastDismissedTime ? Date.now() - Number(lastDismissedTime) : Infinity;
         if (elapsed >= getDismissCooldownMs(savedCount)) {
           setInstallState('idle');
         }
+      } else {
+        setInstallState('installed');
       }
     };
 
@@ -149,9 +237,6 @@ export function usePwaInstall(): UsePwaInstallReturn {
       (window as any).__deferredPwaPrompt = null;
       setInstallState('installed');
       safeStorageSet(STORAGE_INSTALLED_KEY, 'true');
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('pwa-app-installed'));
-      }
     };
 
     window.addEventListener('pwa-prompt-captured', handleCaptured);
@@ -179,9 +264,6 @@ export function usePwaInstall(): UsePwaInstallReturn {
         setDeferredPrompt(null);
         setInstallState('installed');
         safeStorageSet(STORAGE_INSTALLED_KEY, 'true');
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('pwa-app-installed'));
-        }
         return true;
       } else {
         setInstallState('idle');
@@ -240,7 +322,10 @@ export function usePwaInstall(): UsePwaInstallReturn {
   return {
     installState,
     canInstall,
-    isStandalone,
+    isStandalone: pwaDetection.isStandalone,
+    isWebview: pwaDetection.isWebview,
+    isStandaloneWebview: pwaDetection.isStandaloneWebview,
+    isStandardBrowser: pwaDetection.isStandardBrowser,
     isIos,
     isIosSafari,
     isAndroid,

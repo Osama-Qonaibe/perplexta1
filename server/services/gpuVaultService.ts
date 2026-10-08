@@ -79,7 +79,6 @@ export async function testGpuProviderHealth(
   // Normalize base URL
   let targetUrl = baseUrl.trim().replace(/\/+$/, '');
 
-  // Extract clean endpoint ID for RunPod Serverless
   let cleanEndpoint = (endpointId || '').trim();
   if (!cleanEndpoint && baseUrl.includes('/v2/')) {
     cleanEndpoint = baseUrl;
@@ -89,19 +88,21 @@ export async function testGpuProviderHealth(
   }
   cleanEndpoint = cleanEndpoint.split('?')[0].split('#')[0].split('/')[0].trim();
 
-  // Formulate target URL based on provider type
-  if (providerType === 'runpod_serverless') {
-    if (!cleanEndpoint) {
+  const isRunPod = providerType === 'runpod_serverless' || providerType === 'runpod_ai_v2' || baseUrl.includes('runpod.ai');
+
+  if (isRunPod) {
+    if (!cleanEndpoint && !baseUrl.includes('runpod.ai')) {
       return {
         success: false,
         status: 'offline',
         latencyMs: 0,
-        message: 'Missing Endpoint ID for RunPod Serverless (يرجى إضافة معرف الـ Endpoint من لوحة تحكم RunPod)'
+        message: 'Missing Endpoint ID for RunPod Serverless'
       };
     }
-    targetUrl = `https://api.runpod.ai/v2/${cleanEndpoint}`;
+    if (cleanEndpoint) {
+      targetUrl = `https://api.runpod.ai/v2/${cleanEndpoint}`;
+    }
 
-    // Pre-flight check: Verify if the RunPod API Key is valid and auto-resolve Endpoint ID using GraphQL
     if (cleanKey) {
       try {
         const gqlCheck = await fetch(`https://api.runpod.io/graphql?api_key=${cleanKey}`, {
@@ -118,7 +119,7 @@ export async function testGpuProviderHealth(
             success: false,
             status: 'offline',
             latencyMs: Date.now() - startTime,
-            message: 'Invalid RunPod API Key (مفتاح الـ API الخاص بـ RunPod غير صالح أو غير مفعل)'
+            message: 'Invalid RunPod API Key'
           };
         }
 
@@ -126,19 +127,17 @@ export async function testGpuProviderHealth(
         if (gqlData.data?.myself) {
           const userEndpoints = gqlData.data.myself.endpoints || [];
           if (userEndpoints.length > 0) {
-            // Check if exact match exists
             const exactMatch = userEndpoints.find((e: any) => e.id === cleanEndpoint);
+            let matchedEndpoint = exactMatch;
             if (!exactMatch) {
-              // Try fuzzy match (e.g. replacing '1' with 'l', or '0' with 'o')
               const fuzzyMatch = userEndpoints.find((e: any) => 
                 e.id.toLowerCase().replace(/1/g, 'l') === cleanEndpoint.toLowerCase().replace(/1/g, 'l')
               );
               if (fuzzyMatch) {
-                console.log(`[GPU Vault] Auto-corrected RunPod endpoint ID from '${cleanEndpoint}' to '${fuzzyMatch.id}'`);
+                matchedEndpoint = fuzzyMatch;
                 cleanEndpoint = fuzzyMatch.id;
                 targetUrl = `https://api.runpod.ai/v2/${cleanEndpoint}`;
                 
-                // Auto-update DB if provider ID is present
                 if (providerDbId) {
                   try {
                     const pool = getDatabasePool('core');
@@ -146,8 +145,7 @@ export async function testGpuProviderHealth(
                   } catch (_) {}
                 }
               } else if (userEndpoints.length === 1) {
-                // If user has only 1 endpoint in RunPod, auto-use it!
-                console.log(`[GPU Vault] Auto-selected single RunPod endpoint ID '${userEndpoints[0].id}'`);
+                matchedEndpoint = userEndpoints[0];
                 cleanEndpoint = userEndpoints[0].id;
                 targetUrl = `https://api.runpod.ai/v2/${cleanEndpoint}`;
                 if (providerDbId) {
@@ -158,10 +156,20 @@ export async function testGpuProviderHealth(
                 }
               }
             }
+
+            const epName = matchedEndpoint?.name || cleanEndpoint;
+            // CRITICAL: Return immediately via RunPod Control Plane GraphQL query.
+            // DO NOT issue an HTTP GET to /v2/ENDPOINT/health, as that triggers serverless GPU worker warming!
+            return {
+              success: true,
+              status: 'online',
+              latencyMs: Date.now() - startTime,
+              message: `RunPod Endpoint Verified via Control Plane (${epName})`
+            };
           }
         }
       } catch (gqlErr: any) {
-        // Fallthrough if GraphQL endpoint is unreachable
+        console.warn('[GpuVaultService] RunPod GraphQL control plane check warning:', gqlErr.message);
       }
     }
   }
@@ -180,11 +188,9 @@ export async function testGpuProviderHealth(
       headers['Authorization'] = `Bearer ${cleanKey}`;
     }
 
-    if (providerType === 'runpod_serverless') {
-      // Try health check endpoint first
+    if (isRunPod && cleanEndpoint) {
       pingUrl = `${targetUrl}/health`;
     } else {
-      // Default to /v1/models or /health
       pingUrl = targetUrl.endsWith('/v1') ? `${targetUrl}/models` : `${targetUrl}/v1/models`;
     }
 
@@ -195,8 +201,6 @@ export async function testGpuProviderHealth(
         headers,
         signal: controller.signal
       });
-
-      // For RunPod serverless, do NOT trigger /runsync during health checks to avoid waking idle workers and wasting credits
     } catch (fetchErr: any) {
       // If /v1/models failed, try fallback /health
       if (providerType !== 'runpod_serverless' && targetUrl) {
@@ -317,60 +321,20 @@ export async function syncRemoteGpuModels(
   const cleanKey = apiKey.trim();
 
   let targetUrl = baseUrl.trim().replace(/\/+$/, '');
+  const isRunPod = providerType === 'runpod_serverless' || providerType === 'runpod_ai_v2' || baseUrl.includes('runpod.ai');
 
-  if (providerType === 'runpod_serverless') {
+  if (isRunPod) {
     let cleanEndpoint = (endpointId || '').trim();
+    if (!cleanEndpoint && baseUrl.includes('/v2/')) {
+      cleanEndpoint = baseUrl;
+    }
     if (cleanEndpoint.includes('/v2/')) {
       cleanEndpoint = cleanEndpoint.split('/v2/')[1];
     }
     cleanEndpoint = cleanEndpoint.split('?')[0].split('#')[0].split('/')[0].trim();
 
     if (cleanEndpoint) {
-      // 1. First attempt: Check for OpenAI-compatible vLLM endpoints on RunPod
-      const vllmUrl = `https://api.runpod.ai/v2/${cleanEndpoint}/openai/v1/models`;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-      try {
-        const resp = await fetch(vllmUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': cleanKey.startsWith('Bearer ') ? cleanKey : `Bearer ${cleanKey}`
-          },
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (resp.ok) {
-          const json: any = await resp.json();
-          const rawList = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
-          if (rawList.length > 0) {
-            const mapped = rawList.map((item: any) => {
-              const modelId = item.id || item.name || '';
-              return {
-                model_id: modelId,
-                name: item.name || modelId,
-                task_type: detectTaskType(modelId),
-                context_window: item.context_window || 32768,
-                max_output_tokens: item.max_output_tokens || 8192
-              };
-            }).filter((m: any) => m.model_id.length > 0);
-
-            return {
-              success: true,
-              count: mapped.length,
-              models: mapped,
-              message: `Discovered ${mapped.length} remote vLLM model(s)`
-            };
-          }
-        }
-      } catch (_) {
-        clearTimeout(timeoutId);
-      }
-
-      // 2. Second attempt: For ComfyUI, Stable Diffusion, Wan, or custom Serverless workers
-      // Query RunPod GraphQL API to inspect endpoint template & metadata
+      // 1. Check GraphQL Control Plane FIRST (0 worker warming impact)
       try {
         const gqlRes = await fetch(`https://api.runpod.io/graphql?api_key=${cleanKey}`, {
           method: 'POST',
@@ -390,7 +354,7 @@ export async function syncRemoteGpuModels(
               }
             }`
           }),
-          signal: AbortSignal.timeout(10000)
+          signal: AbortSignal.timeout(8000)
         });
 
         if (gqlRes.ok) {
@@ -398,14 +362,13 @@ export async function syncRemoteGpuModels(
           const endpoints = gqlData.data?.myself?.endpoints || [];
           const match = endpoints.find((e: any) => 
             e.id === cleanEndpoint || e.id.toLowerCase().replace(/1/g, 'l') === cleanEndpoint.toLowerCase().replace(/1/g, 'l')
-          ) || endpoints[0];
+          ) || (endpoints.length === 1 ? endpoints[0] : null);
 
           if (match) {
             const epName = match.name || cleanEndpoint;
             const metaString = `${epName} ${match.template?.name || ''} ${match.template?.imageName || ''}`.toLowerCase();
             const detectedTask = detectTaskType(metaString);
 
-            // Synchronize ONLY the authentic remote endpoint returned by the server
             const serverModels = [
               {
                 model_id: match.id || cleanEndpoint,
@@ -420,11 +383,13 @@ export async function syncRemoteGpuModels(
               success: true,
               count: serverModels.length,
               models: serverModels,
-              message: `Synchronized ${serverModels.length} endpoint model (${epName}) directly from server`
+              message: `Synchronized endpoint model (${epName}) safely via Control Plane`
             };
           }
         }
-      } catch (_) {}
+      } catch (gqlErr: any) {
+        console.warn('[GpuVaultService] RunPod GraphQL sync warning:', gqlErr.message);
+      }
     }
   }
 

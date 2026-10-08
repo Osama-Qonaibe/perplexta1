@@ -30,54 +30,56 @@ export const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          transition={{ duration: 0.14 }}
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
           onClick={onClose}
         >
           <motion.div 
-            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            initial={{ scale: 0.97, opacity: 0, y: 8 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            className="bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden font-sans"
+            exit={{ scale: 0.97, opacity: 0, y: 8 }}
+            transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
+            className="bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-shape-lg w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden font-sans"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-6 border-b border-[var(--border-default)] flex items-center justify-between">
+            <div className="p-4 sm:p-5 border-b border-[var(--border-default)] flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-md bg-accent/10 flex items-center justify-center text-accent">
-                  <Bookmark size={20} />
+                <div className="w-9 h-9 rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-center justify-center text-[var(--fg-accent)]">
+                  <Bookmark size={18} />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black uppercase tracking-widest">
+                  <h2 className="text-sm font-bold tracking-normal text-[var(--text-primary)]">
                     {dir === 'rtl' ? 'الرسائل المثبتة' : 'Pinned Messages'}
                   </h2>
-                  <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-tighter mt-0.5">
+                  <p className="text-[11px] text-[var(--text-muted)] font-medium mt-0.5">
                     {pinnedMessages.length} {dir === 'rtl' ? 'رسائل محفوظة' : 'saved messages'}
                   </p>
                 </div>
               </div>
               <button 
                 onClick={onClose}
-                className="w-10 h-10 rounded-sm hover:bg-[var(--bg-overlay)] flex items-center justify-center text-[var(--text-secondary)] transition-colors"
+                className="w-8 h-8 rounded-shape-sm hover:bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 custom-scrollbar">
               {pinnedMessages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Pin size={32} className="text-[var(--text-muted)] opacity-35 mb-3 animate-pulse text-accent/40" />
-                  <p className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                  <Pin size={28} className="text-[var(--text-muted)] opacity-35 mb-3" />
+                  <p className="text-xs font-bold text-[var(--text-muted)]">
                     {dir === 'rtl' ? 'لا توجد رسائل مثبتة حالياً' : 'No pinned messages yet'}
                   </p>
-                  <p className="text-[10px] text-gray-500 mt-1 max-w-[280px] leading-relaxed">
+                  <p className="text-xs text-[var(--text-muted)] opacity-80 mt-1 max-w-[280px] leading-relaxed">
                     {dir === 'rtl' ? 'ثبّت الرسائل المهمة في المحادثة لتبقى محفوظة هنا.' : 'Pin important questions or responses to view them in this list.'}
                   </p>
                 </div>
               ) : (
                 pinnedMessages.map((msg, pIdx) => (
-                  <div key={`pinned-msg-${msg.id || pIdx}-${pIdx}`} className="group relative p-4 rounded-md bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:border-accent/30 transition-theme">
+                  <div key={`pinned-msg-${msg.id || pIdx}-${pIdx}`} className="group relative p-3.5 rounded-shape-md bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:border-[var(--fg-accent)]/40 transition-colors">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[9px] font-black uppercase tracking-[0.2em] text-accent">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-accent)]">
                         {msg.role === 'user' ? (dir === 'rtl' ? 'البرومبت' : 'Your Prompt') : (dir === 'rtl' ? 'إجابة بيربليكستا' : 'Perplexta Answer')}
                       </span>
                       <div className="flex items-center gap-1">
@@ -86,17 +88,17 @@ export const PinnedMessagesModal: React.FC<PinnedMessagesModalProps> = ({
                             navigator.clipboard.writeText(stripProtocolMarkers(msg.content));
                             toast.success(dir === 'rtl' ? 'تم نسخ النص بنجاح' : 'Copied successfully');
                           }}
-                          className="text-gray-400 hover:text-accent transition-theme p-1.5 rounded-sm hover:bg-[var(--bg-overlay)] cursor-pointer"
+                          className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1.5 rounded-shape-xs hover:bg-[var(--surface-card)] cursor-pointer"
                           title={dir === 'rtl' ? 'نسخ' : 'Copy'}
                         >
-                          <Copy size={12} />
+                          <Copy size={13} />
                         </button>
                         <button
                           onClick={() => msg.id && onUnpin(msg.id)}
-                          className="text-gray-400 hover:text-accent transition-theme p-1.5 rounded-sm hover:bg-[var(--bg-overlay)] cursor-pointer"
+                          className="text-[var(--text-muted)] hover:text-rose-500 transition-colors p-1.5 rounded-shape-xs hover:bg-[var(--surface-card)] cursor-pointer"
                           title={dir === 'rtl' ? 'إلغاء التثبيت' : 'Unpin'}
                         >
-                          <PinOff size={12} />
+                          <PinOff size={13} />
                         </button>
                       </div>
                     </div>

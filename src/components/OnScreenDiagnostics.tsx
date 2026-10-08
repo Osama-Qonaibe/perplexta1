@@ -183,19 +183,19 @@ export const OnScreenDiagnostics: React.FC<OnScreenDiagnosticsProps> = ({
     return (
       <div 
         id="mini-diagnostics-bar"
-        className="absolute top-3 left-3 z-50 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-zinc-950/90 backdrop-blur-md border border-[var(--fg-success)]/30 text-[10px] font-mono text-[var(--fg-success)] shadow-lg cursor-pointer hover:border-[var(--fg-success)]/60 transition-all select-none"
+        className="absolute top-3 start-3 z-50 flex items-center gap-2 px-2.5 py-1.5 rounded-shape-sm bg-[var(--surface-card)]/95 backdrop-blur-md border border-[var(--fg-success)]/40 text-[10px] font-mono tabular-nums text-[var(--fg-success)] shadow-lg cursor-pointer hover:border-[var(--fg-success)]/70 transition-all select-none"
         onClick={() => setIsExpanded(true)}
       >
         <span className="relative flex h-1.5 w-1.5">
-          <span className={`animate-ping absolute inline-flex h-full w-full rounded-[4px] opacity-75 ${isPlaying ? 'bg-[var(--fg-success)]' : 'bg-amber-400'}`}></span>
-          <span className={`relative inline-flex rounded-[4px] h-1.5 w-1.5 ${isPlaying ? 'bg-[var(--fg-success)]' : 'bg-amber-500'}`}></span>
+          <span className={`animate-ping absolute inline-flex h-full w-full rounded-shape-full opacity-75 ${isPlaying ? 'bg-[var(--fg-success)]' : 'bg-[var(--fg-warning)]'}`}></span>
+          <span className={`relative inline-flex rounded-shape-full h-1.5 w-1.5 ${isPlaying ? 'bg-[var(--fg-success)]' : 'bg-[var(--fg-warning)]'}`}></span>
         </span>
         <span className="font-bold">MEDIA-HUD</span>
-        <span className="text-zinc-500">|</span>
+        <span className="text-[var(--text-muted)]">|</span>
         <span>{isPlaying ? '▶ PLAY' : '⏸ PAUSE'}</span>
         <span>{isMuted ? '🔇 MUTED' : `🔊 VOL ${Math.round(volume * 100)}%`}</span>
-        {isBuffering && <span className="animate-pulse text-cyan-400">⚡ BUFFER</span>}
-        <Maximize2 size={10} className="text-zinc-400 ms-1" />
+        {isBuffering && <span className="animate-pulse text-[var(--fg-accent)]">⚡ BUFFER</span>}
+        <Maximize2 size={10} className="text-[var(--text-muted)] ms-1" />
       </div>
     );
   }
@@ -203,22 +203,22 @@ export const OnScreenDiagnostics: React.FC<OnScreenDiagnosticsProps> = ({
   return (
     <div 
       id="expanded-diagnostics-panel"
-      className="absolute top-3 left-3 z-50 w-[290px] max-w-[calc(100%-24px)] max-h-[90%] overflow-y-auto rounded-xl bg-zinc-950/95 backdrop-blur-md border border-[var(--fg-success)]/40 p-3 text-[11px] font-mono text-zinc-300 shadow-2xl flex flex-col gap-2 text-left"
+      className="absolute top-3 start-3 z-50 w-[290px] max-w-[calc(100%-24px)] max-h-[90%] overflow-y-auto rounded-shape-md bg-[var(--surface-card)]/98 backdrop-blur-md border border-[var(--border-main)] p-3 text-[11px] font-mono tabular-nums text-[var(--text-secondary)] shadow-2xl flex flex-col gap-2 text-left"
       style={{ direction: 'ltr' }} // Force LTR for clean terminal coding output
     >
       {/* Header */}
-      <div className="flex items-center justify-between pb-1.5 border-b border-zinc-800">
+      <div className="flex items-center justify-between pb-1.5 border-b border-[var(--border-main)]">
         <div className="flex items-center gap-1 text-[var(--fg-success)] font-bold">
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-[4px] bg-[var(--fg-success)] opacity-75"></span>
-            <span className="relative inline-flex rounded-[4px] h-2 w-2 bg-[var(--fg-success)]"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-shape-full bg-[var(--fg-success)] opacity-75"></span>
+            <span className="relative inline-flex rounded-shape-full h-2 w-2 bg-[var(--fg-success)]"></span>
           </span>
           <span>PERPLEXTA MEDIA HUD v1.2</span>
         </div>
         <div className="flex items-center gap-1">
           <button 
             onClick={() => setIsExpanded(false)}
-            className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+            className="p-1 rounded-shape-xs hover:bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors relative before:absolute before:-inset-1.5"
             title="Minimize"
           >
             <Minimize2 size={11} />
@@ -226,7 +226,7 @@ export const OnScreenDiagnostics: React.FC<OnScreenDiagnosticsProps> = ({
           {onClose && (
             <button 
               onClick={onClose}
-              className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+              className="p-1 rounded-shape-xs hover:bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors relative before:absolute before:-inset-1.5"
               title="Close"
             >
               <X size={11} />
@@ -268,7 +268,7 @@ export const OnScreenDiagnostics: React.FC<OnScreenDiagnosticsProps> = ({
         {/* Buffering */}
         <div className="p-1.5 rounded bg-zinc-900/50 border border-zinc-800">
           <span className="text-zinc-500 block">BUFFER / LOADING</span>
-          <span className={`font-bold ${isBuffering || domMetrics.readyState < 2 ? 'text-cyan-400 animate-pulse' : 'text-zinc-400'}`}>
+          <span className={`font-bold ${isBuffering || domMetrics.readyState < 2 ? 'text-[var(--fg-accent)] animate-pulse' : 'text-zinc-400'}`}>
             {isBuffering ? '⚡ BUFFERING' : `✅ READY (${domMetrics.readyState})`}
           </span>
         </div>
@@ -289,7 +289,7 @@ export const OnScreenDiagnostics: React.FC<OnScreenDiagnosticsProps> = ({
         <div className="flex justify-between"><span className="text-zinc-500">Position:</span> <span className="text-zinc-300 font-semibold">{currentTime.toFixed(2)}s / {duration.toFixed(2)}s</span></div>
         <div className="flex justify-between">
           <span className="text-zinc-500">Buffer Ahead:</span> 
-          <span className="text-cyan-400 font-semibold">{domMetrics.bufferedAhead.toFixed(2)}s ({domMetrics.bufferedPercent.toFixed(1)}%)</span>
+          <span className="text-[var(--fg-accent)] font-semibold">{domMetrics.bufferedAhead.toFixed(2)}s ({domMetrics.bufferedPercent.toFixed(1)}%)</span>
         </div>
         <div className="h-px bg-zinc-800/60 my-1" />
         <div className="flex flex-col gap-0.5">

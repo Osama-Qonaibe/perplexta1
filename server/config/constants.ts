@@ -17,7 +17,6 @@ export const tools: ToolDefinition[] = [
   { id: 'ads_copilot', cost: 25, desc: 'Perplexta Ads & Growth Copilot for Meta, Google, TikTok, and ViralBook', descAr: 'مساعد الإعلانات والنمو التجاري لمنصة فيرال بوك والمنصات العالمية' },
   { id: 'code', cost: 20, desc: 'Elite engineering workstation', descAr: 'بيئة هندسة برمجيات' },
   { id: 'canvas', cost: 25, desc: 'Smart Audio & Multi-modal Studio', descAr: 'استوديو الصوت الذكي والإنتاج المتعدد' },
-  { id: 'sovereign_memory', cost: 5, desc: 'Unified sovereign system intelligence and long-term memory synthesis.', descAr: 'ذاكرة النظام السيادية الموحدة وتركيب المعارف طويلة الأمد.' },
   { id: 'sovereign_search', cost: 10, desc: 'Perplexta Research & Studies Protocol', descAr: 'منظومة البحوث والدراسات الأكاديمية' },
   { id: 'vision', cost: 25, desc: 'High-precision sovereign computer vision and multimodal inspection', descAr: 'أداة الرؤية الحاسوبية السيادية الفائقة وتحليل الوسائط المتعددة' },
   { id: 'perplexta_music', cost: 35, desc: 'High-fidelity musical composition and vocal synthesis engine', descAr: 'محرك التأليف الموسيقي وتوليد الصوتيات عالي الدقة' },

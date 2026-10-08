@@ -4,7 +4,7 @@ import { BrainCircuit, Plus, Trash2, Edit2, Save, X, Loader2, Info, User, AlertT
 import { motion } from 'motion/react';
 import { useAppContext } from '../context/AppContext';
 import { ActionConfirmationModal } from './ActionConfirmationModal';
-import { toast } from '@/design-system';
+import { toast, SelectDropdown } from '@/design-system';
 
 interface Memory {
   id: number;
@@ -56,18 +56,20 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
 
   const categories = [
     { id: 'all', label: t('all') || (dir === 'rtl' ? 'الكل' : 'All') },
-    { id: 'personal', label: t('personal') || (dir === 'rtl' ? 'شخصي' : 'Personal') },
-    { id: 'technical', label: t('technical') || (dir === 'rtl' ? 'تقني' : 'Technical') },
-    { id: 'preference', label: t('preference') || (dir === 'rtl' ? 'تفضيلات' : 'Preferences') },
-    { id: 'project', label: t('project') || (dir === 'rtl' ? 'مشاريع' : 'Projects') },
-    { id: 'identity', label: t('identity') || (dir === 'rtl' ? 'هوية' : 'Identity') },
-    { id: 'professional', label: t('professional') || (dir === 'rtl' ? 'مهني' : 'Professional') },
-    { id: 'general', label: t('general') || (dir === 'rtl' ? 'عام' : 'General') },
+    { id: 'identity', label: t('identity') || (dir === 'rtl' ? 'الهوية والشخصية' : 'Identity & Personal') },
+    { id: 'technical', label: t('technical') || (dir === 'rtl' ? 'بيئة وتقنيات العمل' : 'Tech Stack') },
+    { id: 'preference', label: t('preference') || (dir === 'rtl' ? 'التفضيلات والقواعد' : 'Preferences & Rules') },
+    { id: 'project', label: t('project') || (dir === 'rtl' ? 'المشاريع الحالية' : 'Active Projects') },
+    { id: 'professional', label: t('professional') || (dir === 'rtl' ? 'المهنة والدور' : 'Role & Profession') },
+    { id: 'general', label: t('general') || (dir === 'rtl' ? 'حقائق عامة' : 'General Facts') },
   ];
 
   const filteredMemories = filterCategory === 'all' 
     ? memories 
-    : memories.filter(m => m.category === filterCategory);
+    : memories.filter(m => {
+        if (filterCategory === 'identity' && (m.category === 'personal' || m.category === 'identity')) return true;
+        return m.category === filterCategory;
+      });
 
   const MEMORY_LIMIT = 50;
   const memoryCount = memories.length;
@@ -120,15 +122,15 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
     <div className="space-y-4 max-w-4xl mx-auto pb-12">
       {/* Sticky Top Toolbar */}
       <div 
-        className="sticky z-30 pt-2 pb-3 backdrop-blur-md bg-[var(--pub-surface-canvas)]/90 border-b border-[var(--pub-border-default)] transition-all"
+        className="sticky z-30 pt-2 pb-3 backdrop-blur-md bg-[var(--surface-page)]/90 border-b border-[var(--border-default)] transition-all"
         style={{ top: stickyOffset }}
       >
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
-            <h2 className="text-base sm:text-lg font-black tracking-tight text-[var(--pub-text-primary)]">
+            <h2 className="text-base sm:text-lg font-black tracking-tight text-[var(--text-primary)]">
               {t('memoryCenter') || (dir === 'rtl' ? 'مركز الذاكرة' : 'Memory Center')}
             </h2>
-            <p className="text-[11px] text-[var(--pub-text-muted)] font-medium">
+            <p className="text-[11px] text-[var(--text-muted)] font-medium">
               {dir === 'rtl' 
                 ? 'الحقائق والتفضيلات التي تعلمها المساعد عنك.' 
                 : 'Facts and preferences the assistant has learned about you.'}
@@ -141,15 +143,15 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
                 onClick={onRefresh}
                 disabled={isLoading}
                 title={dir === 'rtl' ? 'مزامنة وتحديث الذاكرة' : 'Sync & Refresh Memory'}
-                className="flex items-center justify-center p-2 rounded-[var(--pub-radius-control)] border border-[var(--pub-border-default)] bg-[var(--pub-surface-container)] hover:bg-cyan-500/10 hover:border-cyan-500/20 text-[var(--pub-text-primary)] hover:text-cyan-400 transition-all cursor-pointer"
+                className="flex items-center justify-center p-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-card)] hover:bg-[var(--bg-accent-muted)] hover:border-[var(--border-accent)]/20 text-[var(--text-primary)] hover:text-[var(--fg-accent)] transition-all cursor-pointer"
               >
-                <RefreshCw size={14} className={isLoading ? 'animate-spin text-cyan-400' : ''} />
+                <RefreshCw size={14} className={isLoading ? 'animate-spin text-[var(--fg-accent)]' : ''} />
               </button>
             )}
             <button 
               type="button"
               onClick={() => setIsAdding(true)}
-              className="flex items-center justify-center gap-1 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-[var(--pub-radius-control)] font-bold text-xs transition-all cursor-pointer"
+              className="flex items-center justify-center gap-1 px-4 py-2 bg-[var(--accent)] hover:opacity-90 text-[var(--fg-on-emphasis)] rounded-[var(--radius-sm)] font-bold text-xs transition-all cursor-pointer"
             >
               <Plus size={14} />
               <span>{t('addFact') || (dir === 'rtl' ? 'إضافة حقيقة' : 'Add Fact')}</span>
@@ -158,16 +160,16 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
         </div>
 
         {/* Category Filter Chips */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar">
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 custom-scrollbar">
           {categories.map((cat, cIdx) => (
             <button
               key={`mem-cat-btn-${cat.id}-${cIdx}`}
               type="button"
               onClick={() => setFilterCategory(cat.id)}
-              className={`px-3 py-1 rounded-[var(--pub-radius-micro)] text-[10px] font-bold uppercase tracking-wider shrink-0 transition-all cursor-pointer border ${
+              className={`px-3 py-1 rounded-[var(--radius-xs)] text-[10px] font-bold uppercase tracking-wider shrink-0 transition-all cursor-pointer border ${
                 filterCategory === cat.id
-                  ? 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30'
-                  : 'bg-[var(--pub-surface-container)] border-[var(--pub-border-default)] text-[var(--pub-text-muted)] hover:text-[var(--pub-text-primary)] hover:bg-cyan-500/5'
+                  ? 'bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border-[var(--border-accent)]/30'
+                  : 'bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-accent-muted)]'
               }`}
             >
               {cat.label}
@@ -177,22 +179,22 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
 
         {/* Memory Capacity Indicator */}
         <div 
-          className={`p-3 rounded-[var(--pub-radius-control)] border transition-all mt-2.5 ${
+          className={`p-3 rounded-[var(--radius-sm)] border transition-all mt-2.5 ${
             isLimitReached 
               ? 'bg-amber-500/5 border-amber-500/30'
-              : 'bg-[var(--pub-surface-container)] border-[var(--pub-border-default)]'
+              : 'bg-[var(--surface-card)] border-[var(--border-default)]'
           }`}
         >
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <div className={`w-7 h-7 rounded-[var(--pub-radius-micro)] flex items-center justify-center shrink-0 ${
-                isLimitReached ? 'bg-amber-500/20 text-amber-400' : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+              <div className={`w-7 h-7 rounded-[var(--radius-xs)] flex items-center justify-center shrink-0 ${
+                isLimitReached ? 'bg-amber-500/20 text-amber-400' : 'bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border border-[var(--border-accent)]/20'
               }`}>
                 <BrainCircuit size={14} />
               </div>
               <div>
-                <h3 className="font-bold text-xs text-[var(--pub-text-primary)] leading-tight">{t('memoryCapacity') || (dir === 'rtl' ? 'سعة الذاكرة' : 'Memory Capacity')}</h3>
-                <p className="text-[10px] text-[var(--pub-text-muted)] font-bold">
+                <h3 className="font-bold text-xs text-[var(--text-primary)] leading-tight">{t('memoryCapacity') || (dir === 'rtl' ? 'سعة الذاكرة' : 'Memory Capacity')}</h3>
+                <p className="text-[10px] text-[var(--text-muted)] font-bold">
                   {memoryCount} / {MEMORY_LIMIT} {dir === 'rtl' ? 'حقائق' : 'facts'}
                 </p>
               </div>
@@ -203,7 +205,7 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
                 type="button"
                 onClick={handlePrune}
                 disabled={isPruning}
-                className="flex items-center gap-1 px-3 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-[var(--pub-radius-micro)] text-[10px] font-bold border border-amber-500/30 cursor-pointer transition-all"
+                className="flex items-center gap-1 px-3 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-[var(--radius-xs)] text-[10px] font-bold border border-amber-500/30 cursor-pointer transition-all"
               >
                 {isPruning ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
                 <span>{t('prune') || (dir === 'rtl' ? 'تنظيف' : 'Prune')}</span>
@@ -211,10 +213,10 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
             )}
           </div>
 
-          <div className="w-full h-1.5 bg-[var(--pub-surface-subtle)] rounded-full overflow-hidden border border-[var(--pub-border-default)]">
+          <div className="w-full h-1.5 bg-[var(--surface-subtle)] rounded-full overflow-hidden border border-[var(--border-default)]">
             <motion.div 
               className={`h-full rounded-full ${
-                isLimitReached ? 'bg-amber-500' : 'bg-cyan-500'
+                isLimitReached ? 'bg-amber-500' : 'bg-[var(--accent)]'
               }`}
               initial={{ width: 0 }}
               animate={{ width: `${usagePercentage}%` }}
@@ -236,9 +238,9 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
       </div>
 
       {/* Auto-update Indicator */}
-      <div className="p-3.5 rounded-[var(--pub-radius-container)] border border-cyan-500/20 bg-cyan-500/[0.03] flex items-start gap-2">
-        <Info className="text-cyan-400 shrink-0 mt-0.5" size={15} />
-        <p className="text-[11px] sm:text-xs text-[var(--pub-text-muted)] leading-relaxed font-medium">
+      <div className="p-3.5 rounded-[var(--radius-md)] border border-[var(--border-accent)]/20 bg-[var(--bg-accent-muted)] flex items-start gap-2">
+        <Info className="text-[var(--fg-accent)] shrink-0 mt-0.5" size={15} />
+        <p className="text-[11px] sm:text-xs text-[var(--text-muted)] leading-relaxed font-medium">
           {dir === 'rtl' 
             ? 'يقوم المساعد بتحديث هذه الذاكرة تلقائياً (AI)، ويمكنك إضافة حقائق بنفسك (User).' 
             : 'Assistant updates memory automatically (AI), or you can add facts manually (User).'}
@@ -247,35 +249,34 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
 
       {/* Add New Memory Card */}
       {isAdding && (
-        <div className="p-4 sm:p-5 rounded-[var(--pub-radius-container)] border border-[var(--pub-border-default)] bg-[var(--pub-surface-container)] space-y-3">
+        <div className="p-4 sm:p-5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] space-y-3">
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-[10px] font-bold text-[var(--pub-text-muted)] uppercase mb-1">
-                {t('category') || (dir === 'rtl' ? 'التصنيف' : 'Category')}
-              </label>
-              <select
+              <SelectDropdown
+                size="sm"
+                label={t('category') || (dir === 'rtl' ? 'التصنيف' : 'Category')}
                 value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-                className="w-full p-2 rounded-[var(--pub-radius-control)] border border-[var(--pub-border-default)] bg-[var(--pub-surface-subtle)] text-[var(--pub-text-primary)] text-xs focus:outline-none focus:border-cyan-500/50"
-              >
-                {categories.filter(c => c.id !== 'all').map((cat, cIdx) => (
-                  <option key={`mem-new-cat-${cat.id}-${cIdx}`} value={cat.id}>{cat.label}</option>
-                ))}
-              </select>
+                onChange={(val) => setNewCategory(val)}
+                dir={dir}
+                options={categories.filter(c => c.id !== 'all').map(cat => ({
+                  value: cat.id,
+                  label: cat.label
+                }))}
+              />
             </div>
           </div>
           <textarea
             value={newValue}
             onChange={(e) => setNewValue(e.target.value)}
             placeholder={dir === 'rtl' ? 'ما الذي يجب أن يتذكره المساعد؟' : 'What should the assistant remember?'}
-            className="w-full p-3 rounded-[var(--pub-radius-control)] border border-[var(--pub-border-default)] bg-[var(--pub-surface-subtle)] text-[var(--pub-text-primary)] focus:outline-none focus:border-cyan-500/50 resize-none h-24 text-xs"
+            className="w-full p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] resize-none h-24 text-xs"
             autoFocus
           />
           <div className="flex justify-end gap-2">
             <button 
               type="button"
               onClick={() => { setIsAdding(false); setNewValue(''); }}
-              className="px-4 py-1.5 rounded-[var(--pub-radius-control)] text-xs font-bold text-[var(--pub-text-muted)] hover:text-[var(--pub-text-primary)] hover:bg-[var(--pub-surface-subtle)] transition-all cursor-pointer"
+              className="px-4 py-1.5 rounded-[var(--radius-sm)] text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] transition-all cursor-pointer"
             >
               {t('cancel') || (dir === 'rtl' ? 'إلغاء' : 'Cancel')}
             </button>
@@ -283,7 +284,7 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
               type="button"
               onClick={handleSaveNew}
               disabled={!newValue.trim()}
-              className="px-4 py-1.5 rounded-[var(--pub-radius-control)] text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-all disabled:opacity-50 cursor-pointer"
+              className="px-4 py-1.5 rounded-[var(--radius-sm)] text-xs font-bold bg-[var(--accent)] hover:opacity-90 text-[var(--fg-on-emphasis)] transition-all disabled:opacity-50 cursor-pointer"
             >
               {t('save') || (dir === 'rtl' ? 'حفظ' : 'Save')}
             </button>
@@ -293,16 +294,16 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
 
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
-          <p className="text-xs text-[var(--pub-text-muted)] animate-pulse">{t('loadingMemory') || (dir === 'rtl' ? 'جاري تحميل الذاكرة...' : 'Loading memory...')}</p>
+          <Loader2 className="w-8 h-8 text-[var(--fg-accent)] animate-spin" />
+          <p className="text-xs text-[var(--text-muted)] animate-pulse">{t('loadingMemory') || (dir === 'rtl' ? 'جاري تحميل الذاكرة...' : 'Loading memory...')}</p>
         </div>
       ) : filteredMemories.length === 0 ? (
-        <div className="p-10 rounded-[var(--pub-radius-container)] border border-dashed border-[var(--pub-border-default)] bg-[var(--pub-surface-container)] flex flex-col items-center justify-center text-center">
-          <div className="w-14 h-14 rounded-[var(--pub-radius-control)] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center justify-center mb-4">
+        <div className="p-10 rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--surface-card)] flex flex-col items-center justify-center text-center">
+          <div className="w-14 h-14 rounded-[var(--radius-sm)] bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border border-[var(--border-accent)]/20 flex items-center justify-center mb-4">
             <BrainCircuit size={28} />
           </div>
-          <h3 className="text-sm font-bold mb-1 text-[var(--pub-text-primary)]">{t('noResults') || (dir === 'rtl' ? 'لا توجد عناصر' : 'No memories found')}</h3>
-          <p className="text-xs text-[var(--pub-text-muted)] max-w-sm leading-relaxed">
+          <h3 className="text-sm font-bold mb-1 text-[var(--text-primary)]">{t('noResults') || (dir === 'rtl' ? 'لا توجد عناصر' : 'No memories found')}</h3>
+          <p className="text-xs text-[var(--text-muted)] max-w-sm leading-relaxed">
             {dir === 'rtl' 
               ? 'لا توجد حقائق في هذا التصنيف حالياً.' 
               : 'No facts found in this category yet.'}
@@ -313,34 +314,35 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
           {filteredMemories.map((memory, mIdx) => (
             <div 
               key={`mem-item-${memory.id || mIdx}-${mIdx}`} 
-              className="group p-4 sm:p-5 rounded-[var(--pub-radius-container)] border border-[var(--pub-border-default)] bg-[var(--pub-surface-container)] hover:border-cyan-500/20 transition-all"
+              className="group p-4 sm:p-5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] hover:border-[var(--border-accent)]/20 transition-all"
             >
               {editingId === memory.id ? (
                 <div className="space-y-3">
                   <div className="flex gap-3">
                     <div className="flex-1">
-                      <select
+                      <SelectDropdown
+                        size="sm"
                         value={editCategory}
-                        onChange={(e) => setEditCategory(e.target.value)}
-                        className="w-full p-2 rounded-[var(--pub-radius-control)] border border-[var(--pub-border-default)] bg-[var(--pub-surface-subtle)] text-[var(--pub-text-primary)] text-xs focus:outline-none focus:border-cyan-500/50"
-                      >
-                        {categories.filter(c => c.id !== 'all').map((cat, cIdx) => (
-                          <option key={`mem-edit-cat-${cat.id}-${cIdx}`} value={cat.id}>{cat.label}</option>
-                        ))}
-                      </select>
+                        onChange={(val) => setEditCategory(val)}
+                        dir={dir}
+                        options={categories.filter(c => c.id !== 'all').map(cat => ({
+                          value: cat.id,
+                          label: cat.label
+                        }))}
+                      />
                     </div>
                   </div>
                   <textarea
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
-                    className="w-full p-3 rounded-[var(--pub-radius-control)] border border-[var(--pub-border-default)] bg-[var(--pub-surface-subtle)] text-[var(--pub-text-primary)] focus:outline-none focus:border-cyan-500/50 resize-none h-24 text-xs"
+                    className="w-full p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] resize-none h-24 text-xs"
                     autoFocus
                   />
                   <div className="flex justify-end gap-2 pt-1">
                     <button 
                       type="button"
                       onClick={() => setEditingId(null)}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-[var(--pub-radius-control)] text-xs font-bold text-[var(--pub-text-muted)] hover:text-[var(--pub-text-primary)] hover:bg-[var(--pub-surface-subtle)] transition-all cursor-pointer"
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] transition-all cursor-pointer"
                     >
                       <X size={13} />
                       <span>{t('cancel') || (dir === 'rtl' ? 'إلغاء' : 'Cancel')}</span>
@@ -349,7 +351,7 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
                       type="button"
                       onClick={() => handleSaveEdit(memory.id)}
                       disabled={!editValue.trim()}
-                      className="flex items-center gap-1 px-3.5 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-[var(--pub-radius-control)] text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                      className="flex items-center gap-1 px-3.5 py-1.5 bg-[var(--accent)] hover:opacity-90 text-[var(--fg-on-emphasis)] rounded-[var(--radius-sm)] text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
                     >
                       <Save size={13} />
                       <span>{t('save') || (dir === 'rtl' ? 'حفظ' : 'Save')}</span>
@@ -361,29 +363,29 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1 mb-2 flex-wrap">
                       {memory.source === 'user' ? (
-                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--pub-radius-micro)] bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[9px] font-bold uppercase tracking-wider">
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-xs)] bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[9px] font-bold uppercase tracking-wider">
                           <User size={10} />
                           {dir === 'rtl' ? 'بواسطة المستخدم' : 'User Added'}
                         </span>
                       ) : memory.source === 'consolidated' ? (
-                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--pub-radius-micro)] bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[9px] font-bold uppercase tracking-wider">
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-xs)] bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[9px] font-bold uppercase tracking-wider">
                           <Sparkles size={10} />
                           {dir === 'rtl' ? 'ملخص مدمج' : 'Consolidated Summary'}
                         </span>
                       ) : (
-                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--pub-radius-micro)] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[9px] font-bold uppercase tracking-wider">
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-xs)] bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border border-[var(--border-accent)]/20 text-[9px] font-bold uppercase tracking-wider">
                           <BrainCircuit size={10} />
                           {dir === 'rtl' ? 'تعلم آلي' : 'AI Learned'}
                         </span>
                       )}
-                      <span className="px-2 py-0.5 rounded-[var(--pub-radius-micro)] text-[9px] font-bold uppercase tracking-wider bg-[var(--pub-surface-subtle)] border border-[var(--pub-border-default)] text-[var(--pub-text-muted)]">
+                      <span className="px-2 py-0.5 rounded-[var(--radius-xs)] text-[9px] font-bold uppercase tracking-wider bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-muted)]">
                         {categories.find(c => c.id === memory.category)?.label || memory.category}
                       </span>
                     </div>
-                    <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap text-[var(--pub-text-primary)] font-medium" dir="auto">
+                    <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap text-[var(--text-primary)] font-medium" dir="auto">
                       {memory.fact}
                     </p>
-                    <div className="text-[10px] text-[var(--pub-text-muted)] mt-2 flex items-center flex-wrap gap-1">
+                    <div className="text-[10px] text-[var(--text-muted)] mt-2 flex items-center flex-wrap gap-1">
                       <span>
                         {new Date(memory.created_at).toLocaleString(dir === 'rtl' ? 'ar-EG' : 'en-US', { 
                           year: 'numeric', 
@@ -404,7 +406,7 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
                           <span className="opacity-40">•</span>
                           <Link 
                             to={`/chat/${memory.chat_id}`}
-                            className="inline-flex items-center gap-1 text-cyan-400 hover:text-cyan-300 font-bold hover:underline"
+                            className="inline-flex items-center gap-1 text-[var(--fg-accent)] hover:text-[var(--fg-accent)] font-bold hover:underline"
                             title={dir === 'rtl' ? 'انتقال إلى المحادثة المصدر' : 'Go to source thread'}
                           >
                             <MessageSquare size={10} />
@@ -425,7 +427,7 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
                         setEditValue(memory.fact);
                         setEditCategory(memory.category);
                       }}
-                      className="p-1.5 rounded-[var(--pub-radius-micro)] text-[var(--pub-text-muted)] hover:text-cyan-400 hover:bg-cyan-500/10 transition-all cursor-pointer"
+                      className="p-1.5 rounded-[var(--radius-xs)] text-[var(--text-muted)] hover:text-[var(--fg-accent)] hover:bg-[var(--bg-accent-muted)] transition-all cursor-pointer"
                       title={dir === 'rtl' ? 'تعديل' : 'Edit'}
                     >
                       <Edit2 size={14} />
@@ -433,7 +435,7 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
                     <button 
                       type="button"
                       onClick={() => setDeletingMemory(memory)}
-                      className="p-1.5 rounded-[var(--pub-radius-micro)] text-[var(--pub-text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                      className="p-1.5 rounded-[var(--radius-xs)] text-[var(--text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
                       title={dir === 'rtl' ? 'حذف' : 'Delete'}
                     >
                       <Trash2 size={14} />
@@ -481,7 +483,7 @@ export const MemoryCenter: React.FC<MemoryCenterProps> = ({
           en: 'Are you sure you want to discard this specific fact from the smart assistant\'s memory base?'
         }}
         extraContent={deletingMemory ? (
-          <div className="p-3 rounded-[var(--pub-radius-control)] text-xs leading-relaxed break-all text-start border border-[var(--pub-border-default)] bg-[var(--pub-surface-subtle)] text-[var(--pub-text-primary)] italic">
+          <div className="p-3 rounded-[var(--radius-sm)] text-xs leading-relaxed break-all text-start border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] italic">
             "{deletingMemory.fact}"
           </div>
         ) : undefined}

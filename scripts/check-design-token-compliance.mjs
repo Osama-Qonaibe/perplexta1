@@ -9,6 +9,7 @@ import path from 'path';
 const rootDir = process.cwd();
 const TARGET_DIRS = [
   path.join(rootDir, 'src', 'pages'),
+  path.join(rootDir, 'src', 'components', 'admin'),
   path.join(rootDir, 'src', 'components', 'ui')
 ];
 
@@ -25,14 +26,16 @@ let totalFilesChecked = 0;
 let totalViolations = 0;
 
 function checkFile(filePath) {
-  const content = fs.readFileSync(filePath, 'utf8');
+  const resolvedPath = path.resolve(filePath);
+  if (!resolvedPath.startsWith(path.resolve(rootDir) + path.sep)) return;
+  const content = fs.readFileSync(resolvedPath, 'utf8');
   let fileViolations = 0;
 
   for (const pattern of HARDCODED_COLOR_PATTERNS) {
     const matches = content.match(pattern);
     if (matches) {
       fileViolations += matches.length;
-      console.warn(`[TOKEN NON-COMPLIANCE] in ${path.relative(rootDir, filePath)}:`);
+      console.warn(`[TOKEN NON-COMPLIANCE] in ${path.relative(rootDir, resolvedPath)}:`);
       console.warn(`  Found forbidden hardcoded pattern: ${matches.slice(0, 3).join(', ')}`);
     }
   }
@@ -44,11 +47,14 @@ function checkFile(filePath) {
 }
 
 function scanDir(dirPath) {
-  if (!fs.existsSync(dirPath)) return;
-  const items = fs.readdirSync(dirPath);
+  const resolvedDir = path.resolve(dirPath);
+  if (!fs.existsSync(resolvedDir)) return;
+  const items = fs.readdirSync(resolvedDir);
 
   for (const item of items) {
-    const fullPath = path.join(dirPath, item);
+    if (item.includes('..') || item.includes('/') || item.includes('\\') || item.includes('\0')) continue;
+    const fullPath = path.resolve(resolvedDir, item);
+    if (!fullPath.startsWith(resolvedDir + path.sep)) continue;
     const stat = fs.statSync(fullPath);
 
     if (stat.isDirectory()) {

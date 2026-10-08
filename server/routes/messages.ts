@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
 import { pool } from '../db/index.js';
+import { escapeHtml } from '../utils/security.js';
 
 const router = express.Router();
 
@@ -197,35 +198,35 @@ router.post("/:messageId/feedback", authenticateToken, async (req: any, res) => 
 
           <div style="background: #1e293b; padding: 18px; border-radius: 12px; margin-bottom: 16px;">
             <p style="margin: 0 0 8px 0; font-size: 14px; color: #94a3b8;"><strong>معلومات المستخدم:</strong></p>
-            <p style="margin: 0 0 4px 0; font-size: 15px; color: #ffffff;">👤 <strong>الاسم:</strong> ${userName}</p>
-            <p style="margin: 0 0 4px 0; font-size: 14px; color: #38bdf8;">✉️ <strong>البريد:</strong> ${userEmail}</p>
+            <p style="margin: 0 0 4px 0; font-size: 15px; color: #ffffff;">👤 <strong>الاسم:</strong> ${escapeHtml(userName)}</p>
+            <p style="margin: 0 0 4px 0; font-size: 14px; color: #38bdf8;">✉️ <strong>البريد:</strong> ${escapeHtml(userEmail)}</p>
             <p style="margin: 0; font-size: 13px; color: #94a3b8;">🕒 <strong>التاريخ:</strong> ${new Date().toLocaleString('ar-SA')}</p>
           </div>
 
           ${feedback === 1 ? `
             <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); padding: 18px; border-radius: 12px; margin-bottom: 16px;">
               <p style="margin: 0 0 8px 0; font-size: 15px; color: #10b981;"><strong>التقييم:</strong> <span style="font-size: 18px; color: #fbbf24;">${starsHtml}</span></p>
-              ${tags && tags.length ? `<p style="margin: 0 0 8px 0; font-size: 13px; color: #cbd5e1;"><strong>النقاط الإيجابية المحددة:</strong> ${tags.join(' • ')}</p>` : ''}
-              ${comment ? `<p style="margin: 0; font-size: 14px; color: #ffffff; line-height: 1.6;"><strong>ملاحظة المستخدم:</strong> "${comment}"</p>` : ''}
+              ${tags && tags.length ? `<p style="margin: 0 0 8px 0; font-size: 13px; color: #cbd5e1;"><strong>النقاط الإيجابية المحددة:</strong> ${tags.map((t: string) => escapeHtml(t)).join(' • ')}</p>` : ''}
+              ${comment ? `<p style="margin: 0; font-size: 14px; color: #ffffff; line-height: 1.6;"><strong>ملاحظة المستخدم:</strong> "${escapeHtml(comment)}"</p>` : ''}
             </div>
           ` : `
             <div style="background: rgba(244, 63, 94, 0.08); border: 1px solid rgba(244, 63, 94, 0.25); padding: 18px; border-radius: 12px; margin-bottom: 16px;">
-              ${reason ? `<p style="margin: 0 0 8px 0; font-size: 15px; color: #f43f5e;"><strong>سبب عدم الإعجاب:</strong> ${reason}</p>` : ''}
-              ${comment ? `<p style="margin: 0; font-size: 14px; color: #ffffff; line-height: 1.6;"><strong>توجيه التصحيح والملاحظة:</strong> "${comment}"</p>` : ''}
+              ${reason ? `<p style="margin: 0 0 8px 0; font-size: 15px; color: #f43f5e;"><strong>سبب عدم الإعجاب:</strong> ${escapeHtml(reason)}</p>` : ''}
+              ${comment ? `<p style="margin: 0; font-size: 14px; color: #ffffff; line-height: 1.6;"><strong>توجيه التصحيح والملاحظة:</strong> "${escapeHtml(comment)}"</p>` : ''}
             </div>
           `}
 
           ${finalPrompt ? `
             <div style="background: #1e293b; padding: 14px; border-radius: 10px; margin-bottom: 12px;">
               <p style="margin: 0 0 6px 0; font-size: 12px; color: #94a3b8;"><strong>سؤال المستخدم الأصلي:</strong></p>
-              <p style="margin: 0; font-size: 13px; color: #e2e8f0; max-height: 120px; overflow: hidden;">${finalPrompt.slice(0, 300)}${finalPrompt.length > 300 ? '...' : ''}</p>
+              <p style="margin: 0; font-size: 13px; color: #e2e8f0; max-height: 120px; overflow: hidden;">${escapeHtml(finalPrompt.slice(0, 300))}${finalPrompt.length > 300 ? '...' : ''}</p>
             </div>
           ` : ''}
 
           ${finalAssistantResp ? `
             <div style="background: #1e293b; padding: 14px; border-radius: 10px; margin-bottom: 16px;">
               <p style="margin: 0 0 6px 0; font-size: 12px; color: #94a3b8;"><strong>إجابة المساعد:</strong></p>
-              <p style="margin: 0; font-size: 13px; color: #e2e8f0; max-height: 150px; overflow: hidden;">${finalAssistantResp.slice(0, 400)}${finalAssistantResp.length > 400 ? '...' : ''}</p>
+              <p style="margin: 0; font-size: 13px; color: #e2e8f0; max-height: 150px; overflow: hidden;">${escapeHtml(finalAssistantResp.slice(0, 400))}${finalAssistantResp.length > 400 ? '...' : ''}</p>
             </div>
           ` : ''}
 

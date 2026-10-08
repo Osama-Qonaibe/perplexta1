@@ -12,7 +12,8 @@ import {
   Bar 
 } from 'recharts';
 import { Activity, Clock, Cpu, RefreshCw, Server, Users, Zap } from 'lucide-react';
-import { toast } from '@/design-system';
+import { toast, SelectDropdown } from '@/design-system';
+import { resolveToken } from '@/utils/tokenResolver';
 
 interface RenderMetricItem {
   id: string;
@@ -25,11 +26,14 @@ interface RenderMetricItem {
 }
 
 export const AdminRenderMetricsView: React.FC = () => {
-  const { token, theme } = useAppContext();
+  const { token } = useAppContext();
   const [metrics, setMetrics] = useState<RenderMetricItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedComponent, setSelectedComponent] = useState<string>('all');
   const [selectedSession, setSelectedSession] = useState<string>('all');
+
+  const chartGridStroke = resolveToken('--border-default', '#27272a');
+  const chartAxisStroke = resolveToken('--text-muted', '#71717a');
 
   const fetchMetrics = async () => {
     setLoading(true);
@@ -74,8 +78,6 @@ export const AdminRenderMetricsView: React.FC = () => {
     };
   }, [token]);
 
-  const isDark = theme === 'dark';
-
   const componentsList = Array.from(new Set(metrics.map(m => m.componentName)));
   const sessionsList = Array.from(new Set(metrics.map(m => m.sessionId || 'unknown')));
 
@@ -116,7 +118,7 @@ export const AdminRenderMetricsView: React.FC = () => {
   }));
 
   return (
-    <div className="p-6 space-y-6 text-[var(--fg-primary)]">
+    <div className="p-6 space-y-6 text-[var(--text-primary)]">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4 border-[var(--border-default)]">
         <div>
@@ -124,14 +126,14 @@ export const AdminRenderMetricsView: React.FC = () => {
             <Activity className="w-6 h-6 text-[var(--accent)] animate-pulse" />
             <span>مراقبة زمن الانتقال وأداء المكونات (Render & Latency Telemetry)</span>
           </h2>
-          <p className="text-sm text-[var(--fg-secondary)] mt-1">
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
             لوحة تحكم المشرفين لمراقبة مقاييس أداء مكونات الواجهة وزمن الاستجابة عبر جلسات المستخدمين الحية
           </p>
         </div>
         <button
           onClick={fetchMetrics}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-[var(--accent)] text-[var(--fg-on-accent)] rounded-[var(--radius-md)] text-sm font-bold transition-colors duration-base shadow-sm disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--accent)] text-[var(--fg-on-emphasis)] rounded-[var(--radius-md)] text-sm font-bold transition-colors duration-base shadow-sm disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           <span>تحديث البيانات / Refresh</span>
@@ -140,123 +142,125 @@ export const AdminRenderMetricsView: React.FC = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-[var(--radius-lg)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-sm">
-          <div className="flex items-center justify-between text-[var(--fg-muted)] mb-2">
+        <div className="p-5 rounded-[var(--radius-md)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-sm">
+          <div className="flex items-center justify-between text-[var(--text-muted)] mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider">إجمالي عمليات الرندر</span>
             <Cpu className="w-5 h-5 text-[var(--accent)]" />
           </div>
           <div className="text-3xl font-bold font-mono">{totalRenders}</div>
-          <p className="text-xs text-[var(--fg-secondary)] mt-1">عبر الفلتر المحدد</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1">عبر الفلتر المحدد</p>
         </div>
 
-        <div className="p-5 rounded-[var(--radius-lg)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-sm">
-          <div className="flex items-center justify-between text-[var(--fg-muted)] mb-2">
+        <div className="p-5 rounded-[var(--radius-md)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-sm">
+          <div className="flex items-center justify-between text-[var(--text-muted)] mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider">متوسط زمن الاستجابة (Latency)</span>
-            <Clock className="w-5 h-5 text-[var(--status-info)]" />
+            <Clock className="w-5 h-5 text-[var(--fg-accent)]" />
           </div>
           <div className="text-3xl font-bold font-mono">{avgDuration} ms</div>
           <p className="text-xs text-[var(--accent)] mt-1">أداء ممتاز واستجابة فورية</p>
         </div>
 
-        <div className="p-5 rounded-[var(--radius-lg)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-sm">
-          <div className="flex items-center justify-between text-[var(--fg-muted)] mb-2">
+        <div className="p-5 rounded-[var(--radius-md)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-sm">
+          <div className="flex items-center justify-between text-[var(--text-muted)] mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider">أقصى زمن رندر مسجل</span>
-            <Zap className="w-5 h-5 text-[var(--status-warning)]" />
+            <Zap className="w-5 h-5 text-[var(--fg-warning)]" />
           </div>
           <div className="text-3xl font-bold font-mono">{maxDuration} ms</div>
-          <p className="text-xs text-[var(--fg-secondary)] mt-1">ذروة التحميل القياسية</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1">ذروة التحميل القياسية</p>
         </div>
 
-        <div className="p-5 rounded-[var(--radius-lg)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-sm">
-          <div className="flex items-center justify-between text-[var(--fg-muted)] mb-2">
+        <div className="p-5 rounded-[var(--radius-md)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-sm">
+          <div className="flex items-center justify-between text-[var(--text-muted)] mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider">الجلسات النشطة</span>
-            <Users className="w-5 h-5 text-[var(--status-info)]" />
+            <Users className="w-5 h-5 text-[var(--fg-accent)]" />
           </div>
           <div className="text-3xl font-bold font-mono">{sessionsList.length}</div>
-          <p className="text-xs text-[var(--fg-secondary)] mt-1">جلسات مستخدمين نشطة</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1">جلسات مستخدمين نشطة</p>
         </div>
       </div>
 
       {/* Filters Toolbar */}
-      <div className={`p-4 rounded-xl border flex flex-wrap items-center gap-4 ${isDark ? 'bg-zinc-900/40 border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-gray-500 uppercase">المكون (Component):</span>
-          <select 
-            value={selectedComponent}
-            onChange={(e) => setSelectedComponent(e.target.value)}
-            className={`px-3 py-1.5 rounded-lg text-sm border ${isDark ? 'bg-zinc-950 border-gray-800 text-gray-200' : 'bg-white border-gray-300 text-gray-800'}`}
-          >
-            <option value="all">جميع المكونات (All Components)</option>
-            {componentsList.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
+      <div className="p-4 rounded-[var(--radius-md)] border flex flex-wrap items-center gap-4 bg-[var(--surface-subtle)] border-[var(--border-default)]">
+        <div className="flex items-center gap-2 min-w-[240px]">
+          <span className="text-xs font-semibold text-[var(--text-muted)] uppercase shrink-0">المكون (Component):</span>
+          <div className="flex-1 min-w-[180px]">
+            <SelectDropdown
+              size="sm"
+              value={selectedComponent}
+              onChange={(val) => setSelectedComponent(val)}
+              options={[
+                { value: 'all', label: 'جميع المكونات (All Components)' },
+                ...componentsList.map(c => ({ value: c, label: c }))
+              ]}
+            />
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-gray-500 uppercase">معرف الجلسة (Session):</span>
-          <select 
-            value={selectedSession}
-            onChange={(e) => setSelectedSession(e.target.value)}
-            className={`px-3 py-1.5 rounded-lg text-sm border ${isDark ? 'bg-zinc-950 border-gray-800 text-gray-200' : 'bg-white border-gray-300 text-gray-800'}`}
-          >
-            <option value="all">جميع الجلسات (All Sessions)</option>
-            {sessionsList.map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+        <div className="flex items-center gap-2 min-w-[240px]">
+          <span className="text-xs font-semibold text-[var(--text-muted)] uppercase shrink-0">معرف الجلسة (Session):</span>
+          <div className="flex-1 min-w-[180px]">
+            <SelectDropdown
+              size="sm"
+              value={selectedSession}
+              onChange={(val) => setSelectedSession(val)}
+              options={[
+                { value: 'all', label: 'جميع الجلسات (All Sessions)' },
+                ...sessionsList.map(s => ({ value: s, label: s }))
+              ]}
+            />
+          </div>
         </div>
       </div>
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Area Chart: Latency Trend */}
-        <div className={`p-5 rounded-xl border ${isDark ? 'bg-zinc-900/60 border-gray-800' : 'bg-white border-gray-200'} shadow-sm`}>
-          <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
-            <Activity className="w-4 h-4 text-accent" />
+        <div className="p-5 rounded-[var(--radius-md)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-sm">
+          <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-[var(--text-primary)]">
+            <Activity className="w-4 h-4 text-[var(--accent)]" />
             <span>مخطط زمن استجابة الرندر (Render Latency Area Trend)</span>
           </h3>
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#27272a' : '#e5e7eb'} />
-                <XAxis dataKey="name" stroke={isDark ? '#71717a' : '#9ca3af'} fontSize={11} />
-                <YAxis stroke={isDark ? '#71717a' : '#9ca3af'} fontSize={11} unit="ms" />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
+                <XAxis dataKey="name" stroke={chartAxisStroke} fontSize={11} />
+                <YAxis stroke={chartAxisStroke} fontSize={11} unit="ms" />
                 <Tooltip 
                   contentStyle={{ 
-                    backgroundColor: isDark ? '#18181b' : '#ffffff', 
-                    borderColor: isDark ? '#27272a' : '#e5e7eb',
-                    borderRadius: '8px',
-                    color: isDark ? '#f4f4f5' : '#111827'
+                    backgroundColor: 'var(--surface-card)', 
+                    borderColor: 'var(--border-default)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--text-primary)'
                   }} 
                 />
-                <Area type="monotone" dataKey="duration" name="مدة الرندر (ms)" stroke="#334155" fill="#334155" fillOpacity={0.2} />
+                <Area type="monotone" dataKey="duration" name="مدة الرندر (ms)" stroke="var(--accent)" fill="var(--accent)" fillOpacity={0.15} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Bar Chart: Average Latency per Component */}
-        <div className={`p-5 rounded-xl border ${isDark ? 'bg-zinc-900/60 border-gray-800' : 'bg-white border-gray-200'} shadow-sm`}>
-          <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
-            <Server className="w-4 h-4 text-cyan-500" />
+        <div className="p-5 rounded-[var(--radius-md)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-sm">
+          <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-[var(--text-primary)]">
+            <Server className="w-4 h-4 text-[var(--accent)]" />
             <span>متوسط زمن الرندر حسب المكون (Avg Latency per Component)</span>
           </h3>
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#27272a' : '#e5e7eb'} />
-                <XAxis dataKey="componentName" stroke={isDark ? '#71717a' : '#9ca3af'} fontSize={10} angle={-15} textAnchor="end" />
-                <YAxis stroke={isDark ? '#71717a' : '#9ca3af'} fontSize={11} unit="ms" />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
+                <XAxis dataKey="componentName" stroke={chartAxisStroke} fontSize={10} angle={-15} textAnchor="end" />
+                <YAxis stroke={chartAxisStroke} fontSize={11} unit="ms" />
                 <Tooltip 
                   contentStyle={{ 
-                    backgroundColor: isDark ? '#18181b' : '#ffffff', 
-                    borderColor: isDark ? '#27272a' : '#e5e7eb',
-                    borderRadius: '8px',
-                    color: isDark ? '#f4f4f5' : '#111827'
+                    backgroundColor: 'var(--surface-card)', 
+                    borderColor: 'var(--border-default)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--text-primary)'
                   }} 
                 />
-                <Bar dataKey="avgDuration" name="متوسط المدة (ms)" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="avgDuration" name="متوسط المدة (ms)" fill="var(--accent)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -264,15 +268,15 @@ export const AdminRenderMetricsView: React.FC = () => {
       </div>
 
       {/* Detailed Telemetry Table */}
-      <div className={`rounded-xl border overflow-hidden ${isDark ? 'bg-zinc-900/60 border-gray-800' : 'bg-white border-gray-200'} shadow-sm`}>
-        <div className="p-4 border-b border-gray-200 dark:border-gray-800 font-semibold flex items-center justify-between">
+      <div className="rounded-[var(--radius-md)] border overflow-hidden bg-[var(--surface-card)] border-[var(--border-default)] shadow-sm">
+        <div className="p-4 border-b border-[var(--border-default)] font-semibold flex items-center justify-between text-[var(--text-primary)]">
           <span>سجل القياسات الحية المفصلة (Detailed Telemetry Log)</span>
-          <span className="text-xs font-normal text-gray-500">عرض أحدث {filteredMetrics.length} عملية</span>
+          <span className="text-xs font-normal text-[var(--text-muted)]">عرض أحدث {filteredMetrics.length} عملية</span>
         </div>
         <div className="overflow-x-auto max-h-96">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className={`border-b text-xs font-semibold uppercase tracking-wider ${isDark ? 'bg-zinc-950/50 border-gray-800 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-600'}`}>
+              <tr className="border-b text-xs font-semibold uppercase tracking-wider bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-secondary)]">
                 <th className="p-3">اسم المكون</th>
                 <th className="p-3">عدد الرندرات</th>
                 <th className="p-3">مدة الرندر</th>
@@ -281,26 +285,26 @@ export const AdminRenderMetricsView: React.FC = () => {
                 <th className="p-3">الوقت</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-sm font-mono">
+            <tbody className="divide-y divide-[var(--border-subtle)] text-sm font-mono">
               {filteredMetrics.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-gray-500">
+                  <td colSpan={6} className="p-8 text-center text-[var(--text-muted)]">
                     لا توجد مقاييس مسجلة حالياً
                   </td>
                 </tr>
               ) : (
                 filteredMetrics.map((m) => (
-                  <tr key={m.id} className={`hover:${isDark ? 'bg-zinc-800/40' : 'bg-gray-50/80'} transition-colors`}>
-                    <td className="p-3 font-semibold text-accent font-sans">{m.componentName}</td>
-                    <td className="p-3">{m.renderCount}</td>
+                  <tr key={m.id} className="hover:bg-[var(--surface-subtle)] transition-colors">
+                    <td className="p-3 font-semibold text-[var(--accent)] font-sans">{m.componentName}</td>
+                    <td className="p-3 text-[var(--text-primary)]">{m.renderCount}</td>
                     <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded text-xs ${m.renderDuration > 30 ? 'bg-amber-500/10 text-amber-500' : 'bg-accent/10 text-accent'}`}>
+                      <span className={`px-2 py-0.5 rounded-[var(--radius-xs)] text-xs ${m.renderDuration > 30 ? 'bg-[var(--status-warning-subtle)]/10 text-[var(--fg-warning)] border border-[var(--status-warning)]/20' : 'bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border border-[var(--border-accent)]'}`}>
                         {m.renderDuration} ms
                       </span>
                     </td>
-                    <td className="p-3 text-gray-500">{m.timeSinceMount} ms</td>
-                    <td className="p-3 text-xs text-gray-400">{m.sessionId || 'N/A'}</td>
-                    <td className="p-3 text-xs text-gray-500">{new Date(m.timestamp).toLocaleTimeString()}</td>
+                    <td className="p-3 text-[var(--text-muted)]">{m.timeSinceMount} ms</td>
+                    <td className="p-3 text-xs text-[var(--text-muted)]">{m.sessionId || 'N/A'}</td>
+                    <td className="p-3 text-xs text-[var(--text-muted)]">{new Date(m.timestamp).toLocaleTimeString()}</td>
                   </tr>
                 ))
               )}

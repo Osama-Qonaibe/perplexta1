@@ -2,9 +2,11 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import { authenticateAdmin, authenticateToken } from '../middleware/auth.js';
 import { getSystemSettings, updateSystemSettings, getEconomySettings } from '../services/system.js';
-import { pool } from '../db/index.js';
+import { pool, ledgerPool, externalPool, securityPool, mediaPool, getPoolMetrics, isDatabaseConnected } from '../db/index.js';
+import { checkAllDatabasesHealth } from '../services/admin.js';
 import { getStripe, getPayPalCredentials } from '../services/payments.js';
 import { logSystemActivity } from '../services/notifications.js';
+import { escapeHtml, isSafeExternalUrl } from '../utils/security.js';
 
 const router = express.Router();
 
@@ -44,6 +46,9 @@ router.get("/settings", async (req, res) => {
     if (!isAuth) {
       delete settings.stripe_publishable_key;
       delete settings.paypal_client_id;
+      res.setHeader('Cache-Control', 'public, max-age=120, stale-while-revalidate=300');
+    } else {
+      res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=120');
     }
     res.json({
       ...settings,
@@ -56,6 +61,7 @@ router.get("/settings", async (req, res) => {
 });
 
 const handleGetFontConfig = async (req: express.Request, res: express.Response) => {
+  res.setHeader('Cache-Control', 'public, max-age=600, stale-while-revalidate=1200');
   try {
     const settings = await getSystemSettings();
     const reqLang = req.query.lang as string;
@@ -90,14 +96,14 @@ const handleGetFontConfig = async (req: express.Request, res: express.Response) 
     const fontConfig = {
       dynamicLoading: parsedConfig.dynamicLoading !== false,
       ar: {
-        fontFamily: parsedAr.fontFamily || parsedConfig.ar?.fontFamily || 'Tajawal',
+        fontFamily: parsedAr.fontFamily || parsedConfig.ar?.fontFamily || 'Cairo',
         enabled: parsedAr.enabled !== false && parsedConfig.ar?.enabled !== false,
-        url: parsedAr.url || parsedConfig.ar?.url || 'https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700&display=swap'
+        url: parsedAr.url || parsedConfig.ar?.url || 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap'
       },
       en: {
-        fontFamily: parsedEn.fontFamily || parsedConfig.en?.fontFamily || 'Space Grotesk',
+        fontFamily: parsedEn.fontFamily || parsedConfig.en?.fontFamily || 'Geist',
         enabled: parsedEn.enabled !== false && parsedConfig.en?.enabled !== false,
-        url: parsedEn.url || parsedConfig.en?.url || 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap'
+        url: parsedEn.url || parsedConfig.en?.url || 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap'
       }
     };
 
@@ -145,11 +151,11 @@ router.get("/fonts", handleGetFontConfig);
 router.get("/font-config", handleGetFontConfig);
 router.get("/settings/font-config", handleGetFontConfig);
 
-router.post("/settings/fonts", handlePostFontConfig);
-router.post("/fonts", handlePostFontConfig);
-router.post("/font-config", handlePostFontConfig);
-router.post("/settings/font-config", handlePostFontConfig);
-router.put("/settings/font-config", handlePostFontConfig);
+router.post("/settings/fonts", authenticateAdmin, handlePostFontConfig);
+router.post("/fonts", authenticateAdmin, handlePostFontConfig);
+router.post("/font-config", authenticateAdmin, handlePostFontConfig);
+router.post("/settings/font-config", authenticateAdmin, handlePostFontConfig);
+router.put("/settings/font-config", authenticateAdmin, handlePostFontConfig);
 
 router.get("/economy", async (req, res) => {
   try {
@@ -180,6 +186,11 @@ router.get("/link-metadata", async (req, res) => {
   let cleanUrl = targetUrl.trim();
   if (!/^https?:\/\//i.test(cleanUrl)) {
     cleanUrl = 'https://' + cleanUrl;
+  }
+
+  // SSRF Protection: Reject private/internal IP ranges, localhost, and cloud metadata endpoints
+  if (!isSafeExternalUrl(cleanUrl)) {
+    return res.status(400).json({ error: 'Invalid or restricted URL destination' });
   }
 
   if (urlMetadataCache.has(cleanUrl)) {
@@ -399,36 +410,36 @@ router.post("/reports", authenticateToken, async (req: any, res) => {
 
           <div style="background: #1e293b; padding: 18px; border-radius: 12px; margin-bottom: 16px; border-right: 4px solid #f43f5e;">
             <p style="margin: 0 0 8px 0; font-size: 14px; color: #94a3b8;"><strong>تصنيف المخالفة المحدد:</strong></p>
-            <p style="margin: 0; font-size: 16px; font-weight: bold; color: #fb7185;">⚠️ ${catTitle}</p>
+            <p style="margin: 0; font-size: 16px; font-weight: bold; color: #fb7185;">⚠️ ${escapeHtml(catTitle)}</p>
           </div>
 
           <div style="background: #1e293b; padding: 18px; border-radius: 12px; margin-bottom: 16px;">
             <p style="margin: 0 0 8px 0; font-size: 14px; color: #94a3b8;"><strong>بيانات مُقّدم البلاغ:</strong></p>
-            <p style="margin: 0 0 4px 0; font-size: 15px; color: #ffffff;">👤 <strong>الاسم:</strong> ${userName} (معرف: ${userId})</p>
-            <p style="margin: 0 0 4px 0; font-size: 14px; color: #38bdf8;">✉️ <strong>البريد المسجل:</strong> ${userEmail}</p>
-            ${contactInfo ? `<p style="margin: 0 0 4px 0; font-size: 14px; color: #a7f3d0;">📞 <strong>بيانات لمعاودة الاتصال:</strong> ${contactInfo}</p>` : ''}
-            ${attachmentName ? `<p style="margin: 0 0 4px 0; font-size: 14px; color: #fde047;">📎 <strong>الملف المُرفق:</strong> ${attachmentName}</p>` : ''}
+            <p style="margin: 0 0 4px 0; font-size: 15px; color: #ffffff;">👤 <strong>الاسم:</strong> ${escapeHtml(userName)} (معرف: ${escapeHtml(userId)})</p>
+            <p style="margin: 0 0 4px 0; font-size: 14px; color: #38bdf8;">✉️ <strong>البريد المسجل:</strong> ${escapeHtml(userEmail)}</p>
+            ${contactInfo ? `<p style="margin: 0 0 4px 0; font-size: 14px; color: #a7f3d0;">📞 <strong>بيانات لمعاودة الاتصال:</strong> ${escapeHtml(contactInfo)}</p>` : ''}
+            ${attachmentName ? `<p style="margin: 0 0 4px 0; font-size: 14px; color: #fde047;">📎 <strong>الملف المُرفق:</strong> ${escapeHtml(attachmentName)}</p>` : ''}
             <p style="margin: 0; font-size: 13px; color: #94a3b8;">🕒 <strong>توقيت البلاغ:</strong> ${new Date().toLocaleString('ar-SA')}</p>
           </div>
 
           ${details ? `
             <div style="background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.3); padding: 16px; border-radius: 12px; margin-bottom: 16px;">
               <p style="margin: 0 0 6px 0; font-size: 13px; color: #fb7185; font-weight: bold;">📝 ملاحظات وتفاصيل البلاغ الواردة من المستخدم:</p>
-              <p style="margin: 0; font-size: 14px; color: #ffffff; line-height: 1.6;">"${details}"</p>
+              <p style="margin: 0; font-size: 14px; color: #ffffff; line-height: 1.6;">"${escapeHtml(details)}"</p>
             </div>
           ` : ''}
 
           ${userPrompt ? `
             <div style="background: #1e293b; padding: 14px; border-radius: 10px; margin-bottom: 12px;">
               <p style="margin: 0 0 6px 0; font-size: 12px; color: #94a3b8;"><strong>سؤال المستخدم الأصلي:</strong></p>
-              <p style="margin: 0; font-size: 13px; color: #e2e8f0;">${userPrompt.slice(0, 300)}</p>
+              <p style="margin: 0; font-size: 13px; color: #e2e8f0;">${escapeHtml(userPrompt.slice(0, 300))}</p>
             </div>
           ` : ''}
 
           ${assistantResponse ? `
             <div style="background: #1e293b; padding: 14px; border-radius: 10px; margin-bottom: 16px;">
               <p style="margin: 0 0 6px 0; font-size: 12px; color: #f43f5e;"><strong>معاينة الرد المُبلغ عنه من المساعد الذكي:</strong></p>
-              <div style="margin: 0; font-size: 13px; color: #cbd5e1; max-height: 200px; overflow-y: auto; white-space: pre-wrap; font-family: sans-serif;">${assistantResponse.slice(0, 800)}</div>
+              <div style="margin: 0; font-size: 13px; color: #cbd5e1; max-height: 200px; overflow-y: auto; white-space: pre-wrap; font-family: sans-serif;">${escapeHtml(assistantResponse.slice(0, 800))}</div>
             </div>
           ` : ''}
 
@@ -487,13 +498,11 @@ router.post("/admin/settings", authenticateAdmin, async (req, res) => {
 router.post("/client-error", (req, res) => {
   try {
     const { boundary, message, stack, componentStack, url, ts } = req.body || {};
-    console.error(
-      `[ClientError] [${boundary || 'Unknown'}] ${message || 'No message'}`,
-      `\n  URL: ${url || '-'}`,
-      `\n  Time: ${ts || new Date().toISOString()}`,
-      stack    ? `\n  Stack: ${stack}`           : '',
-      componentStack ? `\n  Component: ${componentStack}` : ''
-    );
+    const logMessage = `[ClientError] [${boundary || 'Unknown'}] ${message || 'No message'}\n  URL: ${url || '-'}\n  Time: ${ts || new Date().toISOString()}\n  Stack: ${stack || 'None'}\n  Component: ${componentStack || 'None'}\n`;
+    console.error(logMessage);
+    import('fs').then(fs => {
+      fs.appendFileSync('/tmp/client_error_detailed.log', logMessage + '\n---\n');
+    }).catch(() => {});
     res.status(204).end();
   } catch {
     res.status(204).end();
@@ -529,6 +538,97 @@ router.post("/launch-telemetry", (req, res) => {
 });
 
 import { validatePwa } from '../../scripts/validate-pwa.js';
+import { 
+  validateLocationData, 
+  cacheLocation, 
+  findCachedLocations, 
+  getAllCachedLocations, 
+  getLocationCacheStats 
+} from '../services/locationCache.js';
+
+/**
+ * POST /api/system/location-sync
+ * Validates selected location data from the client and caches it locally to eliminate redundant Google Places API calls.
+ */
+router.post("/location-sync", async (req, res) => {
+  try {
+    const validation = validateLocationData(req.body);
+    if (!validation.valid || !validation.data) {
+      return res.status(400).json({
+        success: false,
+        error: validation.error || 'Invalid location data payload',
+        error_ar: validation.error_ar || 'بيانات الموقع غير صالحة'
+      });
+    }
+
+    const cached = await cacheLocation(validation.data);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Location data successfully validated and cached locally',
+      message_ar: 'تم التحقق من بيانات الموقع وتخزينها محلياً بنجاح',
+      location: cached
+    });
+  } catch (error: any) {
+    console.error('[LocationSync] Error syncing location:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error during location sync',
+      error_ar: 'حدث خطأ في الخادم أثناء مزامنة الموقع'
+    });
+  }
+});
+
+/**
+ * GET /api/system/location-sync
+ * Retrieve cached locations by query or fetch popular cached items
+ */
+router.get("/location-sync", async (req, res) => {
+  try {
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const countryCode = typeof req.query.country_code === 'string' ? req.query.country_code.trim() : undefined;
+    const limit = Math.min(Number(req.query.limit) || 20, 100);
+
+    if (q) {
+      const results = await findCachedLocations(q, countryCode, limit);
+      return res.json({
+        success: true,
+        count: results.length,
+        query: q,
+        results
+      });
+    }
+
+    const all = await getAllCachedLocations(limit);
+    return res.json({
+      success: true,
+      count: all.length,
+      results: all
+    });
+  } catch (error: any) {
+    console.error('[LocationSync] Error fetching cached locations:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch cached locations'
+    });
+  }
+});
+
+/**
+ * GET /api/system/location-sync/stats
+ * Telemetry and hit count stats for cached locations
+ */
+router.get("/location-sync/stats", (req, res) => {
+  try {
+    const stats = getLocationCacheStats();
+    return res.json({
+      success: true,
+      stats
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 router.get("/validate-manifest", (req, res) => {
   try {
@@ -541,6 +641,72 @@ router.get("/validate-manifest", (req, res) => {
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/system/health
+ * System health status across pools and operational flags
+ */
+router.get("/health", (req, res) => {
+  const pools = {
+    core: getPoolMetrics(pool, 'core'),
+    ledger: getPoolMetrics(ledgerPool, 'ledger'),
+    external: getPoolMetrics(externalPool, 'external'),
+    security: getPoolMetrics(securityPool, 'security'),
+    media: getPoolMetrics(mediaPool, 'media')
+  };
+  const isHealthy = isDatabaseConnected();
+  res.status(isHealthy ? 200 : 503).json({
+    status: isHealthy ? 'ok' : 'degraded',
+    timestamp: new Date().toISOString(),
+    databaseConnected: isHealthy,
+    pools
+  });
+});
+
+/**
+ * GET /api/system/status
+ * Platform operational telemetry and server status
+ */
+router.get("/status", async (req, res) => {
+  try {
+    const isDbOnline = isDatabaseConnected();
+    const pools = {
+      core: getPoolMetrics(pool, 'core'),
+      ledger: getPoolMetrics(ledgerPool, 'ledger'),
+      external: getPoolMetrics(externalPool, 'external'),
+      security: getPoolMetrics(securityPool, 'security'),
+      media: getPoolMetrics(mediaPool, 'media')
+    };
+    res.json({
+      status: 'operational',
+      environment: process.env.NODE_ENV || 'development',
+      timestamp: new Date().toISOString(),
+      uptimeSeconds: Math.floor(process.uptime()),
+      database: {
+        connected: isDbOnline,
+        pools
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', error: error.message });
+  }
+});
+
+/**
+ * GET /api/system/db/status
+ * Multi-cluster database status and health metrics
+ */
+router.get("/db/status", async (req, res) => {
+  try {
+    const health = await checkAllDatabasesHealth();
+    res.json(health);
+  } catch (error: any) {
+    res.status(500).json({
+      error: error.message || 'Failed to check database health status',
+      timestamp: new Date().toISOString()
+    });
   }
 });
 

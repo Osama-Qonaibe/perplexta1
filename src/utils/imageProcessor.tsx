@@ -266,7 +266,7 @@ export const NotificationIconRenderer: React.FC<NotificationIconProps> = ({
           loading="eager"
           decoding="async"
           onError={() => setHasError(true)}
-          className={`w-full h-full object-contain transition-opacity duration-150 ${isProcessing ? 'opacity-70' : 'opacity-100'}`}
+          className={`w-full h-full object-contain transition-opacity duration-fast ${isProcessing ? 'opacity-70' : 'opacity-100'}`}
         />
       ) : (
         fallbackIcon
@@ -348,7 +348,7 @@ export const AdThumbnailRenderer: React.FC<{
           loading="lazy"
           decoding="async"
           onError={() => setHasFailed(true)}
-          className={`w-full h-full ${fit === 'contain' ? 'object-contain' : 'object-cover'} transition-opacity duration-150 ${isReady ? 'opacity-100' : 'opacity-80'}`}
+          className={`w-full h-full ${fit === 'contain' ? 'object-contain' : 'object-cover'} transition-opacity duration-fast ${isReady ? 'opacity-100' : 'opacity-80'}`}
         />
       ) : (
         fallback

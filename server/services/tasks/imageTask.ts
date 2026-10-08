@@ -1,5 +1,5 @@
 import { pool } from '../../db/index.js';
-import { getProviderKey } from '../ai.js';
+import { getProviderKey, callAIProvider } from '../ai.js';
 import { getSystemSettings } from '../system.js';
 import { logSystemActivity } from '../notifications.js';
 import { saveGeneratedImageToDisk } from '../files.js';
@@ -12,7 +12,6 @@ import {
   IMG_TIMEOUT_MS,
   getNestedField
 } from './utils.js';
-import { GoogleGenAI } from "@google/genai";
 import { getEconomySettings } from '../wallet.js';
 import { getCachedGpuProviders } from '../gpuVaultService.js';
 import { dispatchGpuTask } from '../gpu/gpuTaskDispatcher.js';
@@ -186,103 +185,49 @@ export async function executeImageTask(ctx: TaskExecutionContext): Promise<{ res
     });
   }
 
-  // Auto-translate non-English prompts (Arabic, Hebrew, Russian, etc.) to descriptive English using Gemini API
+  // Multilingual prompt optimization strictly routed through Orchestrator text intelligence
   const needsTranslation = /[^\x00-\x7F]/.test(finalPrompt);
-  if (needsTranslation && process.env.GEMINI_API_KEY) {
-    if (io) {
-      io.to(`user_${userId}`).emit('image_progress', {
-        progress: 15,
-        status: 'translating',
-        status_ar: 'جاري ترجمة وتحسين المطلب الفني بدقة عالية إلى الإنجليزية...',
-        status_en: 'Translating and optimizing prompt to descriptive English...'
-      });
-    }
+  if (needsTranslation) {
     try {
-      const { GoogleGenAI } = await import('@google/genai');
+      const { getCachedOrchestratorConfig } = await import('../../db/queries.js');
+      const textRoute = (await getCachedOrchestratorConfig('chat_fast')) || (await getCachedOrchestratorConfig('perplexta_analysis'));
       
-      // Dynamically resolve translation model from orchestrator or vault, default to gemini-2.5-flash
-      let modelToUse = 'gemini-2.5-flash';
-      try {
-        const { getCachedOrchestratorConfig } = await import('../../db/queries.js');
-        const fastOrch = (await getCachedOrchestratorConfig('chat_fast'));
-        if (fastOrch?.primary_model) {
-          modelToUse = fastOrch.primary_model;
-        } else {
-          const vaultRes = await pool.query("SELECT models FROM api_keys_vault WHERE provider IN ('google', 'gemini') AND is_active = true LIMIT 1");
-          if (vaultRes.rows.length > 0) {
-            const models = vaultRes.rows[0].models;
-            if (Array.isArray(models) && models.length > 0) {
-              const firstModel = models[0];
-              modelToUse = typeof firstModel === 'string' ? firstModel : (firstModel.id || firstModel.name);
-            }
+      const provider = textRoute?.primary_provider;
+      const model = textRoute?.primary_model;
+      
+      if (provider && model) {
+        const apiKey = await getProviderKey(provider);
+        if (apiKey) {
+          if (io) {
+            io.to(`user_${userId}`).emit('image_progress', {
+              progress: 15,
+              status: 'translating',
+              status_ar: 'جاري مواءمة وتحسين المطلب الفني عبر الأوركسترا...',
+              status_en: 'Optimizing artistic prompt via Orchestrator route...'
+            });
           }
-        }
-        if (modelToUse && modelToUse.startsWith('models/')) modelToUse = modelToUse.substring(7);
-        if (!modelToUse || !modelToUse.toLowerCase().includes('gemini')) {
-          modelToUse = 'gemini-2.5-flash';
-        }
-      } catch (vaultErr) {
-        console.warn('[Image Prompt Translator] Model lookup failed, using default model.');
-      }
-
-      const apiKey = process.env.GEMINI_API_KEY || (await getProviderKey('google')) || (await getProviderKey('gemini'));
-      if (apiKey) {
-        const aiObj = new GoogleGenAI({
-          apiKey,
-          httpOptions: {
-            headers: {
-              'User-Agent': 'aistudio-build'
-            }
-          }
-        });
-
-        let translationResponse;
-        try {
-          translationResponse = await withTimeout(
-            () => aiObj.models.generateContent({
-              model: modelToUse || 'gemini-2.5-flash',
-              contents: `You are an expert Arabic-to-English translator and elite prompt engineer specializing in AI image generation with 100% precision and fidelity. Translate the Arabic prompt accurately without adding unrequested objects. Return ONLY the translated English text.
-Translate the following user prompt (which may be in Arabic, Hebrew, Russian, or any other language) into clear, accurate, and descriptive English. 
-CRITICAL RULES:
-1. Accurately translate every detail, subject, action, color, lighting, and setting.
-2. Do NOT add unrequested objects, subjects, backgrounds, or excessive embellishments that alter the user's explicit intent.
-3. Keep the translation faithful, direct, and optimized for image generation models.
-4. Return ONLY the translated English text with zero markdown formatting, quotes, or explanations.
-
-User Prompt: "${finalPrompt}"`,
-              config: {
-                maxOutputTokens: 300,
-                temperature: 0.1
-              }
-            }),
-            4500,
+          const translateSystem = 'You are a professional multilingual translator and prompt optimization engine. Translate non-English prompts to clear, descriptive English for image generation without adding unrequested elements. Return ONLY the translation with zero commentary.';
+          const translated = (await withTimeout(
+            callAIProvider(
+              provider,
+              model,
+              apiKey,
+              `Translate the following prompt into clean, descriptive English for AI image generation:\n"${finalPrompt}"`,
+              translateSystem,
+              undefined,
+              [],
+              { temperature: 0.1 }
+            ),
+            5000,
             'ImagePromptTranslation'
-          );
-        } catch (mErr: any) {
-          if (modelToUse !== 'gemini-2.5-flash') {
-            console.warn(`[Image Prompt Translator] Model ${modelToUse} failed (${mErr.message}), trying gemini-2.5-flash fallback...`);
-            translationResponse = await withTimeout(
-              () => aiObj.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: `Translate to precise descriptive English prompt for AI image generation: "${finalPrompt}"`,
-                config: { maxOutputTokens: 300, temperature: 0.2 }
-              }),
-              3500,
-              'ImagePromptTranslationFallback'
-            );
-          } else {
-            throw mErr;
+          )) as any as string;
+          if (translated && translated.trim()) {
+            finalPrompt = translated.trim().replace(/^["']|["']$/g, '');
           }
-        }
-
-        const resultText = translationResponse?.text?.trim();
-        if (resultText) {
-          console.log(`[Image Prompt Translator] Multilingual Translated: "${finalPrompt}" -> "${resultText}"`);
-          finalPrompt = resultText;
         }
       }
     } catch (err: any) {
-      console.warn('[Image Prompt Translator] Failed to translate/optimize prompt (using raw prompt):', err.message);
+      console.warn('[Image Prompt Translator] Prompt optimization skipped via Orchestrator:', err.message);
     }
   }
 
@@ -294,7 +239,7 @@ User Prompt: "${finalPrompt}"`,
     { provider: route.fallback_1_provider, model: route.fallback_1_model, label: 'fallback_1' },
     { provider: route.fallback_2_provider, model: route.fallback_2_model, label: 'fallback_2' },
     { provider: route.fallback_3_provider, model: route.fallback_3_model, label: 'fallback_3' }
-  ].filter(t => t.provider && t.model);
+  ].filter(t => t.provider && t.model).slice(0, 2);
 
   if (targets.length === 0) {
     await safeDecrementOnFailure(quotaCheck, userId, toolIdStr, walletCharged);
@@ -412,33 +357,6 @@ User Prompt: "${finalPrompt}"`,
   }
 
   if (!imageUrl) {
-    console.warn('[Image Orchestrator] All configured targets failed. Triggering Emergency Failover Image Synthesizer via Pollinations AI...');
-    try {
-      const { width, height } = resolveImageDimensions(imageSettings.aspectRatio || '1:1');
-      const seed = Math.floor(Math.random() * 1000000);
-      const pollUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=${width}&height=${height}&seed=${seed}&nologo=true`;
-      
-      const res = await withTimeout(
-        (signal) => fetch(pollUrl, { signal }),
-        20000,
-        'pollinations-emergency-fallback'
-      );
-      if (res.ok) {
-        const buffer = await res.arrayBuffer();
-        const base64Str = Buffer.from(buffer).toString('base64');
-        const b64Url = `data:image/jpeg;base64,${base64Str}`;
-        const diskSavedUrl = await saveGeneratedImageToDisk(String(userId), b64Url);
-        imageUrl = diskSavedUrl;
-        successfulProvider = 'pollinations_failover';
-        successfulModel = 'flux-pollinations';
-        console.log(`[Image Orchestrator] Emergency Failover Image Synthesizer succeeded: ${diskSavedUrl}`);
-      }
-    } catch (pollErr: any) {
-      console.error('[Image Orchestrator] Emergency Failover Image Synthesizer failed:', pollErr.message);
-    }
-  }
-
-  if (!imageUrl) {
     await safeDecrementOnFailure(quotaCheck, userId, toolIdStr, walletCharged);
     throw new Error(JSON.stringify({
       error: "All configured image generation providers in the fallback chain failed or returned empty results.",
@@ -459,12 +377,10 @@ User Prompt: "${finalPrompt}"`,
   let savedUrl = imageUrl;
 
   try {
-    const settings = await getEconomySettings();
-    const pointsPerDollar = parseFloat(settings.points_per_dollar || '1000');
-    const estimatedCost = (route.cost_per_usage || 0) / pointsPerDollar;
+    const estimatedCost = 0.03;
     if (estimatedCost > 0 && successfulProvider) {
       await pool.query(
-        'UPDATE api_keys_vault SET used_today = used_today + $1, updated_at = CURRENT_TIMESTAMP WHERE provider = $2',
+        'UPDATE gpu_providers SET used_today = used_today + $1, updated_at = CURRENT_TIMESTAMP WHERE provider_id = $2',
         [estimatedCost, successfulProvider]
       );
     }

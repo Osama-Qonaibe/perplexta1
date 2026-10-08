@@ -199,7 +199,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
           initial={{ scale: 0.92, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.92, opacity: 0 }}
-          className="relative w-full max-w-lg rounded-2xl bg-[var(--surface-card)] border border-[var(--border-default)] shadow-2xl overflow-hidden flex flex-col text-[var(--text-primary)]"
+          className="relative w-full max-w-lg rounded-[var(--radius-lg)] bg-[var(--surface-card)] border border-[var(--border-default)] shadow-2xl overflow-hidden flex flex-col text-[var(--text-primary)]"
         >
           {/* Modal Header */}
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-default)] bg-[var(--surface-subtle)]">
@@ -209,7 +209,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-[var(--surface-subtle)] transition-colors"
+              className="p-1 rounded-[var(--radius-sm)] text-gray-400 hover:text-gray-600 hover:bg-[var(--surface-subtle)] transition-colors"
             >
               <X size={18} />
             </button>
@@ -228,7 +228,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
               ref={containerRef}
               onMouseDown={handleMouseDown}
               onTouchStart={handleMouseDown}
-              className={`relative overflow-hidden border-2 border-dashed border-accent/60 bg-black/90 cursor-grab active:cursor-grabbing rounded-2xl shadow-inner flex items-center justify-center select-none w-full`}
+              className={`relative overflow-hidden border-2 border-dashed border-accent/60 bg-black/90 cursor-grab active:cursor-grabbing rounded-[var(--radius-lg)] shadow-inner flex items-center justify-center select-none w-full`}
               style={{
                 aspectRatio: `${aspectRatio}`,
                 maxHeight: '280px'
@@ -268,7 +268,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
             </div>
 
             {/* Controls: Zoom & Reset */}
-            <div className="w-full flex items-center justify-between gap-3 px-2 py-1 bg-[var(--surface-subtle)] rounded-xl border border-[var(--border-default)]">
+            <div className="w-full flex items-center justify-between gap-3 px-2 py-1 bg-[var(--surface-subtle)] rounded-[var(--radius-md)] border border-[var(--border-default)]">
               <div className="flex items-center gap-2 flex-1">
                 <ZoomOut size={15} className="text-[var(--text-muted)] shrink-0" />
                 <input
@@ -278,7 +278,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                   step="0.05"
                   value={zoom}
                   onChange={(e) => setZoom(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-accent"
+                  className="w-full h-1.5 bg-[var(--surface-subtle)] rounded-[var(--radius-sm)] appearance-none cursor-pointer accent-accent"
                 />
                 <ZoomIn size={15} className="text-[var(--text-muted)] shrink-0" />
               </div>
@@ -289,7 +289,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                   setZoom(1);
                   setOffset({ x: 0, y: 0 });
                 }}
-                className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] hover:bg-[var(--surface-subtle)] flex items-center gap-1 shrink-0"
+                className="px-2.5 py-1 text-[11px] font-bold rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-card)] hover:bg-[var(--surface-subtle)] flex items-center gap-1 shrink-0"
                 title={isRtl ? 'إعادة ضبط' : 'Reset'}
               >
                 <RefreshCw size={12} />
@@ -304,7 +304,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isProcessing}
-              className="px-4 py-2 text-xs font-bold rounded-xl border border-[var(--border-default)] hover:bg-[var(--surface-subtle)] transition-colors"
+              className="px-4 py-2 text-xs font-bold rounded-[var(--radius-md)] border border-[var(--border-default)] hover:bg-[var(--surface-subtle)] transition-colors"
             >
               {isRtl ? 'إلغاء' : 'Cancel'}
             </button>
@@ -313,7 +313,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
               type="button"
               onClick={handleConfirmCrop}
               disabled={!imageSrc || isProcessing}
-              className="px-5 py-2 text-xs font-bold rounded-xl bg-accent hover:bg-accent/90 text-white flex items-center gap-1 shadow-md transition-all active:scale-95 disabled:opacity-50"
+              className="px-5 py-2 text-xs font-bold rounded-[var(--radius-md)] bg-accent hover:bg-accent/90 text-white flex items-center gap-1 shadow-md transition-all active:scale-95 disabled:opacity-50"
             >
               {isProcessing ? (
                 <>

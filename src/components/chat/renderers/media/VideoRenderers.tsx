@@ -12,8 +12,7 @@ import {
   Play, 
   Pause, 
   Volume2, 
-  VolumeX,
-  Sparkles
+  VolumeX
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useAppContext } from '../../../../context/AppContext';
@@ -27,24 +26,33 @@ export const SimpleVideoLoadingPlaceholder = ({ dir, aspectRatio = '9:16' }: { d
   return (
     <div className="w-full flex flex-col my-2 items-start">
       <div 
-        className={`relative overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-subtle)] ${containerAspectClass} w-full flex items-center justify-center`}
+        className={`relative overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-subtle)]/70 backdrop-blur-xl ${containerAspectClass} w-full`}
       >
-        <div className="absolute inset-0 backdrop-blur-md bg-zinc-950/30 flex flex-col items-center justify-center gap-2 z-10">
-          <Logo size={28} fallbackType="cpu" className="animate-pulse" />
-          <span className="text-[11px] font-bold text-white tracking-wide select-none">
-            {dir === 'rtl' ? 'جارٍ إنتاج الفيديو...' : 'Generating video...'}
-          </span>
-        </div>
+        {/* Calm, serene ambient breathing pulse */}
         <motion.div
           animate={{
-            x: dir === 'rtl' ? ['150%', '-150%'] : ['-150%', '150%']
+            opacity: [0.35, 0.65, 0.35],
+            scale: [1, 1.02, 1],
           }}
           transition={{
-            duration: 2.0,
+            duration: 4.0,
             repeat: Infinity,
             ease: "easeInOut"
           }}
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent skew-x-12 pointer-events-none z-0"
+          className="absolute inset-0 bg-gradient-to-br from-accent/10 via-[var(--surface-card)]/50 to-accent/5 pointer-events-none"
+        />
+
+        {/* Gentle, subtle light sheen sweep */}
+        <motion.div
+          animate={{
+            x: dir === 'rtl' ? ['160%', '-160%'] : ['-160%', '160%']
+          }}
+          transition={{
+            duration: 3.2,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.06] dark:via-white/[0.03] to-transparent skew-x-12 pointer-events-none z-10"
         />
       </div>
     </div>
@@ -57,7 +65,7 @@ export const SimpleVideoErrorPlaceholder = ({ dir, errorMessage, onRetry, aspect
   return (
     <div className="w-full flex flex-col my-3 items-start gap-3">
       <div 
-        className={`relative overflow-hidden rounded-2xl border border-rose-500/30 bg-rose-500/10 ${containerAspectClass} w-full shadow-sm flex flex-col items-center justify-center p-6 text-center`}
+        className={`relative overflow-hidden rounded-shape-lg border border-rose-500/30 bg-rose-500/10 ${containerAspectClass} w-full shadow-sm flex flex-col items-center justify-center p-6 text-center`}
       >
         <AlertTriangle className="text-rose-500 mb-3" size={24} />
         <span className="text-xs font-bold text-[var(--text-primary)] mb-1">
@@ -69,7 +77,7 @@ export const SimpleVideoErrorPlaceholder = ({ dir, errorMessage, onRetry, aspect
         {onRetry && (
           <button
             onClick={onRetry}
-            className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-500/30 bg-[var(--surface-subtle)] text-rose-500 hover:bg-rose-500/20 transition-theme text-[11px] font-black uppercase cursor-pointer"
+            className="mt-3 flex items-center gap-1.5 px-4 py-2 min-h-[44px] rounded-shape-sm border border-rose-500/30 bg-[var(--surface-subtle)] text-rose-500 hover:bg-rose-500/20 transition-theme text-xs font-bold cursor-pointer"
           >
             <RefreshCw size={12} className="animate-spin-slow" />
             <span>{dir === 'rtl' ? 'إعادة المحاولة' : 'Retry'}</span>
@@ -185,8 +193,8 @@ export const VideoPlaybackComponent = ({ src, dir: propDir, alt, title, ...props
             onClick={togglePlay}
             className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-auto cursor-pointer"
           >
-            <div className="w-12 h-12 rounded-shape-sm bg-[var(--surface-inset)]/80 backdrop-blur-md border border-[var(--border-default)] hover:border-accent/40 flex items-center justify-center text-accent hover:text-accent hover:scale-110 active:scale-95 transition-theme shadow-[0_0_20px_rgba(0,0,0,0.6)]">
-              {isPlaying ? <Pause size={18} className="fill-accent-400/20" /> : <Play size={18} className="fill-accent-400/20 ml-0.5" />}
+            <div className="w-12 h-12 rounded-[var(--radius-sm)] bg-[var(--surface-inset)]/80 backdrop-blur-md border border-[var(--border-default)] hover:border-accent/40 flex items-center justify-center text-accent hover:text-accent hover:scale-110 active:scale-95 transition-theme shadow-[0_0_20px_rgba(0,0,0,0.6)]">
+              {isPlaying ? <Pause size={18} className="fill-[var(--accent)]" /> : <Play size={18} className="fill-[var(--accent)] ml-0.5" />}
             </div>
           </div>
 
@@ -204,8 +212,8 @@ export const VideoPlaybackComponent = ({ src, dir: propDir, alt, title, ...props
               <div className="h-full bg-accent" style={{ width: `${progress}%` }} />
             </div>
 
-            <div className="flex items-center gap-1.5 font-mono text-[9px] text-gray-400">
-              <span className="text-gray-200">{currentTime.toFixed(0)}s</span>
+            <div className="flex items-center gap-1.5 font-mono text-[9px] text-[var(--text-muted)]">
+              <span className="text-[var(--text-primary)]">{currentTime.toFixed(0)}s</span>
               <span>/</span>
               <span>{duration ? `${duration.toFixed(0)}s` : '5s'}</span>
             </div>
@@ -213,14 +221,14 @@ export const VideoPlaybackComponent = ({ src, dir: propDir, alt, title, ...props
             <div className="flex items-center gap-2">
               <button 
                 onClick={toggleMute}
-                className="w-8 h-8 rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--text-primary)] hover:text-accent hover:border-accent/35 hover:bg-[var(--surface-subtle)] transition-theme flex items-center justify-center cursor-pointer active:scale-95 shadow-md"
+                className="w-8 h-8 rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--text-primary)] hover:text-accent hover:border-accent/35 hover:bg-[var(--surface-subtle)] transition-theme flex items-center justify-center cursor-pointer active:scale-95 shadow-md relative before:absolute before:-inset-1.5 before:content-['']"
                 title={isMuted ? (dir === 'rtl' ? 'إلغاء الكتم' : 'Unmute') : (dir === 'rtl' ? 'كتم الصوت' : 'Mute')}
               >
-                {isMuted ? <VolumeX size={13} className="text-gray-400" /> : <Volume2 size={13} />}
+                {isMuted ? <VolumeX size={13} className="text-[var(--text-muted)]" /> : <Volume2 size={13} />}
               </button>
               <button 
                 onClick={() => setIsPreviewOpen(true)}
-                className="w-8 h-8 rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--text-primary)] hover:text-accent hover:border-accent/35 hover:bg-[var(--surface-subtle)] transition-theme flex items-center justify-center cursor-pointer active:scale-95 shadow-md"
+                className="w-8 h-8 rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--text-primary)] hover:text-accent hover:border-accent/35 hover:bg-[var(--surface-subtle)] transition-theme flex items-center justify-center cursor-pointer active:scale-95 shadow-md relative before:absolute before:-inset-1.5 before:content-['']"
                 title={dir === 'rtl' ? 'ملء الشاشة' : 'Fullscreen'}
               >
                 <Maximize2 size={13} />
@@ -275,21 +283,21 @@ export const VideoPlaybackComponent = ({ src, dir: propDir, alt, title, ...props
                   <span className="text-[11px] font-bold text-accent/90 tracking-widest uppercase font-mono">
                     {dir === 'rtl' ? 'عرض السينما الفائقة من بيربليكستا' : 'PERPLEXTA CINEMATIC PRO PREVIEW'}
                   </span>
-                  <span className="text-[10px] text-gray-400 font-medium font-sans">
+                  <span className="text-[10px] text-[var(--text-muted)] font-medium font-sans">
                     {dir === 'rtl' ? 'مخرجات آلة توليد الفيديو المتكاملة بدقة ووضوح فائقين' : 'Engineered high-fidelity video production container'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleDownload}
-                    className="w-10 h-10 rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--text-primary)] hover:text-accent hover:border-accent/40 hover:bg-[var(--surface-subtle)] transition-theme flex items-center justify-center cursor-pointer shadow-lg active:scale-95"
+                    className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--text-primary)] hover:text-accent hover:border-accent/40 hover:bg-[var(--surface-subtle)] transition-theme flex items-center justify-center cursor-pointer shadow-lg active:scale-95 touch-target-44"
                     title={dir === 'rtl' ? 'تنزيل' : 'Download'}
                   >
                     <Download size={15} />
                   </button>
                   <button
                     onClick={handleShare}
-                    className="w-10 h-10 rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--text-primary)] hover:text-accent hover:border-accent/40 hover:bg-[var(--surface-subtle)] transition-theme flex items-center justify-center cursor-pointer shadow-lg active:scale-95"
+                    className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--text-primary)] hover:text-accent hover:border-accent/40 hover:bg-[var(--surface-subtle)] transition-theme flex items-center justify-center cursor-pointer shadow-lg active:scale-95 touch-target-44"
                     title={dir === 'rtl' ? 'مشاركة' : 'Share'}
                   >
                     <Share2 size={15} />
@@ -337,29 +345,29 @@ export const VideoPlaybackComponent = ({ src, dir: propDir, alt, title, ...props
                     onClick={togglePreviewPlay}
                     className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300 cursor-pointer"
                   >
-                    <div className="w-16 h-16 rounded-shape-sm bg-[var(--surface-inset)]/80 backdrop-blur-md border border-[var(--border-default)]/80 flex items-center justify-center text-accent shadow-2xl">
-                      {isPreviewPlaying ? <Pause size={24} className="fill-accent-400/25" /> : <Play size={24} className="fill-accent-400/25 ml-1" />}
+                    <div className="w-16 h-16 rounded-[var(--radius-sm)] bg-[var(--surface-inset)]/80 backdrop-blur-md border border-[var(--border-default)]/80 flex items-center justify-center text-accent shadow-2xl">
+                      {isPreviewPlaying ? <Pause size={24} className="fill-[var(--accent)]" /> : <Play size={24} className="fill-[var(--accent)] ml-1" />}
                     </div>
                   </div>
                 </motion.div>
               </div>
 
               <div 
-                className="absolute bottom-8 bg-[var(--surface-card)]/90 backdrop-blur-md border border-[var(--border-default)] shadow-[0_15px_40px_rgba(0,0,0,0.5)] z-[1000] px-5 py-3 rounded-shape-md flex items-center gap-4 text-xs font-mono select-none w-full max-w-lg"
+                className="absolute bottom-8 bg-[var(--surface-card)]/90 backdrop-blur-md border border-[var(--border-default)] shadow-[0_15px_40px_rgba(0,0,0,0.5)] z-[1000] px-5 py-3 rounded-[var(--radius-md)] flex items-center gap-4 text-xs font-mono select-none w-full max-w-lg"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-center gap-2">
                   <button
                     onClick={togglePreviewPlay}
-                    className="w-8 h-8 rounded-shape-sm bg-[var(--surface-subtle)] hover:bg-[var(--surface-inset)] border border-[var(--border-default)]/60 text-accent hover:text-accent flex items-center justify-center active:scale-95 transition-theme"
+                    className="w-8 h-8 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-inset)] border border-[var(--border-default)]/60 text-accent hover:text-accent flex items-center justify-center active:scale-95 transition-theme"
                     title={isPreviewPlaying ? (dir === 'rtl' ? 'إيقاف' : 'Pause') : (dir === 'rtl' ? 'تشغيل' : 'Play')}
                   >
-                    {isPreviewPlaying ? <Pause size={13} className="fill-accent-400/10" /> : <Play size={13} className="fill-accent-400/10 ml-0.5" />}
+                    {isPreviewPlaying ? <Pause size={13} className="fill-[var(--accent)]" /> : <Play size={13} className="fill-[var(--accent)] ml-0.5" />}
                   </button>
 
                   <button
                     onClick={togglePreviewMute}
-                    className="w-8 h-8 rounded-shape-sm bg-[var(--surface-subtle)] hover:bg-[var(--surface-inset)] border border-[var(--border-default)]/60 text-accent hover:text-accent flex items-center justify-center active:scale-95 transition-theme"
+                    className="w-8 h-8 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-inset)] border border-[var(--border-default)]/60 text-accent hover:text-accent flex items-center justify-center active:scale-95 transition-theme"
                     title={isPreviewMuted ? (dir === 'rtl' ? 'إلغاء كتم الصوت' : 'Unmute') : (dir === 'rtl' ? 'كتم الصوت' : 'Mute')}
                   >
                     {isPreviewMuted ? <VolumeX size={13} className="text-[var(--text-muted)]" /> : <Volume2 size={13} />}
@@ -368,7 +376,7 @@ export const VideoPlaybackComponent = ({ src, dir: propDir, alt, title, ...props
 
                 <div 
                   onClick={handlePreviewSeek} 
-                  className="flex-1 h-1.5 bg-[var(--surface-inset)]/80 rounded-shape-sm cursor-pointer relative overflow-hidden"
+                  className="flex-1 h-1.5 bg-[var(--surface-inset)]/80 rounded-[var(--radius-sm)] cursor-pointer relative overflow-hidden"
                 >
                   <div 
                     className="h-full bg-accent transition-theme shadow-[0_5px_10px_rgba(156,163,175,0.3)]" 

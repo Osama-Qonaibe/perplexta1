@@ -77,8 +77,8 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="flex flex-col items-center justify-center p-8 min-h-[200px] bg-[var(--surface-subtle)] border border-red-500/20 rounded-[var(--radius)] m-4">
-          <div className="w-12 h-12 rounded-[var(--radius)] bg-red-500/10 flex items-center justify-center text-red-500 mb-4 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+        <div className="flex flex-col items-center justify-center p-8 min-h-[200px] bg-[var(--surface-subtle)] border border-red-500/20 rounded-[var(--radius-md)] m-4">
+          <div className="w-12 h-12 rounded-[var(--radius-md)] bg-red-500/10 flex items-center justify-center text-red-500 mb-4 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
             <AlertTriangle size={24} />
           </div>
           <h2 className="text-lg font-bold text-[var(--text-primary)] mb-2 uppercase tracking-tight">
@@ -89,7 +89,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </p>
           <button
             onClick={this.handleReset}
-            className="flex items-center gap-2 px-6 py-2 bg-accent text-white font-bold rounded-[var(--radius)] hover:bg-accent transition-theme shadow-[0_0_15px_rgba(156,163,175,0.3)] hover:scale-105"
+            className="flex items-center gap-2 px-6 py-2 bg-accent hover:brightness-110 text-white font-bold rounded-[var(--radius-md)] active:scale-95 transition-all shadow-md cursor-pointer"
           >
             <RefreshCw size={16} />
             <span>ACTIVATE RECOVERY</span>

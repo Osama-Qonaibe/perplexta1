@@ -1,6 +1,6 @@
 {
-  "name": "Remix perplexta",
-  "description": "A professional platform featuring advanced multimodal AI capabilities and in-depth forensic technical analysis, offering advanced image and video tools for content creators and software developers.",
+  "name": "Perplexta",
+  "description": "Professional Elite Multimodal AI Platform featuring advanced forensic analysis and sovereign design system.",
   "requestFramePermissions": [
     "camera",
     "microphone"

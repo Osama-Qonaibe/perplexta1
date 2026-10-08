@@ -181,7 +181,7 @@ export const ThemeExportImportModal: React.FC<ThemeExportImportModalProps> = ({
                   onClick={() => handleCopy(fullJsonExport)}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-inset)] text-xs font-bold text-[var(--text-primary)] transition-all"
                 >
-                  {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                  {copied ? <Check size={14} className="text-[var(--fg-success)]" /> : <Copy size={14} />}
                   <span>{isAr ? 'نسخ JSON' : 'Copy JSON'}</span>
                 </button>
                 <button
@@ -229,7 +229,7 @@ export const ThemeExportImportModal: React.FC<ThemeExportImportModalProps> = ({
                   : 'Paste your tokens JSON below. Supports either full schema ({ theme: { light, dark } }) or a single dictionary.'}
               </p>
               {importError && (
-                <div className="p-3 rounded-[var(--radius-sm)] bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs flex items-center gap-2">
+                <div className="p-3 rounded-[var(--radius-sm)] bg-[var(--status-danger-subtle)] border border-[var(--fg-danger)]/20 text-[var(--fg-danger)] text-xs flex items-center gap-2">
                   <AlertCircle size={14} className="shrink-0" />
                   <span>{importError}</span>
                 </div>

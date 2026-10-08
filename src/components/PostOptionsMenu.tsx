@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { BulletinAd } from '../../server/db/types';
 import { toast } from '@/design-system';
+import { SCROLL_STYLES, HOVER_STYLES } from '../styles/scrollStyles';
 
 export interface PostOptionsMenuProps {
   ad: BulletinAd;
@@ -38,18 +39,78 @@ type ActiveModal =
   | 'embed'
   | 'archive_confirm'
   | 'trash_confirm'
+  | 'report'
   | null;
+
+const REPORT_CATEGORIES = [
+  {
+    id: 'fraud',
+    titleAr: 'احتيال، سكام أو عروض مضللة',
+    titleEn: 'Fraud, Scam or Misleading Offers',
+    descAr: 'إعلانات وهمية، طلبات أموال غير مشروعة، أو روابط صيد وتضليل تجاري',
+    descEn: 'Fake ads, illegal money requests, or phishing and scam links',
+    icon: '🛡️'
+  },
+  {
+    id: 'hate_speech',
+    titleAr: 'خطاب كراهية، تنمر أو مضايقة',
+    titleEn: 'Hate Speech, Bullying or Harassment',
+    descAr: 'إساءة موجهة، تنمر شخصي، شتم، أو تحريض على أفراد أو جماعات',
+    descEn: 'Targeted abuse, personal bullying, or incitement against individuals or groups',
+    icon: '⚠️'
+  },
+  {
+    id: 'violence',
+    titleAr: 'عنف، تهديد أو محتوى خطير',
+    titleEn: 'Violence, Threat or Dangerous Content',
+    descAr: 'مشاهد عنف جسدي، تهديد بالخدمات، أو التحريض على أفعال خطرة',
+    descEn: 'Physical violence scenes, threats, or incitement to dangerous activities',
+    icon: '🚫'
+  },
+  {
+    id: 'adult',
+    titleAr: 'محتوى غير لائق أو مخل بالآداب',
+    titleEn: 'Inappropriate or Adult Content',
+    descAr: 'صور، مقاطع فيديو، أو نصوص تخالف الذوق العام والتعليمات الأخلاقية للمنصة',
+    descEn: 'Photos, videos, or texts violating community moral standards',
+    icon: '🔞'
+  },
+  {
+    id: 'misinformation',
+    titleAr: 'معلومات مضللة أو إشاعات كاذبة',
+    titleEn: 'Misinformation or Fake News',
+    descAr: 'ادعاءات مفبركة، تزوير للحقائق، أو نشر إشاعات لإثارة الفتنة والخداع',
+    descEn: 'Fabricated claims, altered facts, or spreading rumors to deceive',
+    icon: '📰'
+  },
+  {
+    id: 'copyright',
+    titleAr: 'انتهاك حقوق الملكية الفكرية والعلامة',
+    titleEn: 'Intellectual Property Violation',
+    descAr: 'انتحال شخصية، استخدام شعارات بدون إذن، أو سرقة وتكرار محتوى مملوك',
+    descEn: 'Impersonation, unauthorized brand logos, or stolen copyrighted content',
+    icon: '⚖️'
+  },
+  {
+    id: 'other',
+    titleAr: 'سبب آخر (اذكر التفاصيل للرقابة)',
+    titleEn: 'Other Reason (Specify details for moderation)',
+    descAr: 'أي أسباب وملاحظات أخرى تنتهك سياسات شروط الاستخدام لمنصة بيربليكستا',
+    descEn: 'Any other reasons violating platform terms and conditions',
+    icon: '📝'
+  }
+];
 
 const menuVariants = {
   closed: {
     opacity: 0,
-    scale: 0.96,
-    transition: { duration: 0.12, ease: [0.16, 1, 0.3, 1] as any }
+    scale: 0.98,
+    transition: { duration: 0.08, ease: [0.16, 1, 0.3, 1] as any }
   },
   open: {
     opacity: 1,
     scale: 1,
-    transition: { duration: 0.14, ease: [0.16, 1, 0.3, 1] as any }
+    transition: { duration: 0.10, ease: [0.16, 1, 0.3, 1] as any }
   }
 };
 
@@ -70,7 +131,16 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
   dropdownAlign,
   className = ''
 }) => {
-  const isOwner = Boolean(user?.id && (user.id === ad.user_id || user.role === 'admin'));
+  const isOwner = Boolean(
+    user?.id && (
+      user.id === ad.user_id ||
+      ((ad as any).page_owner_id && user.id === (ad as any).page_owner_id) ||
+      ((ad as any).owner_id && user.id === (ad as any).owner_id) ||
+      user.role === 'admin' ||
+      user.role === 'superadmin' ||
+      user.is_admin === true
+    )
+  );
   
   const [isSaved, setIsSaved] = useState(Boolean(ad.user_has_saved));
   const [isMuted, setIsMuted] = useState(Boolean(ad.is_muted_notifications));
@@ -94,6 +164,51 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [copiedEmbed, setCopiedEmbed] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+
+  const [reportReason, setReportReason] = useState('fraud');
+  const [reportDetails, setReportDetails] = useState('');
+
+  const handleSendReport = async () => {
+    if (!token) {
+      toast.error(isRtl ? 'يرجى تسجيل الدخول أولاً للإبلاغ عن المحتوى' : 'Please log in first to report content');
+      return;
+    }
+    const catObj = REPORT_CATEGORIES.find(c => c.id === reportReason) || REPORT_CATEGORIES[0];
+    const categoryTitle = isRtl ? catObj.titleAr : catObj.titleEn;
+
+    setIsActionLoading(true);
+    try {
+      const response = await fetch(`/api/bulletin/ads/${ad.id}/report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          reason: categoryTitle,
+          details: reportDetails.trim() || undefined
+        })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success(
+          data.message ||
+          (isRtl
+            ? 'تم إرسال بلاغك بنجاح للرقابة والإدارة، وسيتم اتخاذ الإجراء المناسب'
+            : 'Report submitted successfully to administration')
+        );
+        if (onReportAd) onReportAd(ad);
+        setActiveModal(null);
+        setReportDetails('');
+      } else {
+        toast.error(data.error || (isRtl ? 'فشل إرسال البلاغ' : 'Failed to submit report'));
+      }
+    } catch (err) {
+      toast.error(isRtl ? 'خطأ في الاتصال بالخادم' : 'Server connection error');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
 
   useEffect(() => {
     setIsSaved(Boolean(ad.user_has_saved));
@@ -448,7 +563,7 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
             },
             {
               id: 'comments',
-              label: isRtl ? 'من يمكنه التعليق؟' : 'Who can comment?',
+              label: isRtl ? 'من يمكنه التعليق على المنشور؟' : 'Who can comment on this post?',
               icon: MessageSquare,
               action: () => {
                 onClose();
@@ -501,7 +616,7 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
             },
             {
               id: 'ai_content',
-              label: isRtl ? 'محتوى ذكاء اصطناعي' : 'AI content',
+              label: isRtl ? 'محتوى ذكاء اصطناعي' : 'AI content details',
               icon: Info,
               action: () => {
                 onClose();
@@ -579,7 +694,7 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
             },
             {
               id: 'ai_content',
-              label: isRtl ? 'محتوى ذكاء اصطناعي' : 'AI content',
+              label: isRtl ? 'محتوى ذكاء اصطناعي' : 'AI content details',
               icon: Info,
               action: () => {
                 onClose();
@@ -614,7 +729,7 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
               isDestructive: true,
               action: () => {
                 onClose();
-                onReportAd?.(ad);
+                setActiveModal('report');
               }
             }
           ];
@@ -643,10 +758,10 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
-              className={`absolute top-full mt-1.5 ${alignClass} ${alignClass === 'right-0' ? 'origin-top-right' : 'origin-top-left'} w-max min-w-[210px] sm:min-w-[230px] max-w-[calc(100vw-32px)] rounded-xl border border-[var(--pub-border-default)] bg-[var(--pub-surface-container)] text-[var(--pub-text-primary)] shadow-2xl p-1 z-50 text-xs font-medium flex flex-col gap-0.5 backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/10 transition-colors duration-150 max-h-[85vh] overflow-y-auto overscroll-contain custom-scrollbar ${className}`}
+              className={`absolute top-full mt-1 ${alignClass} ${alignClass === 'right-0' ? 'origin-top-right' : 'origin-top-left'} w-max min-w-[185px] sm:min-w-[205px] max-w-[calc(100vw-24px)] rounded-shape-md border border-[var(--border-main)] bg-[var(--surface-card)] text-[var(--text-primary)] shadow-2xl p-1 z-[100] text-xs font-medium flex flex-col gap-0.5 backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/10 transition-colors duration-fast ${SCROLL_STYLES.dropdown} max-h-[68vh] sm:max-h-[78vh] overflow-y-auto ${className}`}
               dir={isRtl ? 'rtl' : 'ltr'}
             >
-              {/* Hierarchically Sorted Main Actions */}
+              {/* Hierarchically Sorted Main Actions (Pyramid: Shortest to Longest) */}
               {sortedMain.map((item) => {
                 const Icon = item.icon;
                 return (
@@ -654,19 +769,17 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
                     key={item.id}
                     type="button"
                     onClick={item.action}
-                    className="w-full h-[34px] min-h-[34px] flex items-center gap-2 px-2 rounded-[var(--pub-radius-control)] border border-transparent hover:bg-cyan-500/10 hover:border-cyan-500/20 hover:text-cyan-400 group transition-all duration-150 cursor-pointer select-none text-start"
+                    className={`group w-full h-[32px] min-h-[32px] flex items-center gap-2 px-2.5 py-1 rounded-shape-xs border border-transparent transition-all duration-fast cursor-pointer select-none text-start bg-transparent ${HOVER_STYLES.dropdownItem}`}
                   >
-                    <div className="w-6 h-6 rounded-[var(--pub-radius-micro)] border border-transparent group-hover:bg-cyan-500/15 group-hover:border-cyan-500/25 flex items-center justify-center shrink-0 transition-all duration-150">
-                      <Icon size={13} className={`${item.iconColor || 'text-[var(--pub-text-muted)]'} group-hover:text-cyan-400 transition-all duration-150 shrink-0`} />
-                    </div>
-                    <span className="truncate min-w-0 flex-1 text-xs font-medium text-[var(--pub-text-primary)] group-hover:text-cyan-400 transition-colors">
+                    <Icon size={13.5} className={`${item.iconColor || 'text-[var(--text-muted)]'} group-hover:text-[var(--fg-accent)] shrink-0 transition-colors duration-fast`} />
+                    <span className="truncate min-w-0 flex-1 text-[11.5px] sm:text-xs font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors duration-fast">
                       {item.label}
                     </span>
                   </button>
                 );
               })}
 
-              <div className="my-0.5 h-px bg-[var(--pub-border-default)] mx-1" />
+              <div className="my-0.5 h-px bg-[var(--border-default)]/70 mx-1" />
 
               {/* Hierarchically Sorted Bottom Actions */}
               {sortedBottom.map((item) => {
@@ -676,20 +789,14 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
                     key={item.id}
                     type="button"
                     onClick={item.action}
-                    className={`w-full h-[34px] min-h-[34px] flex items-center gap-2 px-2 rounded-[var(--pub-radius-control)] border border-transparent transition-all duration-150 cursor-pointer select-none text-start ${
+                    className={`group w-full h-[32px] min-h-[32px] flex items-center gap-2 px-2.5 py-1 rounded-shape-xs border border-transparent transition-all duration-fast cursor-pointer select-none text-start ${
                       item.isDestructive
-                        ? 'text-rose-500 hover:bg-rose-500/10 hover:border-rose-500/20 hover:text-rose-400 font-bold group'
-                        : 'text-[var(--pub-text-primary)] hover:bg-cyan-500/10 hover:border-cyan-500/20 hover:text-cyan-400 group'
+                        ? 'bg-transparent hover:bg-rose-500/10 text-rose-500'
+                        : `bg-transparent ${HOVER_STYLES.dropdownItem}`
                     }`}
                   >
-                    <div className={`w-6 h-6 rounded-[var(--pub-radius-micro)] border border-transparent flex items-center justify-center shrink-0 transition-all duration-150 ${
-                      item.isDestructive
-                        ? 'group-hover:bg-rose-500/15 group-hover:border-rose-500/25'
-                        : 'group-hover:bg-cyan-500/15 group-hover:border-cyan-500/25'
-                    }`}>
-                      <Icon size={13} className={`${item.isDestructive ? 'text-rose-500 group-hover:text-rose-400' : 'text-[var(--pub-text-muted)] group-hover:text-cyan-400'} transition-all duration-150 shrink-0`} />
-                    </div>
-                    <span className={`truncate min-w-0 flex-1 text-xs ${item.isDestructive ? 'font-bold text-rose-500 group-hover:text-rose-400' : 'font-medium text-[var(--pub-text-primary)] group-hover:text-cyan-400'} transition-colors`}>
+                    <Icon size={13.5} className={`${item.isDestructive ? 'text-rose-500 group-hover:text-rose-400' : 'text-[var(--text-muted)] group-hover:text-[var(--fg-accent)]'} shrink-0 transition-colors duration-fast`} />
+                    <span className={`truncate min-w-0 flex-1 text-[11.5px] sm:text-xs ${item.isDestructive ? 'font-bold text-rose-500 group-hover:text-rose-400' : 'font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'} transition-colors duration-fast`}>
                       {item.label}
                     </span>
                   </button>
@@ -709,7 +816,7 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
                 initial={{ opacity: 0, scale: 0.95, y: 10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                className="relative w-full max-w-md bg-[var(--surface-card)] text-[var(--text-primary)] rounded-xl border border-[var(--border-default)] shadow-2xl p-4 sm:p-5 overflow-hidden"
+                className="relative w-full max-w-md bg-[var(--surface-card)] text-[var(--text-primary)] rounded-[var(--radius-lg)] border border-[var(--border-default)] shadow-2xl p-4 sm:p-5 overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
               {/* Close Button Header */}
@@ -723,12 +830,13 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
                   {activeModal === 'embed' && (isRtl ? 'تضمين المنشور' : 'Embed post')}
                   {activeModal === 'archive_confirm' && (isRtl ? 'نقل إلى الأرشيف' : 'Move to archive')}
                   {activeModal === 'trash_confirm' && (isRtl ? 'نقل إلى سلة المهملات' : 'Move to trash')}
+                  {activeModal === 'report' && (isRtl ? 'الإبلاغ الرقابي عن محتوى مخالف' : 'Report Content Violation')}
                 </h3>
                 <button
                   type="button"
                   onClick={() => setActiveModal(null)}
                   aria-label={isRtl ? 'إغلاق' : 'Close'}
-                  className="w-7 h-7 rounded-shape-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] border border-transparent hover:border-[var(--border-default)] transition-all duration-150 cursor-pointer shadow-2xs"
+                  className="w-7 h-7 rounded-shape-sm flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] border border-transparent hover:border-[var(--border-default)] transition-all duration-fast cursor-pointer shadow-2xs"
                 >
                   <X size={14} />
                 </button>
@@ -754,7 +862,7 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
                       type="button"
                       onClick={() => handleSaveWhoCanComment(opt.id)}
                       disabled={isActionLoading}
-                      className={`w-full flex items-center justify-between p-2.5 rounded-shape-sm border transition-all duration-150 text-start cursor-pointer ${
+                      className={`w-full flex items-center justify-between p-2.5 rounded-shape-sm border transition-all duration-fast text-start cursor-pointer ${
                         whoCanComment === opt.id
                           ? 'border-accent/60 bg-accent/10'
                           : 'border-[var(--border-default)] hover:bg-[var(--surface-subtle)] hover:border-accent/40'
@@ -797,7 +905,7 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
                         type="button"
                         onClick={() => handleSaveAudience(opt.id)}
                         disabled={isActionLoading}
-                        className={`w-full flex items-center justify-between p-2.5 rounded-shape-sm border transition-all duration-150 text-start cursor-pointer ${
+                        className={`w-full flex items-center justify-between p-2.5 rounded-shape-sm border transition-all duration-fast text-start cursor-pointer ${
                           audience === opt.id
                             ? 'border-accent/60 bg-accent/10'
                             : 'border-[var(--border-default)] hover:bg-[var(--surface-subtle)] hover:border-accent/40'
@@ -872,9 +980,9 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
                       <button
                         type="button"
                         onClick={copyPartnershipCode}
-                        className="h-8 px-3 rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:bg-[var(--surface-card)] hover:border-accent/40 text-[var(--text-primary)] text-xs font-bold transition-all duration-150 shrink-0 flex items-center gap-1 shadow-2xs active:scale-95 cursor-pointer"
+                        className="h-8 px-3 rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:bg-[var(--surface-card)] hover:border-accent/40 text-[var(--text-primary)] text-xs font-bold transition-all duration-fast shrink-0 flex items-center gap-1 shadow-2xs active:scale-95 cursor-pointer"
                       >
-                        {copiedCode ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                        {copiedCode ? <Check size={13} className="text-[var(--fg-success)]" /> : <Copy size={13} />}
                         <span>{copiedCode ? (isRtl ? 'تم النسخ' : 'Copied') : (isRtl ? 'نسخ' : 'Copy')}</span>
                       </button>
                     </div>
@@ -885,7 +993,7 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
                       type="button"
                       onClick={handleSavePartnership}
                       disabled={isActionLoading}
-                      className="w-full h-8 px-4 rounded-shape-sm bg-accent text-white hover:bg-accent/90 text-xs font-bold transition-all duration-150 shadow-2xs active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full h-8 px-4 rounded-shape-sm bg-accent text-white hover:bg-accent/90 text-xs font-bold transition-all duration-fast shadow-2xs active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
                     >
                       {isActionLoading && <Loader2 size={13} className="animate-spin" />}
                       <span>{isRtl ? 'حفظ إعدادات الشراكة' : 'Save Partnership'}</span>
@@ -942,7 +1050,7 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
                       type="button"
                       onClick={handleSaveDate}
                       disabled={isActionLoading}
-                      className="w-full h-8 px-4 rounded-shape-sm bg-accent text-white hover:bg-accent/90 text-xs font-bold transition-all duration-150 shadow-2xs active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full h-8 px-4 rounded-shape-sm bg-accent text-white hover:bg-accent/90 text-xs font-bold transition-all duration-fast shadow-2xs active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
                     >
                       {isActionLoading && <Loader2 size={13} className="animate-spin" />}
                       <span>{isRtl ? 'حفظ التاريخ' : 'Save Date'}</span>
@@ -963,7 +1071,7 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
                   <button
                     type="button"
                     onClick={copyEmbedCode}
-                    className="w-full h-8 px-4 rounded-shape-sm bg-accent text-white hover:bg-accent/90 text-xs font-bold transition-all duration-150 shadow-2xs active:scale-95 cursor-pointer flex items-center justify-center gap-1"
+                    className="w-full h-8 px-4 rounded-shape-sm bg-accent text-white hover:bg-accent/90 text-xs font-bold transition-all duration-fast shadow-2xs active:scale-95 cursor-pointer flex items-center justify-center gap-1"
                   >
                     {copiedEmbed ? <Check size={14} /> : <Copy size={14} />}
                     <span>{copiedEmbed ? (isRtl ? 'تم النسخ بنجاح!' : 'Copied!') : (isRtl ? 'نسخ رمز التضمين' : 'Copy Embed Code')}</span>
@@ -984,7 +1092,7 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
                     <button
                       type="button"
                       onClick={() => setActiveModal(null)}
-                      className="flex-1 h-8 px-3 rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:bg-[var(--surface-card)] text-[var(--text-primary)] text-xs font-bold transition-all duration-150 shadow-2xs active:scale-95 cursor-pointer"
+                      className="flex-1 h-8 px-3 rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:bg-[var(--surface-card)] text-[var(--text-primary)] text-xs font-bold transition-all duration-fast shadow-2xs active:scale-95 cursor-pointer"
                     >
                       {isRtl ? 'إلغاء' : 'Cancel'}
                     </button>
@@ -992,7 +1100,7 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
                       type="button"
                       onClick={handleConfirmArchive}
                       disabled={isActionLoading}
-                      className="flex-1 h-8 px-3 rounded-shape-sm bg-accent text-white hover:bg-accent/90 text-xs font-bold transition-all duration-150 shadow-2xs active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1"
+                      className="flex-1 h-8 px-3 rounded-shape-sm bg-accent text-white hover:bg-accent/90 text-xs font-bold transition-all duration-fast shadow-2xs active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1"
                     >
                       {isActionLoading && <Loader2 size={13} className="animate-spin" />}
                       <span>{isRtl ? 'تأكيد الأرشفة' : 'Confirm Archive'}</span>
@@ -1019,7 +1127,7 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
                     <button
                       type="button"
                       onClick={() => setActiveModal(null)}
-                      className="flex-1 h-8 px-3 rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:bg-[var(--surface-card)] text-[var(--text-primary)] text-xs font-bold transition-all duration-150 shadow-2xs active:scale-95 cursor-pointer"
+                      className="flex-1 h-8 px-3 rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:bg-[var(--surface-card)] text-[var(--text-primary)] text-xs font-bold transition-all duration-fast shadow-2xs active:scale-95 cursor-pointer"
                     >
                       {isRtl ? 'إلغاء' : 'Cancel'}
                     </button>
@@ -1027,10 +1135,103 @@ export const PostOptionsMenu: React.FC<PostOptionsMenuProps> = ({
                       type="button"
                       onClick={handleConfirmTrash}
                       disabled={isActionLoading}
-                      className="flex-1 h-8 px-3 rounded-shape-sm bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all duration-150 shadow-2xs active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1"
+                      className="flex-1 h-8 px-3 rounded-shape-sm bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all duration-fast shadow-2xs active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1"
                     >
                       {isActionLoading && <Loader2 size={13} className="animate-spin" />}
                       <span>{isRtl ? 'نقل إلى سلة المهملات' : 'Move to Trash'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 9. Modal: Professional Content Report */}
+              {activeModal === 'report' && (
+                <div className="space-y-3.5" dir={isRtl ? 'rtl' : 'ltr'}>
+                  <div className="p-3 rounded-shape-sm bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs">
+                    <span className="font-bold block mb-1 text-xs">
+                      {isRtl ? 'الإبلاغ الرقابي الاحترافي عن محتوى مخالف' : 'Professional Content Moderation Report'}
+                    </span>
+                    <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+                      {isRtl
+                        ? 'اختر الفئة الأكثر دقة لوصف المخالفة. سيتم إرسال إشعار فوري وتوثيق بالبريد الإلكتروني للرقابة والإدارة لمراجعة المحتوى.'
+                        : 'Select the category that best describes the violation. A notification & email dispatch will be routed to administration.'}
+                    </p>
+                  </div>
+
+                  {/* Categories list */}
+                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                    {REPORT_CATEGORIES.map((cat) => {
+                      const isSelected = reportReason === cat.id;
+                      return (
+                        <div
+                          key={cat.id}
+                          onClick={() => setReportReason(cat.id)}
+                          className={`flex items-start gap-2.5 p-2.5 rounded-shape-sm border transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-accent/10 border-accent text-[var(--text-primary)] shadow-2xs'
+                              : 'bg-[var(--surface-subtle)] border-[var(--border-default)] hover:bg-[var(--surface-card)] text-[var(--text-secondary)]'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="report_reason_group"
+                            checked={isSelected}
+                            onChange={() => setReportReason(cat.id)}
+                            className="mt-0.5 accent-accent cursor-pointer"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 font-bold text-xs text-[var(--text-primary)]">
+                              <span>{cat.icon}</span>
+                              <span>{isRtl ? cat.titleAr : cat.titleEn}</span>
+                            </div>
+                            <p className="text-[10px] text-[var(--text-muted)] leading-tight mt-0.5">
+                              {isRtl ? cat.descAr : cat.descEn}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Details textarea */}
+                  <div>
+                    <label className="block text-[11px] font-bold mb-1 text-[var(--text-secondary)]">
+                      {isRtl ? 'تفاصيل إضافية حول البلاغ (اختياري/موصى به):' : 'Additional details (Optional/Recommended):'}
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={reportDetails}
+                      onChange={(e) => setReportDetails(e.target.value)}
+                      placeholder={
+                        isRtl
+                          ? 'أضف هنا أي تفاصيل أو سياق إضافي يساعد قسم الرقابة في سرعة اتخاذ القرار...'
+                          : 'Add any extra details or context to help moderation team review quickly...'
+                      }
+                      className="w-full p-2.5 rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-accent/60 resize-none"
+                    />
+                  </div>
+
+                  {/* Footer buttons */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal(null)}
+                      className="flex-1 h-8 px-3 rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:bg-[var(--surface-card)] text-[var(--text-primary)] text-xs font-bold transition-all duration-fast shadow-2xs active:scale-95 cursor-pointer"
+                    >
+                      {isRtl ? 'إلغاء' : 'Cancel'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSendReport}
+                      disabled={isActionLoading}
+                      className="flex-1 h-8 px-3 rounded-shape-sm bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all duration-fast shadow-2xs active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      {isActionLoading ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <Flag size={13} />
+                      )}
+                      <span>{isRtl ? 'إرسال البلاغ للرقابة' : 'Submit Report'}</span>
                     </button>
                   </div>
                 </div>

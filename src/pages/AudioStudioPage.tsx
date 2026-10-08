@@ -8,6 +8,7 @@ import {
   HelpCircle, Sparkle, RefreshCw
 } from 'lucide-react';
 import { resolveImageUrl } from '../utils/imageResolver';
+import { SelectDropdown } from '@/design-system';
 
 type AudioTab = 'tts' | 'stt' | 'music' | 'orchestra';
 
@@ -22,13 +23,11 @@ export const AudioStudioPage: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
 
-  // TTS State
   const [ttsText, setTtsText] = useState('');
   const [ttsGender, setTtsGender] = useState<'male' | 'female'>('female');
   const [ttsTone, setTtsTone] = useState<'natural' | 'professional' | 'energetic' | 'deep'>('natural');
   const [ttsSpeed, setTtsSpeed] = useState<'slow' | 'natural' | 'fast'>('natural');
 
-  // STT State
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [sttFile, setSttFile] = useState<File | null>(null);
@@ -36,22 +35,18 @@ export const AudioStudioPage: React.FC = () => {
   const [recordingWaveform, setRecordingWaveform] = useState<number[]>([]);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Music State
   const [musicPrompt, setMusicPrompt] = useState('');
   const [musicMood, setMusicMood] = useState<'Epic' | 'Tarab' | 'EDM' | 'Acoustic' | 'LoFi' | 'Jazz' | 'Pop' | 'Classical'>('Tarab');
   const [musicVocal, setMusicVocal] = useState<'Choir' | 'Female' | 'Male' | 'Vocaloid' | 'Instrumental'>('Instrumental');
   const [musicDuration, setMusicDuration] = useState<number>(30);
 
-  // Orchestra State
   const [orchPrompt, setOrchPrompt] = useState('');
   const [orchGenre, setOrchGenre] = useState('ambient');
   const [orchTempo, setOrchTempo] = useState('natural');
 
-  // Plan verification
   const currentPlan = plans?.find((p: any) => p.id?.toString() === user?.subscription?.plan_id?.toString());
   const hasBalance = (balance && balance > 0) || (balanceUSD && balanceUSD > 0);
 
-  // Gating check for tools
   const isToolLocked = (toolId: string) => {
     const limit = currentPlan?.limits?.[toolId];
     if (!limit) return false;
@@ -59,12 +54,10 @@ export const AudioStudioPage: React.FC = () => {
     return isZeroLimit && !hasBalance;
   };
 
-  // Timer for voice recording animation
   useEffect(() => {
     if (isRecording) {
       recordingTimerRef.current = setInterval(() => {
         setRecordingSeconds(prev => prev + 1);
-        // generate random heights for real-time waveform bars
         setRecordingWaveform(prev => {
           const next = [...prev];
           if (next.length > 25) next.shift();
@@ -135,7 +128,6 @@ export const AudioStudioPage: React.FC = () => {
     setErrorText(null);
 
     try {
-      // 1. Post Chat Creation to Server API
       const title = isAr ? `جلسة استوديو الصوت - ${new Date().toLocaleDateString('ar-EG')}` : `Audio Studio Session - ${new Date().toLocaleDateString()}`;
       
       const res = await fetch('/api/chats', {
@@ -158,7 +150,6 @@ export const AudioStudioPage: React.FC = () => {
 
       const chatData = await res.json();
 
-      // 2. Smoothly transition to chat with parameters stored in sessionStorage
       if (additionalParams) {
         sessionStorage.setItem(`audio_params_${chatData.id}`, JSON.stringify(additionalParams));
       }
@@ -210,19 +201,18 @@ export const AudioStudioPage: React.FC = () => {
 
   return (
     <div className="h-screen-safe bg-[var(--surface-page)] text-[var(--text-primary)] font-sans flex flex-col overflow-hidden select-none">
-      {/* Platform Header */}
       <header className="sticky top-0 z-40 backdrop-blur-xl bg-[var(--surface-page)]/90 border-b border-[var(--border-default)] pt-[env(safe-area-inset-top,0px)]">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button 
               onClick={() => navigate(-1)} 
-              className="h-9 px-3 flex items-center gap-1.5 rounded-[var(--radius)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] hover:text-accent transition-theme active:scale-95 cursor-pointer text-xs font-bold"
+              className="h-9 px-3 flex items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] hover:text-accent transition-theme active:scale-95 cursor-pointer text-xs font-bold"
             >
               {isAr ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
               <span>{isAr ? 'الرجوع' : 'Back'}</span>
             </button>
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-[8px] bg-accent/10 border border-accent/20 flex items-center justify-center text-accent">
+              <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-accent)] flex items-center justify-center text-[var(--fg-accent)]">
                 <Music className="w-4 h-4 animate-pulse" />
               </div>
               <div className="flex items-center">
@@ -233,13 +223,12 @@ export const AudioStudioPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick Stats or Logo */}
           <div className="flex items-center gap-2">
             {logo ? (
-              <img src={resolveImageUrl(logo, 'general')} alt={siteName} className="w-7 h-7 rounded-[6px] object-cover" />
+              <img src={resolveImageUrl(logo, 'general')} alt={siteName} className="w-7 h-7 rounded-[var(--radius-xs)] object-cover" />
             ) : (
-              <div className="w-7 h-7 rounded-[6px] bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-center justify-center">
-                <Cpu className="w-3.5 h-3.5 text-accent" />
+              <div className="w-7 h-7 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-center justify-center">
+                <Cpu className="w-3.5 h-3.5 text-[var(--fg-accent)]" />
               </div>
             )}
           </div>
@@ -247,8 +236,7 @@ export const AudioStudioPage: React.FC = () => {
       </header>
 
       <main className="flex-1 overflow-y-auto max-w-5xl w-full mx-auto px-4 py-3 space-y-3">
-        {/* Banner Section */}
-        <section className="p-4 sm:p-5 rounded-[var(--radius)] bg-gradient-to-br from-[var(--surface-card)] to-[var(--surface-subtle)] border border-[var(--border-default)] relative overflow-hidden">
+        <section className="p-4 sm:p-5 rounded-[var(--radius-md)] bg-gradient-to-br from-[var(--surface-card)] to-[var(--surface-subtle)] border border-[var(--border-default)] relative overflow-hidden">
           <div className="max-w-3xl relative z-10 space-y-2">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-shape-sm bg-accent/10 border border-accent/20 text-accent text-[11px] font-black uppercase tracking-wider">
               <Sparkle size={12} className="animate-spin-slow" />
@@ -267,7 +255,6 @@ export const AudioStudioPage: React.FC = () => {
           <div className="absolute bottom-0 left-0 w-36 h-36 bg-accent/5 blur-[80px] pointer-events-none" />
         </section>
 
-        {/* Tab Navigation Controls - Sticky */}
         <section className="sticky top-14 z-30 bg-[var(--surface-page)]/95 backdrop-blur-md py-1.5 grid grid-cols-2 md:grid-cols-4 gap-2">
           {[
             { id: 'orchestra', icon: <Sliders className="w-4 h-4" />, titleAr: 'الأوركسترا الصوتية', titleEn: 'Sound Orchestra' },
@@ -285,7 +272,7 @@ export const AudioStudioPage: React.FC = () => {
                   setActiveTab(tab.id as AudioTab);
                   setErrorText(null);
                 }}
-                className={`p-3.5 rounded-[var(--radius)] border font-bold text-xs flex items-center justify-between transition-all duration-200 active:scale-98 cursor-pointer ${
+                className={`p-3.5 rounded-[var(--radius-md)] border font-bold text-xs flex items-center justify-between transition-all duration-200 active:scale-98 cursor-pointer ${
                   isSelected
                     ? 'bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] border-accent shadow-sm'
                     : 'bg-[var(--surface-card)] text-[var(--text-primary)] border-[var(--border-default)] hover:border-accent/40'
@@ -303,18 +290,15 @@ export const AudioStudioPage: React.FC = () => {
           })}
         </section>
 
-        {/* Error Notification Alert */}
         {errorText && (
-          <div className="p-4 rounded-[var(--radius)] bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold flex items-center gap-2.5">
+          <div className="p-4 rounded-[var(--radius-md)] bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold flex items-center gap-2.5">
             <AlertCircle size={16} className="shrink-0" />
             <span>{errorText}</span>
           </div>
         )}
 
-        {/* Workspace Active Views */}
-        <section className="p-6 sm:p-8 rounded-[var(--radius)] bg-[var(--surface-card)] border border-[var(--border-default)] min-h-[300px] flex flex-col justify-between relative shadow-xs">
+        <section className="p-6 sm:p-8 rounded-[var(--radius-md)] bg-[var(--surface-card)] border border-[var(--border-default)] min-h-[300px] flex flex-col justify-between relative shadow-xs">
           
-          {/* View 1: Sound Orchestra (Canvas) */}
           {activeTab === 'orchestra' && (
             <div className="space-y-6 flex-1 flex flex-col justify-between">
               <div className="space-y-4">
@@ -338,40 +322,38 @@ export const AudioStudioPage: React.FC = () => {
                     value={orchPrompt}
                     onChange={(e) => setOrchPrompt(e.target.value)}
                     placeholder={isAr ? 'مثال: معزوفة عود شرقي حزين مع تداخل الكمان والأصوات الطبيعية الهادئة للأمطار والليل الغامض...' : 'Example: Dramatic cinematic orchestral arrangement with slow ambient violin and natural rain frequencies...'}
-                    className="w-full h-32 rounded-[var(--radius)] bg-[var(--surface-subtle)] border border-[var(--border-default)] p-4 text-xs font-bold focus:border-accent focus:outline-none transition-theme leading-relaxed text-[var(--text-primary)]"
+                    className="w-full h-32 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] p-4 text-xs font-bold focus:border-accent focus:outline-none transition-theme leading-relaxed text-[var(--text-primary)]"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-[var(--text-secondary)] uppercase tracking-wide block">
-                      {isAr ? 'التصنيف الموسيقي العام' : 'General Genre'}
-                    </label>
-                    <select
+                    <SelectDropdown
+                      label={isAr ? 'التصنيف الموسيقي العام' : 'General Genre'}
                       value={orchGenre}
-                      onChange={(e) => setOrchGenre(e.target.value)}
-                      className="w-full h-10 px-3 rounded-[var(--radius)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-bold text-[var(--text-primary)]"
-                    >
-                      <option value="ambient">{isAr ? 'محيطي / Ambient' : 'Ambient'}</option>
-                      <option value="cinematic">{isAr ? 'سينمائي / Cinematic' : 'Cinematic'}</option>
-                      <option value="traditional">{isAr ? 'تقليدي شرقي / Tarab' : 'Tarab / Traditional'}</option>
-                      <option value="electronic">{isAr ? 'إلكتروني / Techno' : 'Electronic / Techno'}</option>
-                    </select>
+                      onChange={(val) => setOrchGenre(val)}
+                      dir={isAr ? 'rtl' : 'ltr'}
+                      options={[
+                        { value: 'ambient', label: isAr ? 'محيطي / Ambient' : 'Ambient' },
+                        { value: 'cinematic', label: isAr ? 'سينمائي / Cinematic' : 'Cinematic' },
+                        { value: 'traditional', label: isAr ? 'تقليدي شرقي / Tarab' : 'Tarab / Traditional' },
+                        { value: 'electronic', label: isAr ? 'إلكتروني / Techno' : 'Electronic / Techno' }
+                      ]}
+                    />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-[var(--text-secondary)] uppercase tracking-wide block">
-                      {isAr ? 'سرعة الإيقاع الإجمالي' : 'Overall Tempo'}
-                    </label>
-                    <select
+                    <SelectDropdown
+                      label={isAr ? 'سرعة الإيقاع الإجمالي' : 'Overall Tempo'}
                       value={orchTempo}
-                      onChange={(e) => setOrchTempo(e.target.value)}
-                      className="w-full h-10 px-3 rounded-[var(--radius)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-bold text-[var(--text-primary)]"
-                    >
-                      <option value="slow">{isAr ? 'بطيء / Slow Pace' : 'Slow Pace'}</option>
-                      <option value="natural">{isAr ? 'طبيعي / Natural' : 'Natural Speed'}</option>
-                      <option value="fast">{isAr ? 'حماسي وسريع / Fast Upbeat' : 'Fast Upbeat'}</option>
-                    </select>
+                      onChange={(val) => setOrchTempo(val)}
+                      dir={isAr ? 'rtl' : 'ltr'}
+                      options={[
+                        { value: 'slow', label: isAr ? 'بطيء / Slow Pace' : 'Slow Pace' },
+                        { value: 'natural', label: isAr ? 'طبيعي / Natural' : 'Natural Speed' },
+                        { value: 'fast', label: isAr ? 'حماسي وسريع / Fast Upbeat' : 'Fast Upbeat' }
+                      ]}
+                    />
                   </div>
                 </div>
               </div>
@@ -385,7 +367,7 @@ export const AudioStudioPage: React.FC = () => {
                 <button
                   onClick={executeOrchestra}
                   disabled={isGenerating}
-                  className="h-10 px-6 rounded-[var(--radius)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-black text-xs transition-all flex items-center gap-2 hover:opacity-90 active:scale-95 cursor-pointer disabled:opacity-50"
+                  className="h-10 px-6 rounded-[var(--radius-md)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-black text-xs transition-all flex items-center gap-2 hover:opacity-90 active:scale-95 cursor-pointer disabled:opacity-50"
                 >
                   {isGenerating ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
                   <span>{isAr ? 'بدء إنتاج الأوركسترا' : 'Launch Orchestra Suite'}</span>
@@ -394,7 +376,6 @@ export const AudioStudioPage: React.FC = () => {
             </div>
           )}
 
-          {/* View 2: Music & Songs */}
           {activeTab === 'music' && (
             <div className="space-y-6 flex-1 flex flex-col justify-between">
               <div className="space-y-4">
@@ -415,45 +396,43 @@ export const AudioStudioPage: React.FC = () => {
                     value={musicPrompt}
                     onChange={(e) => setMusicPrompt(e.target.value)}
                     placeholder={isAr ? 'مثال: أغنية طرب شرقية هادئة على مقام راست بآلة العود والناي تحاكي الشوق والحنين...' : 'Example: Lofi chill study beat with soft acoustic guitar chords and ambient keyboard layer...'}
-                    className="w-full h-32 rounded-[var(--radius)] bg-[var(--surface-subtle)] border border-[var(--border-default)] p-4 text-xs font-bold focus:border-accent focus:outline-none transition-theme leading-relaxed text-[var(--text-primary)]"
+                    className="w-full h-32 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] p-4 text-xs font-bold focus:border-accent focus:outline-none transition-theme leading-relaxed text-[var(--text-primary)]"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-[var(--text-secondary)] uppercase tracking-wide block">
-                      {isAr ? 'المزاج والحالة اللحنية' : 'Mood & Musical Style'}
-                    </label>
-                    <select
+                    <SelectDropdown
+                      label={isAr ? 'المزاج والحالة اللحنية' : 'Mood & Musical Style'}
                       value={musicMood}
-                      onChange={(e) => setMusicMood(e.target.value as any)}
-                      className="w-full h-10 px-3 rounded-[var(--radius)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-bold text-[var(--text-primary)]"
-                    >
-                      <option value="Tarab">{isAr ? 'طرب شرقي / Tarab' : 'Traditional Tarab'}</option>
-                      <option value="Epic">{isAr ? 'أوركسترا ملحمية / Epic Orchestral' : 'Epic Orchestral'}</option>
-                      <option value="EDM">{isAr ? 'إلكترونك دي جي / EDM Techno' : 'EDM & Techno'}</option>
-                      <option value="Acoustic">{isAr ? 'هادئ غيتار / Acoustic Guitar' : 'Acoustic Guitar'}</option>
-                      <option value="LoFi">{isAr ? 'لوفاي مريح / LoFi Study' : 'LoFi Chill'}</option>
-                      <option value="Jazz">{isAr ? 'جاز بلوز / Jazz & Blues' : 'Jazz & Blues'}</option>
-                      <option value="Pop">{isAr ? 'بوب حماسي / Upbeat Pop' : 'Upbeat Pop'}</option>
-                    </select>
+                      onChange={(val) => setMusicMood(val as any)}
+                      dir={isAr ? 'rtl' : 'ltr'}
+                      options={[
+                        { value: 'Tarab', label: isAr ? 'طرب شرقي / Tarab' : 'Traditional Tarab' },
+                        { value: 'Epic', label: isAr ? 'أوركسترا ملحمية / Epic Orchestral' : 'Epic Orchestral' },
+                        { value: 'EDM', label: isAr ? 'إلكترونك دي جي / EDM Techno' : 'EDM & Techno' },
+                        { value: 'Acoustic', label: isAr ? 'هادئ غيتار / Acoustic Guitar' : 'Acoustic Guitar' },
+                        { value: 'LoFi', label: isAr ? 'لوفاي مريح / LoFi Study' : 'LoFi Chill' },
+                        { value: 'Jazz', label: isAr ? 'جاز بلوز / Jazz & Blues' : 'Jazz & Blues' },
+                        { value: 'Pop', label: isAr ? 'بوب حماسي / Upbeat Pop' : 'Upbeat Pop' }
+                      ]}
+                    />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-[var(--text-secondary)] uppercase tracking-wide block">
-                      {isAr ? 'التوزيع الصوتي والأداء' : 'Vocal Distribution'}
-                    </label>
-                    <select
+                    <SelectDropdown
+                      label={isAr ? 'التوزيع الصوتي والأداء' : 'Vocal Distribution'}
                       value={musicVocal}
-                      onChange={(e) => setMusicVocal(e.target.value as any)}
-                      className="w-full h-10 px-3 rounded-[var(--radius)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-bold text-[var(--text-primary)]"
-                    >
-                      <option value="Instrumental">{isAr ? 'موسيقى فقط (عزف) / Instrumental' : 'Instrumental Only'}</option>
-                      <option value="Choir">{isAr ? 'كورال جماعي / Choral Choir' : 'Choral Choir'}</option>
-                      <option value="Female">{isAr ? 'صوت أنثوي / Female Voice' : 'Female Lead Voice'}</option>
-                      <option value="Male">{isAr ? 'صوت ذكوري / Male Voice' : 'Male Lead Voice'}</option>
-                      <option value="Vocaloid">{isAr ? 'صوت مصنع رقمي / AI Synthesizer' : 'AI Synthesizer'}</option>
-                    </select>
+                      onChange={(val) => setMusicVocal(val as any)}
+                      dir={isAr ? 'rtl' : 'ltr'}
+                      options={[
+                        { value: 'Instrumental', label: isAr ? 'موسيقى فقط (عزف) / Instrumental' : 'Instrumental Only' },
+                        { value: 'Choir', label: isAr ? 'كورال جماعي / Choral Choir' : 'Choral Choir' },
+                        { value: 'Female', label: isAr ? 'صوت أنثوي / Female Voice' : 'Female Lead Voice' },
+                        { value: 'Male', label: isAr ? 'صوت ذكوري / Male Voice' : 'Male Lead Voice' },
+                        { value: 'Vocaloid', label: isAr ? 'صوت مصنع رقمي / AI Synthesizer' : 'AI Synthesizer' }
+                      ]}
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -485,7 +464,7 @@ export const AudioStudioPage: React.FC = () => {
                 <button
                   onClick={executeMusic}
                   disabled={isGenerating}
-                  className="h-10 px-6 rounded-[var(--radius)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-black text-xs transition-all flex items-center gap-2 hover:opacity-90 active:scale-95 cursor-pointer disabled:opacity-50"
+                  className="h-10 px-6 rounded-[var(--radius-md)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-black text-xs transition-all flex items-center gap-2 hover:opacity-90 active:scale-95 cursor-pointer disabled:opacity-50"
                 >
                   {isGenerating ? <RefreshCw size={14} className="animate-spin" /> : <Disc size={14} />}
                   <span>{isAr ? 'تأليف اللحن الموسيقي' : 'Compose Audio'}</span>
@@ -494,7 +473,6 @@ export const AudioStudioPage: React.FC = () => {
             </div>
           )}
 
-          {/* View 3: Text to Speech (TTS) */}
           {activeTab === 'tts' && (
             <div className="space-y-6 flex-1 flex flex-col justify-between">
               <div className="space-y-4">
@@ -515,7 +493,7 @@ export const AudioStudioPage: React.FC = () => {
                     value={ttsText}
                     onChange={(e) => setTtsText(e.target.value)}
                     placeholder={isAr ? 'اكتب هنا ما تود سماعه، مثل التقارير الإخبارية، المناهج التعليمية، أو السرد القصصي الاحترافي...' : 'Type anything you want the engine to narrate with high-fidelity, organic voice patterns...'}
-                    className="w-full h-32 rounded-[var(--radius)] bg-[var(--surface-subtle)] border border-[var(--border-default)] p-4 text-xs font-bold focus:border-accent focus:outline-none transition-theme leading-relaxed text-[var(--text-primary)]"
+                    className="w-full h-32 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] p-4 text-xs font-bold focus:border-accent focus:outline-none transition-theme leading-relaxed text-[var(--text-primary)]"
                   />
                 </div>
 
@@ -527,7 +505,7 @@ export const AudioStudioPage: React.FC = () => {
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         onClick={() => setTtsGender('female')}
-                        className={`h-10 rounded-[var(--radius)] border text-xs font-bold transition-all ${
+                        className={`h-10 rounded-[var(--radius-md)] border text-xs font-bold transition-all ${
                           ttsGender === 'female'
                             ? 'bg-accent/10 text-accent border-accent'
                             : 'bg-[var(--surface-subtle)] text-[var(--text-primary)] border-[var(--border-default)] hover:border-accent/40'
@@ -537,7 +515,7 @@ export const AudioStudioPage: React.FC = () => {
                       </button>
                       <button
                         onClick={() => setTtsGender('male')}
-                        className={`h-10 rounded-[var(--radius)] border text-xs font-bold transition-all ${
+                        className={`h-10 rounded-[var(--radius-md)] border text-xs font-bold transition-all ${
                           ttsGender === 'male'
                             ? 'bg-accent/10 text-accent border-accent'
                             : 'bg-[var(--surface-subtle)] text-[var(--text-primary)] border-[var(--border-default)] hover:border-accent/40'
@@ -549,34 +527,32 @@ export const AudioStudioPage: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-[var(--text-secondary)] uppercase tracking-wide block">
-                      {isAr ? 'الأسلوب والنبرة الكلامية' : 'Reading Tone'}
-                    </label>
-                    <select
+                    <SelectDropdown
+                      label={isAr ? 'الأسلوب والنبرة الكلامية' : 'Reading Tone'}
                       value={ttsTone}
-                      onChange={(e) => setTtsTone(e.target.value as any)}
-                      className="w-full h-10 px-3 rounded-[var(--radius)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-bold text-[var(--text-primary)]"
-                    >
-                      <option value="natural">{isAr ? 'طبيعي وسردي / Natural' : 'Natural Narrative'}</option>
-                      <option value="professional">{isAr ? 'إخباري رسمي / Corporate' : 'Formal Corporate'}</option>
-                      <option value="energetic">{isAr ? 'حماسي وتفاعلي / Upbeat' : 'Upbeat Promotional'}</option>
-                      <option value="deep">{isAr ? 'سينمائي عميق / Cinematic' : 'Cinematic Deep'}</option>
-                    </select>
+                      onChange={(val) => setTtsTone(val as any)}
+                      dir={isAr ? 'rtl' : 'ltr'}
+                      options={[
+                        { value: 'natural', label: isAr ? 'طبيعي وسردي / Natural' : 'Natural Narrative' },
+                        { value: 'professional', label: isAr ? 'إخباري رسمي / Corporate' : 'Formal Corporate' },
+                        { value: 'energetic', label: isAr ? 'حماسي وتفاعلي / Upbeat' : 'Upbeat Promotional' },
+                        { value: 'deep', label: isAr ? 'سينمائي عميق / Cinematic' : 'Cinematic Deep' }
+                      ]}
+                    />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-[var(--text-secondary)] uppercase tracking-wide block">
-                      {isAr ? 'سرعة النطق' : 'Pacing Speed'}
-                    </label>
-                    <select
+                    <SelectDropdown
+                      label={isAr ? 'سرعة النطق' : 'Pacing Speed'}
                       value={ttsSpeed}
-                      onChange={(e) => setTtsSpeed(e.target.value as any)}
-                      className="w-full h-10 px-3 rounded-[var(--radius)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-bold text-[var(--text-primary)]"
-                    >
-                      <option value="slow">{isAr ? 'هادئ وبطيء / Calming' : 'Calm & Slow'}</option>
-                      <option value="natural">{isAr ? 'طبيعي ومدروس / Regular' : 'Regular'}</option>
-                      <option value="fast">{isAr ? 'سريع ومتدفق / Fluent' : 'Fluent & Fast'}</option>
-                    </select>
+                      onChange={(val) => setTtsSpeed(val as any)}
+                      dir={isAr ? 'rtl' : 'ltr'}
+                      options={[
+                        { value: 'slow', label: isAr ? 'هادئ وبطيء / Calming' : 'Calm & Slow' },
+                        { value: 'natural', label: isAr ? 'طبيعي ومدروس / Regular' : 'Regular' },
+                        { value: 'fast', label: isAr ? 'سريع ومتدفق / Fluent' : 'Fluent & Fast' }
+                      ]}
+                    />
                   </div>
                 </div>
               </div>
@@ -590,7 +566,7 @@ export const AudioStudioPage: React.FC = () => {
                 <button
                   onClick={executeTTS}
                   disabled={isGenerating}
-                  className="h-10 px-6 rounded-[var(--radius)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-black text-xs transition-all flex items-center gap-2 hover:opacity-90 active:scale-95 cursor-pointer disabled:opacity-50"
+                  className="h-10 px-6 rounded-[var(--radius-md)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-black text-xs transition-all flex items-center gap-2 hover:opacity-90 active:scale-95 cursor-pointer disabled:opacity-50"
                 >
                   {isGenerating ? <RefreshCw size={14} className="animate-spin" /> : <Volume2 size={14} />}
                   <span>{isAr ? 'توليد النطق الطبيعي' : 'Generate Speech'}</span>
@@ -599,7 +575,6 @@ export const AudioStudioPage: React.FC = () => {
             </div>
           )}
 
-          {/* View 4: Speech to Text (STT) */}
           {activeTab === 'stt' && (
             <div className="space-y-6 flex-1 flex flex-col justify-between">
               <div className="space-y-4">
@@ -613,12 +588,11 @@ export const AudioStudioPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* File Upload Zone */}
                   <div
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
-                    className={`border border-dashed rounded-[var(--radius)] p-6 flex flex-col items-center justify-center text-center gap-3 min-h-[180px] transition-all relative ${
+                    className={`border border-dashed rounded-[var(--radius-md)] p-6 flex flex-col items-center justify-center text-center gap-3 min-h-[180px] transition-all relative ${
                       sttDragOver
                         ? 'border-accent bg-accent/5 scale-[1.01]'
                         : 'border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-accent/40'
@@ -651,8 +625,7 @@ export const AudioStudioPage: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Microphone Recording Zone */}
-                  <div className="border border-[var(--border-default)] rounded-[var(--radius)] bg-[var(--surface-subtle)] p-6 flex flex-col items-center justify-center text-center gap-4 min-h-[180px]">
+                  <div className="border border-[var(--border-default)] rounded-[var(--radius-md)] bg-[var(--surface-subtle)] p-6 flex flex-col items-center justify-center text-center gap-4 min-h-[180px]">
                     {isRecording ? (
                       <div className="space-y-4 w-full flex flex-col items-center">
                         <div className="flex items-center gap-1.5 h-8">
@@ -711,7 +684,7 @@ export const AudioStudioPage: React.FC = () => {
                 <button
                   onClick={executeSTT}
                   disabled={isGenerating || (!sttFile && !isRecording)}
-                  className="h-10 px-6 rounded-[var(--radius)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-black text-xs transition-all flex items-center gap-2 hover:opacity-90 active:scale-95 cursor-pointer disabled:opacity-50"
+                  className="h-10 px-6 rounded-[var(--radius-md)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-black text-xs transition-all flex items-center gap-2 hover:opacity-90 active:scale-95 cursor-pointer disabled:opacity-50"
                 >
                   {isGenerating ? <RefreshCw size={14} className="animate-spin" /> : <Mic size={14} />}
                   <span>{isAr ? 'تفريغ وتفسير المقطع الصوتي' : 'Transcribe Audio'}</span>
@@ -724,7 +697,6 @@ export const AudioStudioPage: React.FC = () => {
 
       </main>
 
-      {/* Fixed Bottom Footer Bar */}
       <footer className="flex-shrink-0 z-50 bg-[var(--surface-page)] border-t border-[var(--border-default)] select-none py-3 shadow-md">
         <div className="max-w-5xl w-full mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-[10px] sm:text-[11px] text-[var(--text-secondary)]">
           <nav className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 font-bold text-accent">
@@ -754,8 +726,8 @@ export const AudioStudioPage: React.FC = () => {
           </nav>
           <p className="font-sans tracking-wide leading-relaxed text-[var(--text-muted)] whitespace-nowrap text-[9px] sm:text-[11px]">
             {isAr 
-              ? 'جميع الحقوق محفوظة © 2026 ViralLinkUp'
-              : '© 2026 ViralLinkUp. All rights reserved.'
+              ? 'جميع الحقوق محفوظة © 2026 بيربليكستا'
+              : '© 2026 Perplexta. All rights reserved.'
             }
           </p>
         </div>

@@ -12,3 +12,4 @@ export * from './ResponsiveSheet';
 export * from './Button';
 export * from './AssistantIcon';
 export * from './AdaptiveMenu';
+export * from './SelectDropdown';

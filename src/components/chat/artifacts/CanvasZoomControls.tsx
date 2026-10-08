@@ -101,15 +101,19 @@ export function CanvasZoomControls({
             setShowPresetMenu(v => !v);
             setShowHelpPopover(false);
           }}
-          className="px-2 h-8 rounded-shape-sm text-[11px] font-mono font-bold text-[var(--text-primary)] hover:bg-[var(--surface-inset)] transition-theme flex items-center gap-1 cursor-pointer active:scale-95 relative before:absolute before:-inset-1.5"
+          className={`px-2 h-8 rounded-shape-sm text-[11px] font-mono font-bold transition-colors duration-200 flex items-center gap-1 cursor-pointer active:scale-95 relative before:absolute before:-inset-1.5 bg-transparent border ${
+            showPresetMenu 
+              ? 'border-[var(--border-default)] text-[var(--fg-accent)]' 
+              : 'border-transparent hover:border-[var(--border-accent)]/50 text-[var(--text-primary)]'
+          }`}
           title={isAr ? 'قائمة نسب التكبير' : 'Zoom Presets'}
           aria-expanded={showPresetMenu}
         >
           <span>{Math.round(zoom * 100)}%</span>
           <ChevronUp
             size={11}
-            className={`text-[var(--text-muted)] transition-transform duration-150 ${
-              showPresetMenu ? 'rotate-180' : ''
+            className={`text-[var(--text-muted)] transition-transform duration-fast ${
+              showPresetMenu ? 'rotate-180 text-[var(--fg-accent)]' : ''
             }`}
           />
         </button>
@@ -117,12 +121,12 @@ export function CanvasZoomControls({
         {/* Quick Presets Dropdown */}
         {showPresetMenu && (
           <div
-            className="absolute bottom-full mb-2 start-0 w-max min-w-[160px] p-1 bg-[var(--surface-card)] border border-[var(--border-default)] rounded-xl shadow-2xl backdrop-blur-xl z-50 flex flex-col gap-0.5"
+            className="absolute bottom-full mb-2 start-0 w-max min-w-[160px] p-1 bg-[var(--surface-card)] border border-[var(--border-default)] rounded-[var(--radius-md)] shadow-2xl backdrop-blur-xl z-50 flex flex-col gap-0.5"
             dir={isAr ? 'rtl' : 'ltr'}
           >
             <div className="px-2.5 py-1 text-[10px] font-bold text-[var(--text-muted)] tracking-wider uppercase border-b border-[var(--border-default)]/50 mb-0.5 flex items-center justify-between">
               <span>{isAr ? 'نسب التكبير' : 'Zoom Presets'}</span>
-              <span className="font-mono text-[9px] text-cyan-400 font-bold">{Math.round(zoom * 100)}%</span>
+              <span className="font-mono text-[9px] text-[var(--fg-accent)] font-bold">{Math.round(zoom * 100)}%</span>
             </div>
 
             <button
@@ -131,13 +135,13 @@ export function CanvasZoomControls({
                 onFitToScreen();
                 setShowPresetMenu(false);
               }}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-shape-sm text-xs font-semibold text-[var(--text-primary)] hover:bg-cyan-500/10 hover:text-cyan-400 group transition-all duration-150 cursor-pointer select-none"
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-shape-sm text-xs font-semibold text-[var(--text-primary)] bg-transparent group transition-all duration-200 cursor-pointer select-none"
             >
               <div className="flex items-center gap-1.5 min-w-0">
-                <Maximize size={12} className="text-[var(--text-muted)] group-hover:text-cyan-400 transition-colors shrink-0" />
-                <span className="truncate group-hover:text-cyan-400 transition-colors">{isAr ? 'ملاءمة الشاشة' : 'Fit to View'}</span>
+                <Maximize size={12} className="text-[var(--text-muted)] group-hover:text-[var(--fg-accent)] transition-colors duration-200 shrink-0" />
+                <span className="truncate group-hover:text-[var(--text-primary)] transition-colors duration-200">{isAr ? 'ملاءمة الشاشة' : 'Fit to View'}</span>
               </div>
-              <kbd className="text-[9px] font-mono text-[var(--text-muted)] group-hover:text-cyan-400 transition-colors ms-2">F</kbd>
+              <kbd className="text-[10px] font-mono text-[var(--text-muted)] group-hover:text-[var(--fg-accent)] transition-colors ms-2">F</kbd>
             </button>
 
             <div className="h-px bg-[var(--border-default)] my-0.5" />
@@ -149,14 +153,10 @@ export function CanvasZoomControls({
                   key={preset.value}
                   type="button"
                   onClick={() => handleSelectPreset(preset.value)}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-shape-sm text-xs font-semibold transition-all duration-150 cursor-pointer select-none group ${
-                    isActive
-                      ? 'bg-cyan-500/15 text-cyan-400 font-bold'
-                      : 'text-[var(--text-primary)] hover:bg-cyan-500/10 hover:text-cyan-400'
-                  }`}
+                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-shape-sm text-xs font-semibold transition-all duration-200 cursor-pointer select-none group bg-transparent text-[var(--text-primary)]"
                 >
-                  <span className="font-mono group-hover:text-cyan-400 transition-colors">{preset.label}</span>
-                  {isActive && <Check size={12} className="text-cyan-400 shrink-0 ms-1.5" />}
+                  <span className={`font-mono transition-colors duration-200 ${isActive ? 'text-[var(--fg-accent)] font-bold' : 'group-hover:text-[var(--text-primary)]'}`}>{preset.label}</span>
+                  {isActive && <Check size={12} className="text-[var(--fg-accent)] shrink-0 ms-1.5" />}
                 </button>
               );
             })}
@@ -240,15 +240,15 @@ export function CanvasZoomControls({
             setShowHelpPopover(v => !v);
             setShowPresetMenu(false);
           }}
-          className={`w-7 h-8 rounded-shape-sm transition-theme flex items-center justify-center cursor-pointer active:scale-95 relative before:absolute before:-inset-1.5 ${
+          className={`w-7 h-8 rounded-shape-sm transition-colors duration-200 flex items-center justify-center cursor-pointer active:scale-95 relative before:absolute before:-inset-1.5 bg-transparent border ${
             showHelpPopover
-              ? 'text-[var(--fg-accent)] bg-[var(--surface-subtle)]'
-              : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-inset)]'
+              ? 'border-[var(--border-default)] text-[var(--fg-accent)]'
+              : 'border-transparent hover:border-[var(--border-accent)]/50 text-[var(--text-muted)] hover:text-[var(--text-primary)]'
           }`}
           title={isAr ? 'اختصارات لوحة المفاتيح' : 'Keyboard Shortcuts'}
           aria-label={isAr ? 'اختصارات لوحة المفاتيح' : 'Keyboard Shortcuts'}
         >
-          <Keyboard size={13} />
+          <Keyboard size={13} className={showHelpPopover ? 'text-[var(--fg-accent)]' : ''} />
         </button>
 
         {showHelpPopover && (
@@ -262,11 +262,11 @@ export function CanvasZoomControls({
               <Keyboard size={13} className="text-[var(--fg-accent)]" />
             </div>
 
-            <div className="space-y-1.5 text-[11px]">
+            <div className="space-y-1.5 text-xs">
               <div className="flex items-center justify-between text-[var(--text-secondary)]">
                 <span>{isAr ? 'تكبير دقيق حول المؤشر' : 'Focal Zoom at cursor'}</span>
-                <div className="flex items-center gap-1 font-mono text-[9.5px]">
-                  <kbd className="px-1 py-0.2 rounded-xs bg-[var(--surface-subtle)] border border-[var(--border-default)]">Ctrl</kbd>
+                <div className="flex items-center gap-1 font-mono text-[10px]">
+                  <kbd className="px-1 py-0.2 rounded-shape-xs bg-[var(--surface-subtle)] border border-[var(--border-default)]">Ctrl</kbd>
                   <span>+</span>
                   <span className="text-[var(--text-muted)]">{isAr ? 'عجلة الفأرة' : 'Wheel'}</span>
                 </div>
@@ -274,8 +274,8 @@ export function CanvasZoomControls({
 
               <div className="flex items-center justify-between text-[var(--text-secondary)]">
                 <span>{isAr ? 'التحريك الحر (بان)' : 'Pan Canvas'}</span>
-                <div className="flex items-center gap-1 font-mono text-[9.5px]">
-                  <kbd className="px-1 py-0.2 rounded-xs bg-[var(--surface-subtle)] border border-[var(--border-default)]">Space</kbd>
+                <div className="flex items-center gap-1 font-mono text-[10px]">
+                  <kbd className="px-1 py-0.2 rounded-shape-xs bg-[var(--surface-subtle)] border border-[var(--border-default)]">Space</kbd>
                   <span>+</span>
                   <span className="text-[var(--text-muted)]">{isAr ? 'سحب' : 'Drag'}</span>
                 </div>
@@ -283,25 +283,25 @@ export function CanvasZoomControls({
 
               <div className="flex items-center justify-between text-[var(--text-secondary)]">
                 <span>{isAr ? 'تكبير / تصغير' : 'Zoom In / Out'}</span>
-                <div className="flex items-center gap-1 font-mono text-[9.5px]">
-                  <kbd className="px-1 py-0.2 rounded-xs bg-[var(--surface-subtle)] border border-[var(--border-default)]">+</kbd>
-                  <kbd className="px-1 py-0.2 rounded-xs bg-[var(--surface-subtle)] border border-[var(--border-default)]">-</kbd>
+                <div className="flex items-center gap-1 font-mono text-[10px]">
+                  <kbd className="px-1 py-0.2 rounded-shape-xs bg-[var(--surface-subtle)] border border-[var(--border-default)]">+</kbd>
+                  <kbd className="px-1 py-0.2 rounded-shape-xs bg-[var(--surface-subtle)] border border-[var(--border-default)]">-</kbd>
                 </div>
               </div>
 
               <div className="flex items-center justify-between text-[var(--text-secondary)]">
                 <span>{isAr ? 'إعادة ضبط 100%' : 'Reset 100%'}</span>
-                <kbd className="px-1.5 py-0.2 rounded-xs bg-[var(--surface-subtle)] border border-[var(--border-default)] font-mono text-[9.5px]">0</kbd>
+                <kbd className="px-1.5 py-0.2 rounded-shape-xs bg-[var(--surface-subtle)] border border-[var(--border-default)] font-mono text-[10px]">0</kbd>
               </div>
 
               <div className="flex items-center justify-between text-[var(--text-secondary)]">
                 <span>{isAr ? 'ملاءمة النافذة' : 'Fit to View'}</span>
-                <kbd className="px-1.5 py-0.2 rounded-xs bg-[var(--surface-subtle)] border border-[var(--border-default)] font-mono text-[9.5px]">F</kbd>
+                <kbd className="px-1.5 py-0.2 rounded-shape-xs bg-[var(--surface-subtle)] border border-[var(--border-default)] font-mono text-[10px]">F</kbd>
               </div>
 
               <div className="flex items-center justify-between text-[var(--text-secondary)]">
                 <span>{isAr ? 'تحريك دقيق (بيكسل)' : 'Nudge Position'}</span>
-                <span className="font-mono text-[9.5px] text-[var(--text-muted)]">{isAr ? 'الأسهم' : 'Arrow keys'}</span>
+                <span className="font-mono text-[10px] text-[var(--text-muted)]">{isAr ? 'الأسهم' : 'Arrow keys'}</span>
               </div>
             </div>
           </div>
@@ -310,7 +310,7 @@ export function CanvasZoomControls({
 
       {/* Numerical Coordinate & Zoom Pill (shown on hover or when transformed) */}
       {isTransformed && (
-        <div className="hidden sm:flex items-center gap-1.5 ps-1.5 pe-2 py-0.5 text-[9.5px] font-mono text-[var(--text-muted)] border-s border-[var(--border-default)]">
+        <div className="hidden sm:flex items-center gap-1.5 ps-1.5 pe-2 py-0.5 text-[10px] font-mono tabular-nums text-[var(--text-muted)] border-s border-[var(--border-default)]">
           <span>X:{pan.x > 0 ? `+${pan.x}` : pan.x}</span>
           <span>Y:{pan.y > 0 ? `+${pan.y}` : pan.y}</span>
         </div>

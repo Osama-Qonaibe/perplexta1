@@ -16,8 +16,9 @@ export const SEMANTIC_COLORS = {
 
   // Foreground (Text)
   text: {
-    primary: 'var(--fg-default)',
-    secondary: 'var(--fg-muted)',
+    primary: 'var(--text-primary)',
+    secondary: 'var(--text-secondary)',
+    muted: 'var(--text-muted)',
     disabled: 'var(--fg-disabled)',
     onEmphasis: 'var(--fg-on-emphasis)',
     accent: 'var(--fg-accent)',
@@ -34,9 +35,11 @@ export const SEMANTIC_COLORS = {
 
   // Borders
   border: {
-    default: 'var(--border-default)',
+    main: 'var(--border-main)',
+    default: 'var(--border-main)',
+    subtle: 'var(--border-subtle)',
     muted: 'var(--border-muted)',
-    accent: 'var(--border-accent-emphasis)',
+    accent: 'var(--border-accent)',
   },
 
   // Status (Semantic)
@@ -51,9 +54,11 @@ export const SEMANTIC_COLORS = {
     bgEmphasis: 'var(--bg-danger-emphasis)',
   },
   warning: {
-    fg: 'var(--fg-attention)',
-    bg: 'var(--bg-attention-muted)',
-    bgEmphasis: 'var(--bg-attention-emphasis)',
+    fg: 'var(--fg-warning)',
+    bg: 'var(--bg-warning-muted)',
+    bgEmphasis: 'var(--bg-warning-emphasis)',
+    attentionFg: 'var(--fg-warning)',
+    attentionBg: 'var(--bg-warning-muted)',
   },
   info: {
     fg: 'var(--fg-info)',

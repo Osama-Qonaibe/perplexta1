@@ -197,10 +197,10 @@ export const MassBroadcastView = ({
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div
-          className="p-5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] shadow-sm group transition-theme hover:border-[var(--border-accent)]"
+          className="p-5 rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-card)] shadow-sm group transition-theme hover:border-[var(--border-accent)]"
         >
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-md bg-[var(--surface-subtle)] text-[var(--fg-accent)] group-hover: transition-theme">
+            <div className="p-3 rounded-shape-sm bg-[var(--surface-subtle)] text-[var(--fg-accent)] group-hover: transition-theme">
               <Send size={24} />
             </div>
             <div>
@@ -213,10 +213,10 @@ export const MassBroadcastView = ({
           </div>
         </div>
         <div
-          className="p-5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] shadow-sm group transition-theme hover:border-[var(--border-accent)]"
+          className="p-5 rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-card)] shadow-sm group transition-theme hover:border-[var(--border-accent)]"
         >
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-md bg-[var(--surface-subtle)] text-[var(--fg-accent)] group-hover: transition-theme">
+            <div className="p-3 rounded-shape-sm bg-[var(--surface-subtle)] text-[var(--fg-accent)] group-hover: transition-theme">
               <Users size={24} />
             </div>
             <div>
@@ -231,10 +231,10 @@ export const MassBroadcastView = ({
           </div>
         </div>
         <div
-          className="p-5 rounded-lg border border-[var(--border-accent)] bg-[var(--surface-subtle)] shadow-sm group transition-theme"
+          className="p-5 rounded-shape-md border border-[var(--border-accent)] bg-[var(--surface-subtle)] shadow-sm group transition-theme"
         >
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-md bg-[var(--surface-card)] text-[var(--fg-accent)]">
+            <div className="p-3 rounded-shape-sm bg-[var(--surface-card)] text-[var(--fg-accent)]">
               <Megaphone size={24} className="animate-bounce" />
             </div>
             <div>
@@ -254,7 +254,7 @@ export const MassBroadcastView = ({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="p-6 md:p-8 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] shadow-sm"
+            className="p-6 md:p-8 rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-card)] shadow-sm"
           >
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="space-y-6">
@@ -285,7 +285,7 @@ export const MassBroadcastView = ({
                       onClick={() =>
                         setForm({ ...form, broadcast_type: type.id })
                       }
-                      className={`flex flex-col items-center justify-center gap-2 p-4 rounded-md border transition-theme ${
+                      className={`flex flex-col items-center justify-center gap-2 p-4 rounded-shape-sm border transition-theme ${
                         form.broadcast_type === type.id
                           ? "bg-[var(--bg-accent-emphasis)] border-[var(--border-accent)] text-[var(--fg-accent)] font-bold"
                           : "border-[var(--border-default)] text-[var(--text-muted)] hover:border-[var(--border-accent)] bg-[var(--surface-subtle)]"
@@ -327,7 +327,7 @@ export const MassBroadcastView = ({
                         onClick={() =>
                           setForm({ ...form, target_group: group.id })
                         }
-                        className={`flex flex-col items-center justify-center gap-2 p-4 rounded-md border transition-theme ${
+                        className={`flex flex-col items-center justify-center gap-2 p-4 rounded-shape-sm border transition-theme ${
                           form.target_group === group.id
                             ? "bg-[var(--bg-accent-emphasis)] border-[var(--border-accent)] text-[var(--fg-accent)] font-bold"
                             : "border-[var(--border-default)] text-[var(--text-muted)] hover:border-[var(--border-accent)] bg-[var(--surface-subtle)]"
@@ -370,7 +370,7 @@ export const MassBroadcastView = ({
                         onChange={(e) =>
                           setForm({ ...form, title_en: e.target.value })
                         }
-                        className="w-full px-4 py-3 rounded-md border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-theme"
+                        className="w-full px-4 py-3 rounded-shape-sm border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-theme"
                         dir="ltr"
                       />
                     </div>
@@ -384,7 +384,7 @@ export const MassBroadcastView = ({
                         onChange={(e) =>
                           setForm({ ...form, title_ar: e.target.value })
                         }
-                        className="w-full px-4 py-3 rounded-md border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-theme"
+                        className="w-full px-4 py-3 rounded-shape-sm border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-theme"
                         dir="rtl"
                       />
                     </div>
@@ -403,7 +403,7 @@ export const MassBroadcastView = ({
                     onChange={(e) =>
                       setForm({ ...form, content_en: e.target.value })
                     }
-                    className="w-full px-4 py-3 rounded-md border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-theme text-sm font-sans"
+                    className="w-full px-4 py-3 rounded-shape-sm border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-theme text-sm font-sans"
                     dir="ltr"
                   />
                 </div>
@@ -417,7 +417,7 @@ export const MassBroadcastView = ({
                     onChange={(e) =>
                       setForm({ ...form, content_ar: e.target.value })
                     }
-                    className="w-full px-4 py-3 rounded-md border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-theme text-sm font-sans"
+                    className="w-full px-4 py-3 rounded-shape-sm border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-theme text-sm font-sans"
                     dir="rtl"
                   />
                 </div>
@@ -428,7 +428,7 @@ export const MassBroadcastView = ({
               <button
                 onClick={handleSend}
                 disabled={isSending}
-                className="w-full md:w-auto bg-[var(--fg-accent)] hover:opacity-90 text-[var(--surface-page)] px-10 py-4 rounded-md font-bold transition-theme flex items-center justify-center gap-3 disabled:opacity-50"
+                className="w-full md:w-auto bg-[var(--fg-accent)] hover:opacity-90 text-[var(--surface-page)] px-10 py-4 rounded-shape-sm font-bold transition-theme flex items-center justify-center gap-3 disabled:opacity-50"
               >
                 {isSending ? (
                   <RefreshCw size={22} className="animate-spin" />
@@ -456,7 +456,7 @@ export const MassBroadcastView = ({
               </div>
             ) : broadcasts.length === 0 ? (
               <div
-                className="p-12 rounded-lg border border-dashed border-[var(--border-default)] bg-[var(--surface-subtle)] flex flex-col items-center justify-center text-center"
+                className="p-12 rounded-shape-md border border-dashed border-[var(--border-default)] bg-[var(--surface-subtle)] flex flex-col items-center justify-center text-center"
               >
                 <Send
                   className="text-[var(--text-muted)] mb-4"
@@ -475,12 +475,12 @@ export const MassBroadcastView = ({
                 {broadcasts.map((b) => (
                   <div
                     key={b.id}
-                    className="p-6 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] transition-theme hover:border-[var(--border-accent)] shadow-sm"
+                    className="p-6 rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-card)] transition-theme hover:border-[var(--border-accent)] shadow-sm"
                   >
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-3">
                         <div
-                          className="p-2 rounded-md bg-[var(--surface-subtle)]"
+                          className="p-2 rounded-shape-sm bg-[var(--surface-subtle)]"
                         >
                           {b.broadcast_type === "email" ? (
                             <Mail size={18} className="text-[var(--fg-accent)]" />

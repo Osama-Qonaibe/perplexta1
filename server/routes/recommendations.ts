@@ -171,7 +171,7 @@ async function generateRecommendationsForUser(userId?: number, options: { limit?
     if (item.is_boosted || item.is_verified) {
       score += 18;
       reasons_en.push('🔥 Verified Viralbook Feature');
-      reasons_ar.push('🔥 محتوى/صفحة موثقة ورائجة على فايرال بوك');
+      reasons_ar.push('🔥 محتوى/صفحة موثقة ورائجة على فيرال بوك');
     }
 
     if (Number(item.likes_count) > 5 || Number(item.followers_count) > 10 || Number(item.impressions_count) > 50) {
@@ -187,10 +187,10 @@ async function generateRecommendationsForUser(userId?: number, options: { limit?
     if (reasons_en.length === 0) {
       if (type === 'bulletin') {
         reasons_en.push('📌 Recommended Viralbook Listing');
-        reasons_ar.push('📌 منشور مقترح على شبكة فايرال بوك');
+        reasons_ar.push('📌 منشور مقترح على شبكة فيرال بوك');
       } else if (type === 'page') {
         reasons_en.push('🏢 Verified Business Page on Viralbook');
-        reasons_ar.push('🏢 صفحة تجارية موثقة على فايرال بوك');
+        reasons_ar.push('🏢 صفحة تجارية موثقة على فيرال بوك');
       } else if (type === 'tool') {
         reasons_en.push('⚡ Recommended AI Productivity Assistant');
         reasons_ar.push('⚡ مساعد ذكاء اصطناعي مقترح لتسهيل عملك');
@@ -293,9 +293,11 @@ router.get('/', authenticateTokenOptional, async (req: any, res: any) => {
 });
 
 /**
- * GET /api/recommendations/marketplace (Legacy compatibility handler - returns empty array)
+ * GET /api/recommendations/marketplace (Legacy compatibility handler - deprecated)
  */
 router.get('/marketplace', authenticateTokenOptional, async (req: any, res: any) => {
+  res.set('Deprecation', 'true');
+  res.set('Sunset', 'Wed, 31 Dec 2026 23:59:59 GMT');
   res.json({
     success: true,
     items: []

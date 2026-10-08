@@ -162,10 +162,10 @@ export function updateDocumentHeadIcons(iconSource?: string | null): void {
   if (!manifestLink) {
     manifestLink = document.createElement('link');
     manifestLink.rel = 'manifest';
-    manifestLink.href = '/manifest.webmanifest';
+    manifestLink.href = '/manifest.json';
     document.head.appendChild(manifestLink);
   } else {
-    manifestLink.href = '/manifest.webmanifest';
+    manifestLink.href = '/manifest.json';
   }
 }
 

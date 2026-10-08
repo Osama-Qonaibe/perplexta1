@@ -1,41 +1,61 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ThemeMode, TokenCategory, ThemeTokensMap, ThemePreset } from '../types';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { ThemeTokensMap, TokenCategory, ThemePreset } from '../types';
 import { DEFAULT_LIGHT_TOKENS, DEFAULT_DARK_TOKENS } from '../tokens/defaultTokens';
 import { TOKEN_REGISTRY } from '../tokens/registry';
 import { ThemeSync, resolveThemeMode, THEME_BOOTSTRAP_STORAGE_KEY } from '@/utils/ThemeSync';
 
-export const useThemeStudio = (
-  token: string | null,
-  showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void,
-  language: string
-) => {
+export function useThemeStudio(
+  arg1: string | null | { token: string | null; language?: string; showToast?: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void },
+  arg2?: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void,
+  arg3?: string
+) {
+  let token: string | null = null;
+  let showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void = () => {};
+  let language = 'ar';
+
+  if (typeof arg1 === 'object' && arg1 !== null) {
+    token = arg1.token;
+    language = arg1.language || 'ar';
+    showToast = arg1.showToast || (() => {});
+  } else {
+    token = arg1 as string | null;
+    showToast = arg2 || (() => {});
+    language = arg3 || 'ar';
+  }
+
   const isAr = language === 'ar';
   const [activeMode, setActiveMode] = useState<'light' | 'dark'>('dark');
   const [lightTokens, setLightTokens] = useState<ThemeTokensMap>(DEFAULT_LIGHT_TOKENS);
   const [darkTokens, setDarkTokens] = useState<ThemeTokensMap>(DEFAULT_DARK_TOKENS);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [activePresetId, setActivePresetId] = useState<string | undefined>('perplexta_warm');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [dbStatus, setDbStatus] = useState<'connected' | 'saving' | 'synced' | 'error'>('connected');
+  const [autoSave, setAutoSave] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('perplexta_theme_autosave') === 'true';
+    }
+    return false;
+  });
 
-  // Search and Filter
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<TokenCategory | 'all'>('all');
+  const [activePresetId, setActivePresetId] = useState<string>('perplexta_canonical_developer');
 
-  // Synchronize document theme mode when activeMode changes in Theme Studio
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       ThemeSync.apply(activeMode);
-      const tokensToApply = activeMode === 'light' ? lightTokens : darkTokens;
-      applyTokensToDOM(activeMode, tokensToApply);
     }
   }, [activeMode]);
 
-  // Fetch from database on mount or token change
-  useEffect(() => {
-    fetchCustomizations();
-  }, [token]);
+  const applyTokensToDOM = useCallback((mode: 'light' | 'dark', tokens: ThemeTokensMap) => {
+    if (typeof window === 'undefined' || !tokens) return;
+    ThemeSync.applyRoot(mode, tokens);
+  }, []);
 
-  const fetchCustomizations = async () => {
+  const fetchCustomizations = useCallback(async () => {
     if (!token) {
       setLoading(false);
       return;
@@ -47,6 +67,10 @@ export const useThemeStudio = (
       });
       if (res.ok) {
         const data = await res.json();
+        setDbStatus('connected');
+        if (data.updated_at) {
+          setLastSavedAt(data.updated_at);
+        }
         if (data.customizations) {
           let updatedLight = DEFAULT_LIGHT_TOKENS;
           let updatedDark = DEFAULT_DARK_TOKENS;
@@ -61,41 +85,93 @@ export const useThemeStudio = (
           const activeTokens = activeMode === 'light' ? updatedLight : updatedDark;
           applyTokensToDOM(activeMode, activeTokens);
         }
+      } else {
+        setDbStatus('error');
       }
     } catch (err) {
-      console.error('Failed to fetch theme customizations:', err);
+      setDbStatus('error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, activeMode, applyTokensToDOM]);
 
-  // Live apply token changes to DOM during editing
-  const applyTokensToDOM = useCallback((mode: 'light' | 'dark', tokens: ThemeTokensMap) => {
-    if (typeof window === 'undefined' || !tokens) return;
-    const root = document.documentElement;
-    root.dataset.theme = mode;
-    root.classList.toggle('dark', mode === 'dark');
-    root.classList.toggle('light', mode === 'light');
-    Object.entries(tokens).forEach(([key, val]) => {
-      if (val && typeof key === 'string' && key.startsWith('--')) {
-        root.style.setProperty(key, val);
+  useEffect(() => {
+    fetchCustomizations();
+  }, [fetchCustomizations]);
+
+  const triggerDebouncedAutoSave = useCallback((mode: 'light' | 'dark', updatedTokens: ThemeTokensMap) => {
+    if (!autoSave || !token) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(async () => {
+      try {
+        setDbStatus('saving');
+        const res = await fetch('/api/admin/theme-customizations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ theme_mode: mode, tokens: updatedTokens }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setDbStatus('synced');
+          setLastSavedAt(data.updated_at || new Date().toISOString());
+          ThemeSync.persistPayload({
+            version: 4,
+            mode: activeMode,
+            resolvedMode: resolveThemeMode(activeMode),
+            tokens: {
+              light: mode === 'light' ? updatedTokens : lightTokens,
+              dark: mode === 'dark' ? updatedTokens : darkTokens,
+            },
+            updatedAt: Date.now(),
+          });
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('perplexta_theme_updated'));
+          }
+        }
+      } catch (e) {
+        setDbStatus('error');
       }
-    });
-  }, []);
+    }, 600);
+  }, [autoSave, token, activeMode, lightTokens, darkTokens]);
+
+  const toggleAutoSave = (val: boolean) => {
+    setAutoSave(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('perplexta_theme_autosave', val ? 'true' : 'false');
+    }
+    showToast(
+      isAr
+        ? val ? 'تم تفعيل الحفظ التلقائي في قاعدة البيانات' : 'تم تعطيل الحفظ التلقائي'
+        : val ? 'Live Auto-Save to Database enabled' : 'Auto-Save disabled',
+      'info'
+    );
+  };
 
   const handleTokenChange = (mode: 'light' | 'dark', key: string, value: string) => {
     if (mode === 'light') {
       setLightTokens((prev) => {
         const next = { ...prev, [key]: value };
         applyTokensToDOM('light', next);
+        triggerDebouncedAutoSave('light', next);
         return next;
       });
     } else {
       setDarkTokens((prev) => {
         const next = { ...prev, [key]: value };
         applyTokensToDOM('dark', next);
+        triggerDebouncedAutoSave('dark', next);
         return next;
       });
+    }
+  };
+
+  const handleResetToken = (key: string) => {
+    const defaultVal = activeMode === 'light' ? DEFAULT_LIGHT_TOKENS[key] : DEFAULT_DARK_TOKENS[key];
+    if (defaultVal) {
+      handleTokenChange(activeMode, key, defaultVal);
     }
   };
 
@@ -106,9 +182,9 @@ export const useThemeStudio = (
     setLightTokens(newLight);
     setDarkTokens(newDark);
     applyTokensToDOM(activeMode, activeMode === 'light' ? newLight : newDark);
-    
+
     ThemeSync.persistPayload({
-      version: 1,
+      version: 4,
       mode: activeMode,
       resolvedMode: resolveThemeMode(activeMode),
       tokens: {
@@ -118,11 +194,11 @@ export const useThemeStudio = (
       updatedAt: Date.now(),
     });
 
-    // Auto-commit to database for seamless 1-click persistence
     if (token) {
       try {
         setSaving(true);
-        await Promise.all([
+        setDbStatus('saving');
+        const [resLight, resDark] = await Promise.all([
           fetch('/api/admin/theme-customizations', {
             method: 'POST',
             headers: {
@@ -140,11 +216,16 @@ export const useThemeStudio = (
             body: JSON.stringify({ theme_mode: 'dark', tokens: newDark }),
           })
         ]);
+        if (resLight.ok && resDark.ok) {
+          const data = await resDark.json();
+          setLastSavedAt(data.updated_at || new Date().toISOString());
+          setDbStatus('synced');
+        }
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('perplexta_theme_updated'));
         }
       } catch (err) {
-        console.warn('Auto-save preset failed:', err);
+        setDbStatus('error');
       } finally {
         setSaving(false);
       }
@@ -152,8 +233,8 @@ export const useThemeStudio = (
 
     showToast(
       isAr
-        ? `تم تطبيق وحفظ القالب: ${preset.nameAr} بنجاح!`
-        : `Applied & saved preset: ${preset.nameEn}!`,
+        ? `تم تطبيق واعتماد قالب: ${preset.nameAr} في قاعدة البيانات بنجاح!`
+        : `Applied & committed preset: ${preset.nameEn} to database!`,
       'success'
     );
   };
@@ -163,12 +244,14 @@ export const useThemeStudio = (
       setLightTokens((prev) => {
         const next = { ...prev, ...imported };
         applyTokensToDOM('light', next);
+        triggerDebouncedAutoSave('light', next);
         return next;
       });
     } else {
       setDarkTokens((prev) => {
         const next = { ...prev, ...imported };
         applyTokensToDOM('dark', next);
+        triggerDebouncedAutoSave('dark', next);
         return next;
       });
     }
@@ -178,7 +261,9 @@ export const useThemeStudio = (
     if (!token) return;
     try {
       setSaving(true);
+      setDbStatus('saving');
       const modes = modeToSave ? [modeToSave] : (['light', 'dark'] as const);
+      let latestUpdated: string | null = null;
 
       for (const mode of modes) {
         const tokensToSave = mode === 'light' ? lightTokens : darkTokens;
@@ -191,10 +276,15 @@ export const useThemeStudio = (
           body: JSON.stringify({ theme_mode: mode, tokens: tokensToSave }),
         });
         if (!res.ok) throw new Error(`Failed to save ${mode} theme`);
+        const data = await res.json();
+        if (data.updated_at) latestUpdated = data.updated_at;
       }
 
+      setLastSavedAt(latestUpdated || new Date().toISOString());
+      setDbStatus('synced');
+
       ThemeSync.persistPayload({
-        version: 1,
+        version: 4,
         mode: activeMode,
         resolvedMode: resolveThemeMode(activeMode),
         tokens: {
@@ -206,16 +296,16 @@ export const useThemeStudio = (
 
       showToast(
         isAr
-          ? 'تم حفظ وتعميم كافة رموز التصميم في قاعدة البيانات بنجاح!'
-          : 'All design tokens securely committed and deployed globally!',
+          ? 'تم حفظ وتعميم خيارات الهوية البصرية في قاعدة البيانات بنجاح!'
+          : 'All theme settings permanently saved to database and deployed globally!',
         'success'
       );
 
-      // Trigger global event
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('perplexta_theme_updated'));
       }
     } catch (err: any) {
+      setDbStatus('error');
       showToast(err.message || (isAr ? 'فشل حفظ تخصيصات المظهر' : 'Failed to save theme'), 'error');
     } finally {
       setSaving(false);
@@ -232,7 +322,7 @@ export const useThemeStudio = (
     }
 
     ThemeSync.persistPayload({
-      version: 1,
+      version: 4,
       mode: activeMode,
       resolvedMode: resolveThemeMode(activeMode),
       tokens: {
@@ -254,6 +344,7 @@ export const useThemeStudio = (
     if (!token) return;
     try {
       setSaving(true);
+      setDbStatus('saving');
       const res = await fetch('/api/admin/theme-customizations', {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
@@ -264,6 +355,8 @@ export const useThemeStudio = (
       setDarkTokens(DEFAULT_DARK_TOKENS);
       applyTokensToDOM('light', DEFAULT_LIGHT_TOKENS);
       applyTokensToDOM('dark', DEFAULT_DARK_TOKENS);
+      setLastSavedAt(null);
+      setDbStatus('connected');
 
       if (typeof window !== 'undefined') {
         localStorage.removeItem(THEME_BOOTSTRAP_STORAGE_KEY);
@@ -277,22 +370,24 @@ export const useThemeStudio = (
         'success'
       );
     } catch (err: any) {
+      setDbStatus('error');
       showToast(err.message || (isAr ? 'فشل تطهير قاعدة البيانات' : 'Failed to purge database overrides'), 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  // Filtered tokens
   const currentTokens = activeMode === 'light' ? lightTokens : darkTokens;
   const currentDefaultTokens = activeMode === 'light' ? DEFAULT_LIGHT_TOKENS : DEFAULT_DARK_TOKENS;
 
+  const modifiedCount = Object.keys(currentTokens).filter(
+    (key) => currentTokens[key] && currentTokens[key] !== currentDefaultTokens[key]
+  ).length;
+
   const filteredDefinitions = TOKEN_REGISTRY.filter((def) => {
-    // Category match
     if (selectedCategory !== 'all' && def.category !== selectedCategory) {
       return false;
     }
-    // Search query match
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchKey = def.key.toLowerCase().includes(q);
@@ -313,17 +408,24 @@ export const useThemeStudio = (
     currentDefaultTokens,
     loading,
     saving,
+    lastSavedAt,
+    dbStatus,
+    autoSave,
+    toggleAutoSave,
     searchQuery,
     setSearchQuery,
     selectedCategory,
     setSelectedCategory,
     activePresetId,
     filteredDefinitions,
+    modifiedCount,
+    totalTokensCount: TOKEN_REGISTRY.length,
     handleTokenChange,
+    handleResetToken,
     handleSelectPreset,
     handleImportTokens,
     handleSave,
     handleReset,
     handlePurgeDatabaseOverrides,
   };
-};
+}

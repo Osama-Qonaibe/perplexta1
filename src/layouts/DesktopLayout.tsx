@@ -3,20 +3,25 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
 import { Header } from '../components/Header';
 import { AuthModal } from '../components/AuthModal';
+import { MobileChatHistoryDrawer } from '../components/mobile/MobileChatHistoryDrawer';
 import { SponsoredSidebar } from '../components/SponsoredSidebar';
 import { useAppContext } from '../context/AppContext';
+import { useArtifact } from '../context/ArtifactContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { SIDEBAR_TRANSITION } from '@/design-system';
 import { isInsideActiveViewport } from '../utils/boundaryCheck';
 
 export const DesktopLayout: React.FC = () => {
   const { isSidebarOpen, setIsSidebarOpen, language, isMobile } = useAppContext();
+  const { isFullscreen } = useArtifact();
   const location = useLocation();
 
   const isViralbookRoute = location.pathname.startsWith('/viralbook') || location.pathname.startsWith('/bulletin') || location.pathname.startsWith('/reels');
-  const isStudioRoute = location.pathname.startsWith('/app');
+  const isStudioRoute = location.pathname.startsWith('/app') || location.pathname.startsWith('/image-studio') || location.pathname.startsWith('/studio') || location.pathname.startsWith('/audio-studio');
+  const isCreatorRoute = location.pathname.startsWith('/creator');
+  const isFullSovereignView = isViralbookRoute || isStudioRoute || isCreatorRoute || isFullscreen;
   // Stable base sidebar offset to eliminate any horizontal layout shifts
-  const baseSidebarOffset = (isMobile || isViralbookRoute || isStudioRoute) ? 0 : 50;
+  const baseSidebarOffset = (isMobile || isFullSovereignView) ? 0 : 50;
   const isChatRoute = location.pathname.startsWith('/chat') || location.pathname === '/';
 
   // Dynamic smooth collapse when clicking outside sidebar on desktop
@@ -55,24 +60,15 @@ export const DesktopLayout: React.FC = () => {
 
   return (
     <div className="flex h-[100dvh] w-full overflow-hidden relative bg-[var(--surface-page)] text-[var(--text-primary)] transition-theme">
-      {!isViralbookRoute && !isStudioRoute && (
+      {!isFullSovereignView && (
         <Header activeLanguage={language} />
       )}
 
       {/* Standard Desktop Sidebar */}
-      {!isViralbookRoute && !isStudioRoute && (
+      {!isFullSovereignView && (
         <div className="hidden lg:block">
           <Sidebar activeLanguage={language} />
         </div>
-      )}
-
-      {/* Backdrop overlay when sidebar is expanded on desktop */}
-      {!isMobile && !isViralbookRoute && !isStudioRoute && isSidebarOpen && (
-        <div
-          onClick={() => setIsSidebarOpen(false)}
-          className="hidden lg:block fixed inset-0 z-[140] bg-[var(--surface-overlay)]/20 backdrop-blur-[0.5px] transition-opacity duration-200 cursor-pointer"
-          aria-hidden="true"
-        />
       )}
 
       {/* Main Layout Content Area - Fixed stable padding to prevent any horizontal jump */}
@@ -82,27 +78,29 @@ export const DesktopLayout: React.FC = () => {
         }`}
         style={{
           paddingInlineStart: `${baseSidebarOffset}px`,
-          transform: 'translateZ(0)',
-          WebkitBackfaceVisibility: 'hidden',
-          backfaceVisibility: 'hidden',
+          ...(isFullscreen ? {} : {
+            transform: 'translateZ(0)',
+            WebkitBackfaceVisibility: 'hidden',
+            backfaceVisibility: 'hidden',
+          }),
           WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
+          ...(isChatRoute ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}),
         }}
       >
         <main className={`flex-1 min-h-full relative ${
-          (isViralbookRoute || isStudioRoute) ? 'pt-0' : 'pt-[calc(56px+env(safe-area-inset-top,0px))]'
+          isFullSovereignView ? 'pt-0' : 'pt-[calc(56px+env(safe-area-inset-top,0px))]'
         } pb-0 bg-[var(--surface-page)] transition-theme flex flex-col`}>
           <div
             className="flex-1 w-full relative min-w-0 flex flex-col min-h-full"
           >
             <Outlet />
           </div>
-          {!isViralbookRoute && !isStudioRoute && <SponsoredSidebar />}
+          {!isFullSovereignView && <SponsoredSidebar />}
         </main>
       </div>
 
       <AuthModal />
+      <MobileChatHistoryDrawer />
     </div>
   );
 };

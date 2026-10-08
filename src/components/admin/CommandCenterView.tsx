@@ -32,6 +32,7 @@ import {
 import { ActionConfirmationModal } from "../ActionConfirmationModal";
 import { HighlightText } from "../HighlightText";
 import { CommandCenterViewProps } from "./adminTypes";
+import { SelectDropdown } from "../../design-system";
 
 export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
   theme,
@@ -194,9 +195,11 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
           });
           if (res.ok) {
             setActivity((prev) =>
-              prev.filter((a) => a.id !== id),
+              prev.filter((a) => String(a.id) !== String(id)),
             );
+            setSelectedActivityIds((prev) => prev.filter((item) => String(item) !== String(id)));
             showToast(t("logDeleted") || (language === "ar" ? "تم حذف السجل بنجاح" : "Log deleted successfully"), "success");
+            fetchData();
           }
         } catch (err) {
           console.error("Failed to delete activity log", err);
@@ -336,11 +339,12 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
           });
 
           if (res.ok) {
+            const strIds = ids.map(String);
             if (type === "activity") {
-              setActivity((prev) => prev.filter((a) => !ids.includes(a.id)));
+              setActivity((prev) => prev.filter((a) => !strIds.includes(String(a.id))));
               setSelectedActivityIds([]);
             } else {
-              setAlerts((prev) => prev.filter((a) => !ids.includes(a.id)));
+              setAlerts((prev) => prev.filter((a) => !strIds.includes(String(a.id))));
               setSelectedAlertIds([]);
             }
             showToast(
@@ -434,16 +438,16 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
         {kpis.map((kpi, idx) => (
           <div
             key={`cmd-kpi-${idx}-${kpi.title}`}
-            className="p-5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] transition-theme shadow-xs hover:shadow-sm"
+            className="p-5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] transition-theme shadow-2xs hover:border-[var(--border-accent)]"
           >
             <div className="flex justify-between items-start mb-4">
               <div
-                className="p-2.5 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] text-[var(--fg-accent)] border border-[var(--border-default)]"
+                className="w-9 h-9 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] text-[var(--text-primary)] border border-[var(--border-default)] flex items-center justify-center shrink-0"
               >
                 {kpi.icon}
               </div>
               <span
-                className={`text-xs font-bold px-2 py-1 rounded-[var(--radius-xs)] ${kpi.isPositive ? "bg-[var(--surface-subtle)] text-[var(--fg-accent)]" : "bg-red-500/10 text-red-500"}`}
+                className={`text-xs font-bold px-2 py-0.5 rounded-[var(--radius-xs)] border ${kpi.isPositive ? "bg-[var(--status-success-subtle)] text-[var(--fg-success)] border-[var(--fg-success)]/20" : "bg-[var(--status-danger-subtle)] text-[var(--fg-danger)] border-[var(--fg-danger)]/20"}`}
               >
                 {kpi.trend}
               </span>
@@ -451,21 +455,21 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
             <h3 className="text-[var(--text-secondary)] text-xs font-semibold mb-1 transition-theme">
               {kpi.title}
             </h3>
-            <p className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">{kpi.value}</p>
+            <p className="text-2xl font-black tracking-tight text-[var(--text-primary)]">{kpi.value}</p>
           </div>
         ))}
       </div>
 
       {/* Quick Launchpad & SEO Operations Hub */}
-      <div className="p-5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] space-y-4 shadow-xs transition-theme">
+      <div className="p-5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] space-y-4 shadow-2xs transition-theme">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles size={18} className="text-[var(--fg-accent)]" />
-            <h2 className="text-sm font-black uppercase tracking-wider text-[var(--text-primary)]">
+            <Sparkles size={16} className="text-[var(--text-secondary)]" />
+            <h2 className="text-sm font-bold text-[var(--text-primary)]">
               {language === 'ar' ? 'اختصارات الأقسام والعمليات السريعة' : 'Command Operations & Quick Launchpad'}
             </h2>
           </div>
-          <span className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest">
+          <span className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-wider">
             {language === 'ar' ? 'وصول فوري' : 'Direct Access'}
           </span>
         </div>
@@ -473,22 +477,22 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
           <button
             onClick={() => navigate('/admin/seo')}
-            className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all flex flex-col items-center text-center gap-2 group cursor-pointer"
+            className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all flex flex-col items-center text-center gap-2 group cursor-pointer active:scale-95 shadow-2xs"
           >
-            <div className="p-2 rounded-[var(--radius-xs)] bg-[var(--surface-card)] text-[var(--fg-accent)] group-hover:scale-105 transition-transform border border-[var(--border-default)]">
-              <Globe size={18} />
+            <div className="w-8 h-8 rounded-[var(--radius-xs)] bg-[var(--surface-card)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors border border-[var(--border-default)] flex items-center justify-center">
+              <Globe size={16} />
             </div>
-            <span className="text-xs font-bold text-[var(--fg-accent)] leading-tight">
+            <span className="text-xs font-bold text-[var(--text-primary)] leading-tight">
               {language === 'ar' ? 'مركز السيو' : 'SEO Audit'}
             </span>
           </button>
 
           <button
             onClick={() => navigate('/admin/orchestrator')}
-            className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all flex flex-col items-center text-center gap-2 group cursor-pointer"
+            className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all flex flex-col items-center text-center gap-2 group cursor-pointer active:scale-95 shadow-2xs"
           >
-            <div className="p-2 rounded-[var(--radius-xs)] bg-[var(--surface-card)] text-[var(--text-primary)] group-hover:scale-105 transition-transform border border-[var(--border-default)]">
-              <Cpu size={18} />
+            <div className="w-8 h-8 rounded-[var(--radius-xs)] bg-[var(--surface-card)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors border border-[var(--border-default)] flex items-center justify-center">
+              <Cpu size={16} />
             </div>
             <span className="text-xs font-bold text-[var(--text-primary)] leading-tight">
               {language === 'ar' ? 'الموجّه الذكي' : 'Orchestrator'}
@@ -497,10 +501,10 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
           <button
             onClick={() => navigate('/admin/databases')}
-            className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all flex flex-col items-center text-center gap-2 group cursor-pointer"
+            className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all flex flex-col items-center text-center gap-2 group cursor-pointer active:scale-95 shadow-2xs"
           >
-            <div className="p-2 rounded-[var(--radius-xs)] bg-[var(--surface-card)] text-[var(--text-primary)] group-hover:scale-105 transition-transform border border-[var(--border-default)]">
-              <Database size={18} />
+            <div className="w-8 h-8 rounded-[var(--radius-xs)] bg-[var(--surface-card)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors border border-[var(--border-default)] flex items-center justify-center">
+              <Database size={16} />
             </div>
             <span className="text-xs font-bold text-[var(--text-primary)] leading-tight">
               {language === 'ar' ? 'قواعد البيانات' : 'Databases'}
@@ -509,10 +513,10 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
           <button
             onClick={() => navigate('/admin/keys')}
-            className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all flex flex-col items-center text-center gap-2 group cursor-pointer"
+            className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all flex flex-col items-center text-center gap-2 group cursor-pointer active:scale-95 shadow-2xs"
           >
-            <div className="p-2 rounded-[var(--radius-xs)] bg-[var(--surface-card)] text-[var(--text-primary)] group-hover:scale-105 transition-transform border border-[var(--border-default)]">
-              <Key size={18} />
+            <div className="w-8 h-8 rounded-[var(--radius-xs)] bg-[var(--surface-card)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors border border-[var(--border-default)] flex items-center justify-center">
+              <Key size={16} />
             </div>
             <span className="text-xs font-bold text-[var(--text-primary)] leading-tight">
               {language === 'ar' ? 'مفاتيح API' : 'API Keys'}
@@ -521,10 +525,10 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
           <button
             onClick={() => navigate('/admin/radar')}
-            className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all flex flex-col items-center text-center gap-2 group cursor-pointer"
+            className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all flex flex-col items-center text-center gap-2 group cursor-pointer active:scale-95 shadow-2xs"
           >
-            <div className="p-2 rounded-[var(--radius-xs)] bg-[var(--surface-card)] text-[var(--text-primary)] group-hover:scale-105 transition-transform border border-[var(--border-default)]">
-              <ShieldCheck size={18} />
+            <div className="w-8 h-8 rounded-[var(--radius-xs)] bg-[var(--surface-card)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors border border-[var(--border-default)] flex items-center justify-center">
+              <ShieldCheck size={16} />
             </div>
             <span className="text-xs font-bold text-[var(--text-primary)] leading-tight">
               {language === 'ar' ? 'رادار الأمان' : 'Security'}
@@ -533,10 +537,10 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
           <button
             onClick={() => navigate('/admin/finance')}
-            className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all flex flex-col items-center text-center gap-2 group cursor-pointer"
+            className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all flex flex-col items-center text-center gap-2 group cursor-pointer active:scale-95 shadow-2xs"
           >
-            <div className="p-2 rounded-[var(--radius-xs)] bg-[var(--surface-card)] text-[var(--text-primary)] group-hover:scale-105 transition-transform border border-[var(--border-default)]">
-              <Landmark size={18} />
+            <div className="w-8 h-8 rounded-[var(--radius-xs)] bg-[var(--surface-card)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors border border-[var(--border-default)] flex items-center justify-center">
+              <Landmark size={16} />
             </div>
             <span className="text-xs font-bold text-[var(--text-primary)] leading-tight">
               {language === 'ar' ? 'المالية والدفتر' : 'Finance'}
@@ -545,10 +549,10 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
           <button
             onClick={() => navigate('/admin/plans')}
-            className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all flex flex-col items-center text-center gap-2 group cursor-pointer"
+            className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all flex flex-col items-center text-center gap-2 group cursor-pointer active:scale-95 shadow-2xs"
           >
-            <div className="p-2 rounded-[var(--radius-xs)] bg-[var(--surface-card)] text-[var(--text-primary)] group-hover:scale-105 transition-transform border border-[var(--border-default)]">
-              <CreditCard size={18} />
+            <div className="w-8 h-8 rounded-[var(--radius-xs)] bg-[var(--surface-card)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors border border-[var(--border-default)] flex items-center justify-center">
+              <CreditCard size={16} />
             </div>
             <span className="text-xs font-bold text-[var(--text-primary)] leading-tight">
               {language === 'ar' ? 'الاشتراكات' : 'Plans'}
@@ -557,10 +561,10 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
           <button
             onClick={() => navigate('/admin/users')}
-            className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all flex flex-col items-center text-center gap-2 group cursor-pointer"
+            className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all flex flex-col items-center text-center gap-2 group cursor-pointer active:scale-95 shadow-2xs"
           >
-            <div className="p-2 rounded-[var(--radius-xs)] bg-[var(--surface-card)] text-[var(--text-primary)] group-hover:scale-105 transition-transform border border-[var(--border-default)]">
-              <Users size={18} />
+            <div className="w-8 h-8 rounded-[var(--radius-xs)] bg-[var(--surface-card)] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors border border-[var(--border-default)] flex items-center justify-center">
+              <Users size={16} />
             </div>
             <span className="text-xs font-bold text-[var(--text-primary)] leading-tight">
               {language === 'ar' ? 'المستخدمين' : 'Users'}
@@ -571,23 +575,23 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div
-          className="p-6 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] flex flex-col shadow-xs"
+          className="p-6 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] flex flex-col shadow-2xs transition-theme"
         >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <Cpu className="text-[var(--fg-accent)]" size={20} />
-              <h2 className="text-lg font-bold text-[var(--text-primary)]">{t("resourceUtilization")}</h2>
+              <Cpu className="text-[var(--text-secondary)]" size={18} />
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">{t("resourceUtilization")}</h2>
             </div>
-            <div className="flex items-center gap-2 text-[10px] font-black text-[var(--fg-accent)]/70 uppercase tracking-widest">
-              <span className="w-2 h-2 rounded-full bg-[var(--fg-accent)] animate-pulse" />
-              Live Diagnostics
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-[var(--fg-success)]" />
+              {language === "ar" ? "تشخيص لحظي" : "Live Diagnostics"}
             </div>
           </div>
           <div className="flex-1 space-y-6">
             <div className="space-y-2">
-              <div className="flex justify-between text-[11px] font-bold uppercase tracking-tight">
-                <span className="text-[var(--text-muted)]">{t("cpuLoad")}</span>
-                <span className="text-[var(--fg-accent)] font-bold">
+              <div className="flex justify-between text-xs font-semibold">
+                <span className="text-[var(--text-secondary)]">{t("cpuLoad")}</span>
+                <span className="text-[var(--text-primary)] font-bold">
                   {serverHealth?.cpu || 0}%
                 </span>
               </div>
@@ -595,14 +599,14 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${serverHealth?.cpu || 0}%` }}
-                  className="h-full bg-[var(--bg-accent-emphasis)]"
+                  className="h-full bg-[var(--text-primary)]"
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <div className="flex justify-between text-[11px] font-bold uppercase tracking-tight">
-                <span className="text-[var(--text-muted)]">{t("memoryAllocation")}</span>
-                <span className="text-[var(--fg-accent)] font-bold">
+              <div className="flex justify-between text-xs font-semibold">
+                <span className="text-[var(--text-secondary)]">{t("memoryAllocation")}</span>
+                <span className="text-[var(--text-primary)] font-bold">
                   {serverHealth?.memory?.used || 0}MB
                 </span>
               </div>
@@ -610,14 +614,14 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${serverHealth?.memory?.percent || 0}%` }}
-                  className="h-full bg-[var(--bg-accent-emphasis)]"
+                  className="h-full bg-[var(--text-primary)]"
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <div className="flex justify-between text-[11px] font-bold uppercase tracking-tight">
-                <span className="text-[var(--text-muted)]">{t("systemLoad")}</span>
-                <span className="text-[var(--fg-accent)] font-bold">
+              <div className="flex justify-between text-xs font-semibold">
+                <span className="text-[var(--text-secondary)]">{t("systemLoad")}</span>
+                <span className="text-[var(--text-primary)] font-bold">
                   {serverHealth?.load
                     ? serverHealth.load[0].toFixed(2)
                     : "0.00"}
@@ -629,12 +633,12 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                   animate={{
                     width: `${Math.min(100, (serverHealth?.load?.[0] || 0) * 10)}%`,
                   }}
-                  className="h-full bg-[var(--bg-accent-emphasis)]"
+                  className="h-full bg-[var(--text-primary)]"
                 />
               </div>
             </div>
             <div className="pt-2 flex justify-center">
-              <p className="text-[10px] text-[var(--text-muted)] font-medium uppercase tracking-tighter">
+              <p className="text-[11px] text-[var(--text-muted)] font-medium">
                 {t("serverMonitoringActive")}
               </p>
             </div>
@@ -642,16 +646,22 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
         </div>
 
         <div
-          className="p-6 rounded-[var(--radius-md)] border border-[var(--border-accent)] bg-[var(--surface-card)] flex flex-col shadow-xs"
+          className="p-6 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] flex flex-col shadow-2xs transition-theme"
         >
-          <div className="flex items-center gap-3 mb-6">
-            <Activity className="text-[var(--fg-accent)]" size={20} />
-            <h2 className="text-lg font-bold text-[var(--text-primary)]">
-              {t("systemUptime")}
-            </h2>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <Activity className="text-[var(--text-secondary)]" size={18} />
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                {t("systemUptime")}
+              </h2>
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-[var(--status-success-subtle)] text-[var(--fg-success)] border border-[var(--fg-success)]/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--fg-success)]" />
+              {language === "ar" ? "بروتوكول مستقر" : "Optimal"}
+            </span>
           </div>
           <div className="flex-1 flex flex-col justify-center items-center py-10">
-            <p className="text-4xl font-black text-[var(--fg-accent)]">100%</p>
+            <p className="text-4xl font-black text-[var(--text-primary)] tracking-tight">100%</p>
             <p className="text-xs text-[var(--text-muted)] mt-2 font-medium">
               {t("stableOperationalProtocol")}
             </p>
@@ -660,20 +670,17 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
       </div>
 
       {/* Database Pool Connectivity Monitors */}
-      <div className="p-6 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] flex flex-col gap-6 shadow-xs transition-theme">
+      <div className="p-6 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] flex flex-col gap-6 shadow-2xs transition-theme">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Database className="text-[var(--fg-accent)]" size={20} />
-            <h2 className="text-lg font-bold text-[var(--text-primary)]">
+            <Database className="text-[var(--text-secondary)]" size={18} />
+            <h2 className="text-sm font-bold text-[var(--text-primary)]">
               {language === "ar" ? "مراقب اتصال قواعد البيانات النشطة" : "Database Pool Connectivity Monitor"}
             </h2>
           </div>
-          <div className="flex items-center gap-2 text-[10px] font-black text-[var(--fg-accent)]/70 uppercase tracking-widest">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--fg-accent)] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--fg-accent)]"></span>
-            </span>
-            {language === "ar" ? "التحقق المباشر من البث المباشر" : "Active Pool Polling"}
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+            <span className="w-2 h-2 rounded-full bg-[var(--fg-success)]" />
+            {language === "ar" ? "فحص دوري مباشر" : "Active Pool Polling"}
           </div>
         </div>
 
@@ -686,54 +693,54 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
             return (
               <div 
                 key={dbId}
-                className="p-4 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] flex flex-col gap-3 relative overflow-hidden transition-theme hover:border-[var(--border-accent)]"
+                className="p-4 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] flex flex-col gap-3 relative transition-theme hover:border-[var(--border-accent)] shadow-2xs"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Database size={16} className={`${isConnected ? 'text-[var(--fg-accent)]' : isLoading ? 'text-[var(--text-muted)] animate-pulse' : 'text-[var(--fg-danger)] animate-pulse'}`} />
-                    <span className="font-bold text-xs uppercase tracking-tight text-[var(--text-primary)]">
+                    <Database size={15} className={`${isConnected ? 'text-[var(--text-primary)]' : isLoading ? 'text-[var(--text-muted)]' : 'text-[var(--fg-danger)]'}`} />
+                    <span className="font-bold text-xs tracking-tight text-[var(--text-primary)]">
                       {dbId === 'core' && (language === "ar" ? "قاعدة البيانات الأساسية" : "Core DB")}
                       {dbId === 'ledger' && (language === "ar" ? "دفتر الأرباح المالي" : "Ledger DB")}
                       {dbId === 'external' && (language === "ar" ? "قاعدة المجتمع والمدونة" : "External DB")}
                       {dbId === 'security' && (language === "ar" ? "قاعدة الأمان والحماية" : "Security DB")}
                     </span>
                   </div>
-                  <span className={`text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-[var(--radius-xs)] ${isConnected ? 'bg-[var(--bg-accent-emphasis)]/10 text-[var(--fg-accent)]' : isLoading ? 'bg-[var(--surface-subtle)] text-[var(--text-muted)]' : 'bg-[var(--fg-danger)]/10 text-[var(--fg-danger)]'}`}>
-                    {isLoading ? (language === "ar" ? "جاري الاستعلام" : "Loading") : isConnected ? (language === "ar" ? "متصل" : "Connected") : (language === "ar" ? "غير متصل" : "Offline")}
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-[var(--radius-xs)] border ${isConnected ? 'bg-[var(--status-success-subtle)] text-[var(--fg-success)] border-[var(--fg-success)]/20' : isLoading ? 'bg-[var(--surface-card)] text-[var(--text-muted)] border-[var(--border-default)]' : 'bg-[var(--status-danger-subtle)] text-[var(--fg-danger)] border-[var(--fg-danger)]/20'}`}>
+                    {isLoading ? (language === "ar" ? "جاري الفحص" : "Checking") : isConnected ? (language === "ar" ? "متصل" : "Connected") : (language === "ar" ? "غير متصل" : "Offline")}
                   </span>
                 </div>
 
-                <div className="mt-1 flex flex-col gap-1 text-[10px] text-[var(--text-muted)] font-mono">
-                  <div className="flex justify-between">
-                    <span>Target:</span>
-                    <span className="font-semibold text-[var(--text-primary)] uppercase">{dbId}</span>
+                <div className="mt-1 flex flex-col gap-1.5 text-xs text-[var(--text-muted)]">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[11px] text-[var(--text-secondary)]">{language === "ar" ? "المعرف" : "Identifier"}</span>
+                    <span className="font-mono font-bold text-[var(--text-primary)] uppercase text-[11px]">{dbId}</span>
                   </div>
                   {isConnected && (
                     <>
-                      <div className="flex justify-between">
-                        <span>Latency:</span>
-                        <span className="text-[var(--fg-accent)] font-semibold">{dbInfo.latencyMs}ms</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[11px] text-[var(--text-secondary)]">{language === "ar" ? "زمن الاستجابة" : "Latency"}</span>
+                        <span className="font-mono font-bold text-[var(--fg-success)] text-[11px]">{dbInfo.latencyMs}ms</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Active / Max:</span>
-                        <span className="text-[var(--text-primary)] font-semibold">{dbInfo.active ?? 0} / {dbInfo.max ?? 20}</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[11px] text-[var(--text-secondary)]">{language === "ar" ? "اتصالات نشطة / الحد الأقصى" : "Active / Max"}</span>
+                        <span className="font-mono font-bold text-[var(--text-primary)] text-[11px]">{dbInfo.active ?? 0} / {dbInfo.max ?? 20}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Idle / Waiting:</span>
-                        <span className="text-[var(--text-primary)] font-semibold">{dbInfo.idle ?? 0} / {dbInfo.waiting ?? 0}</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[11px] text-[var(--text-secondary)]">{language === "ar" ? "خاملة / قيد الانتظار" : "Idle / Waiting"}</span>
+                        <span className="font-mono font-bold text-[var(--text-primary)] text-[11px]">{dbInfo.idle ?? 0} / {dbInfo.waiting ?? 0}</span>
                       </div>
                       {dbInfo.connection_leak_risk && (
-                        <div className="mt-2 p-2 rounded bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[9px] flex flex-col gap-2">
+                        <div className="mt-2 p-2.5 rounded-[var(--radius-xs)] bg-[var(--status-warning-subtle)] border border-[var(--fg-warning)]/20 text-[var(--fg-warning)] text-[10px] flex flex-col gap-2">
                           <span className="font-bold flex items-center gap-1">
                             ⚠️ {language === 'ar' ? 'خطر تسريب الاتصال!' : 'Connection Leak Risk!'}
                           </span>
                           <button
                             disabled={reconnectingPool !== null}
                             onClick={() => handleForceReconnect(dbId)}
-                            className="w-full py-1 rounded-[var(--radius)] text-[9px] font-black border border-amber-500/30 text-amber-500 hover:bg-amber-500/20 active:scale-[0.98] transition-all uppercase tracking-wider flex items-center justify-center gap-1"
+                            className="w-full py-1.5 rounded-[var(--radius-xs)] text-[10px] font-bold border border-[var(--fg-warning)]/30 text-[var(--fg-warning)] hover:bg-[var(--status-warning-subtle)] active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer"
                           >
                             {reconnectingPool === dbId ? (
-                              <span className="animate-spin h-3 w-3 border-2 border-amber-500 border-t-transparent rounded-full" />
+                              <span className="animate-spin h-3 w-3 border-2 border-[var(--fg-warning)]/40 border-t-transparent rounded-full" />
                             ) : (
                               language === 'ar' ? 'إعادة اتصال إجباري' : 'Force Reconnect'
                             )}
@@ -743,13 +750,11 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                     </>
                   )}
                   {!isConnected && !isLoading && (
-                    <div className="text-[var(--fg-danger)] font-semibold truncate leading-normal" title={dbInfo.error}>
-                      Error: {dbInfo.error || "Connection test failed"}
+                    <div className="text-[var(--fg-danger)] font-medium text-[11px] truncate leading-normal" title={dbInfo.error}>
+                      {dbInfo.error || (language === "ar" ? "فشل اختبار الاتصال" : "Connection failed")}
                     </div>
                   )}
                 </div>
-
-                <div className={`absolute bottom-0 left-0 right-0 h-1 ${isConnected ? 'bg-[var(--bg-accent-emphasis)]' : isLoading ? 'bg-[var(--text-muted)]/40 animate-pulse' : 'bg-[var(--fg-danger)]'}`} />
               </div>
             );
           })}
@@ -758,24 +763,23 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div
-          className={`p-6 rounded-lg border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm`}
+          className="p-6 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] shadow-2xs transition-theme"
         >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <Clock className="text-accent" size={20} />
-              <h2 className="text-lg font-bold">
-                {t("activityStream")}
-                <span className="ml-2 text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded-full font-bold">
+              <Clock className="text-[var(--text-secondary)]" size={18} />
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                  {t("activityStream")}
+                </h2>
+                <span className="text-[10px] bg-[var(--surface-subtle)] text-[var(--text-secondary)] border border-[var(--border-default)] px-2 py-0.5 rounded-full font-bold">
                   {activity.length}
                 </span>
-              </h2>
+              </div>
               <div className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-accent"></span>
-                </span>
+                <span className="w-2 h-2 rounded-full bg-[var(--fg-success)]" />
                 {activity.length > 0 && (
-                  <div className="ml-2 flex items-center gap-2 bg-[var(--bg-overlay)] px-2 py-1 rounded-sm border border-[var(--border-default)] transition-theme">
+                  <div className="flex items-center gap-1.5 bg-[var(--surface-subtle)] px-2 py-1 rounded-[var(--radius-xs)] border border-[var(--border-default)] transition-theme">
                     <input
                       type="checkbox"
                       checked={
@@ -783,9 +787,9 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                         selectedActivityIds.length === activity.length
                       }
                       onChange={() => handleSelectAll("activity")}
-                      className="w-3.5 h-3.5 rounded-sm border-[var(--border-default)] text-accent focus:ring-accent-500 cursor-pointer accent-accent"
+                      className="w-3.5 h-3.5 rounded-shape-xs border-[var(--border-default)] text-[var(--comp-button-primary-bg)] cursor-pointer"
                     />
-                    <span className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-tighter">
+                    <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-tight">
                       {language === "ar" ? "تحديد الكل" : (t("selectAll") || "Select All")}
                     </span>
                   </div>
@@ -800,7 +804,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                     animate={{ opacity: 1, scale: 1, x: 0 }}
                     exit={{ opacity: 0, scale: 0.9, x: 20 }}
                     onClick={() => handleBatchDelete("activity")}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-[var(--fg-danger)] text-[var(--surface-page)] text-[10px] font-bold uppercase tracking-wider hover:opacity-90 transition-theme shadow-xs active:scale-95"
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-shape-sm bg-[var(--fg-danger)] text-[var(--surface-page)] text-[10px] font-bold uppercase tracking-wider hover:opacity-90 transition-theme shadow-xs active:scale-95"
                   >
                     <Trash2 size={13} />
                     {t("deleteSelected") || (language === "ar" ? "حذف المحدد" : "Delete Selected")} ({selectedActivityIds.length})
@@ -855,80 +859,70 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Status Selector */}
                   <div className="relative">
-                    <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-wider block mb-1.5">
-                      {language === "ar" ? "تصفية حسب الحالة" : "Filter by Status"}
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={logStatusFilter}
-                        onChange={(e) => setLogStatusFilter(e.target.value)}
-                        className={`w-full ${dir === "rtl" ? "pr-3 pl-10" : "pl-3 pr-10"} py-2 rounded-md border appearance-none focus:outline-none focus:ring-1 focus:ring-[var(--border-accent)] text-xs font-bold bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--text-primary)] pointer-events-auto transition-theme`}
-                      >
-                        {statusOptions.map(opt => (
-                          <option key={opt.id} value={opt.id}>
-                            {dir === "rtl" ? opt.labelAr : opt.labelEn}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown
-                        size={14}
-                        className={`absolute ${dir === "rtl" ? "left-3" : "right-3"} top-1/2 -translate-y-1/2 pointer-events-none text-[var(--text-muted)]`}
-                      />
-                    </div>
+                    <SelectDropdown
+                      label={language === "ar" ? "تصفية حسب الحالة" : "Filter by Status"}
+                      value={logStatusFilter}
+                      onChange={(val) => setLogStatusFilter(val)}
+                      dir={dir}
+                      options={statusOptions.map(opt => ({
+                        value: opt.id,
+                        label: dir === "rtl" ? opt.labelAr : opt.labelEn,
+                        labelEn: opt.labelEn,
+                        labelAr: opt.labelAr
+                      }))}
+                    />
                   </div>
 
                   {/* Tool Selector */}
                   <div className="relative">
-                    <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-wider block mb-1.5">
-                      {language === "ar" ? "تصفية حسب الأداة" : "Filter by Tool"}
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={logToolFilter}
-                        onChange={(e) => setLogToolFilter(e.target.value)}
-                        className={`w-full ${dir === "rtl" ? "pr-3 pl-10" : "pl-3 pr-10"} py-2 rounded-md border appearance-none focus:outline-none focus:ring-1 focus:ring-[var(--border-accent)] text-xs font-bold bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--text-primary)] pointer-events-auto transition-theme`}
-                      >
-                        <option value="all">
-                          {dir === "rtl" ? "جميع الأدوات والخدمات" : "All Tools & Services"}
-                        </option>
-                        {availableToolFilters.map(tool => (
-                          <option key={tool.id} value={tool.id}>
-                            {dir === "rtl" ? tool.labelAr : tool.labelEn}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown
-                        size={14}
-                        className={`absolute ${dir === "rtl" ? "left-3" : "right-3"} top-1/2 -translate-y-1/2 pointer-events-none text-[var(--text-muted)]`}
-                      />
-                    </div>
+                    <SelectDropdown
+                      label={language === "ar" ? "تصفية حسب الأداة" : "Filter by Tool"}
+                      value={logToolFilter}
+                      onChange={(val) => setLogToolFilter(val)}
+                      dir={dir}
+                      searchable={availableToolFilters.length > 6}
+                      options={[
+                        {
+                          value: 'all',
+                          label: dir === "rtl" ? "جميع الأدوات والخدمات" : "All Tools & Services",
+                          labelEn: "All Tools & Services",
+                          labelAr: "جميع الأدوات والخدمات"
+                        },
+                        ...availableToolFilters.map(tool => ({
+                          value: tool.id,
+                          label: dir === "rtl" ? tool.labelAr : tool.labelEn,
+                          labelEn: tool.labelEn,
+                          labelAr: tool.labelAr
+                        }))
+                      ]}
+                    />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   {/* Start Date */}
                   <div className="relative">
-                    <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-wider block mb-1.5">
+                    <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block mb-1.5">
                       {language === "ar" ? "تاريخ البدء" : "Start Date"}
                     </label>
                     <input
                       type="date"
                       value={logStartDate}
                       onChange={(e) => setLogStartDate(e.target.value)}
-                      className={`w-full px-3 py-1.5 rounded-md border focus:outline-none focus:ring-1 focus:ring-[var(--border-accent)] text-xs font-bold transition-theme bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--text-primary)]`}
+                      className="w-full px-3 py-2 min-h-[44px] rounded-[var(--radius-sm)] border border-[var(--border-default)] focus:border-[var(--border-accent)] focus:outline-none text-xs font-semibold bg-[var(--surface-subtle)] text-[var(--text-primary)] transition-all"
                     />
                   </div>
 
                   {/* End Date */}
                   <div className="relative">
-                    <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-wider block mb-1.5">
+                    <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider block mb-1.5">
                       {language === "ar" ? "تاريخ الانتهاء" : "End Date"}
                     </label>
                     <input
                       type="date"
                       value={logEndDate}
                       onChange={(e) => setLogEndDate(e.target.value)}
-                      className={`w-full px-3 py-1.5 rounded-md border focus:outline-none focus:ring-1 focus:ring-[var(--border-accent)] text-xs font-bold transition-theme bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--text-primary)]`}
+                      className="w-full px-3 py-2 min-h-[44px] rounded-[var(--radius-sm)] border border-[var(--border-default)] focus:border-[var(--border-accent)] focus:outline-none text-xs font-semibold bg-[var(--surface-subtle)] text-[var(--text-primary)] transition-all"
                     />
                   </div>
                 </div>
@@ -938,20 +932,20 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
           <div className="mb-4 relative group">
             <Search
-              className={`absolute ${dir === "rtl" ? "right-3" : "left-3"} top-1/2 -translate-y-1/2 transition-theme ${search ? "text-[var(--fg-accent)]" : "text-[var(--text-muted)] group-focus-within:text-[var(--fg-accent)]"}`}
-              size={16}
+              className={`absolute ${dir === "rtl" ? "right-3.5" : "left-3.5"} top-1/2 -translate-y-1/2 transition-colors ${search ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] group-focus-within:text-[var(--text-primary)]"}`}
+              size={15}
             />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={t("searchActivityPlaceholder") || (language === "ar" ? "بحث في السجلات..." : "Search activity logs...")}
-              className={`w-full ${dir === "rtl" ? "pr-10 pl-10" : "pl-10 pr-10"} py-2.5 rounded-md border text-xs font-medium transition-theme focus:outline-none focus:ring-2 focus:ring-[var(--border-accent)] bg-[var(--bg-overlay)] border-[var(--border-default)] focus:border-[var(--border-accent)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]`}
+              placeholder={language === "ar" ? "بحث في سجل العمليات والأنشطة..." : "Search activity stream & logs..."}
+              className={`w-full ${dir === "rtl" ? "pr-10 pl-10" : "pl-10 pr-10"} py-2.5 min-h-[44px] rounded-[var(--radius-sm)] border text-xs font-medium transition-all focus:outline-none bg-[var(--surface-subtle)] border-[var(--border-default)] focus:border-[var(--border-accent)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]`}
             />
             {search && (
               <button 
                 onClick={() => setSearch("")}
-                className={`absolute ${dir === "rtl" ? "left-3" : "right-3"} top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--fg-danger)] transition-theme p-1`}
+                className={`absolute ${dir === "rtl" ? "left-3" : "right-3"} top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--fg-danger)] transition-colors p-1.5 rounded-full hover:bg-[var(--surface-card)] cursor-pointer`}
               >
                 <X size={14} />
               </button>
@@ -1016,7 +1010,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
 
               if (filteredList.length === 0) {
                 return (
-                  <div className="flex flex-col items-center justify-center py-10 px-4 text-center border border-dashed border-[var(--border-default)] rounded-lg bg-[var(--surface-subtle)]/30">
+                  <div className="flex flex-col items-center justify-center py-10 px-4 text-center border border-dashed border-[var(--border-default)] rounded-shape-md bg-[var(--surface-subtle)]/30">
                     <div className="w-12 h-12 rounded-full bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--text-muted)] mb-3">
                       <Search size={20} className="stroke-[1.5]" />
                     </div>
@@ -1037,7 +1031,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                           setLogEndDate("");
                           setSearch("");
                         }}
-                        className="mt-4 px-3 py-1.5 rounded-md bg-accent/10 border border-accent/20 text-accent text-xs font-bold hover:bg-accent/20 transition-theme"
+                        className="mt-4 px-3 py-1.5 rounded-shape-sm bg-accent/10 border border-accent/20 text-accent text-xs font-bold hover:bg-accent/20 transition-theme"
                       >
                         {language === "ar" ? "إعادة تعيين الفلاتر" : "Reset Filters"}
                       </button>
@@ -1077,7 +1071,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                 return (
                   <div
                     key={`cmd-log-${log.id || idx}-${idx}`}
-                    className={`flex items-start gap-3 group p-2 rounded-md transition-theme border border-transparent ${isSelected ? "bg-accent/5 border-accent/20" : "hover:bg-[var(--surface-subtle)]0/5"}`}
+                    className={`flex items-start gap-3 group p-2 rounded-shape-sm transition-theme border border-transparent ${isSelected ? "bg-accent/5 border-accent/20" : "hover:bg-[var(--surface-subtle)]0/5"}`}
                   >
                     <div className="pt-1 select-none">
                       <input
@@ -1090,14 +1084,14 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                               : [...prev, log.id],
                           );
                         }}
-                        className="w-4 h-4 rounded-sm border-[var(--border-default)] text-accent focus:ring-accent-500 cursor-pointer accent-accent"
+                        className="w-4 h-4 rounded-shape-xs border-[var(--border-default)] text-[var(--fg-accent)] focus:ring-[var(--fg-accent)] cursor-pointer accent-[var(--fg-accent)]"
                       />
                     </div>
                     <div
-                      className={`mt-0.5 p-1.5 rounded-md shrink-0 ${
+                      className={`mt-0.5 p-1.5 rounded-shape-sm shrink-0 ${
                         log.type === "ai_generation"
-                          ? "bg-blue-500/20 text-blue-500"
-                          : "bg-accent/20 text-accent"
+                          ? "bg-[var(--fg-accent)]/10 text-[var(--fg-accent)]"
+                          : "bg-[var(--fg-accent)]/10 text-[var(--fg-accent)]"
                       }`}
                     >
                       {log.type === "ai_generation" ? (
@@ -1152,16 +1146,23 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
         </div>
 
         <div
-          className="p-6 rounded-lg border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-xs"
+          className="p-6 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] shadow-2xs transition-theme"
         >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <ShieldAlert className="text-[var(--fg-danger)]" size={20} />
-              <h2 className="text-lg font-bold text-[var(--fg-danger)]">
-                {t("securityAlerts")}
-              </h2>
+              <ShieldAlert className="text-[var(--fg-danger)]" size={18} />
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                  {t("securityAlerts")}
+                </h2>
+                {alerts.length > 0 && (
+                  <span className="text-[10px] bg-[var(--status-danger-subtle)] text-[var(--fg-danger)] border border-[var(--fg-danger)]/20 px-2 py-0.5 rounded-full font-bold">
+                    {alerts.length}
+                  </span>
+                )}
+              </div>
               {alerts.length > 0 && (
-                <div className="flex items-center gap-2 bg-[var(--fg-danger)]/5 px-2 py-1 rounded-md border border-[var(--fg-danger)]/10">
+                <div className="flex items-center gap-1.5 bg-[var(--surface-subtle)] px-2 py-1 rounded-[var(--radius-xs)] border border-[var(--border-default)]">
                   <input
                     type="checkbox"
                     checked={
@@ -1169,10 +1170,10 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                       selectedAlertIds.length === alerts.length
                     }
                     onChange={() => handleSelectAll("alert")}
-                    className="w-3.5 h-3.5 rounded-sm border-[var(--border-default)] text-[var(--fg-danger)] focus:ring-[var(--fg-danger)] cursor-pointer accent-[var(--fg-danger)]"
+                    className="w-3.5 h-3.5 rounded-shape-xs border-[var(--border-default)] text-[var(--fg-danger)] focus:ring-rose-500 cursor-pointer accent-rose-500"
                   />
-                  <span className="text-[9px] font-bold text-[var(--fg-danger)] uppercase tracking-tighter">
-                    {t("selectAll") || "الكل"}
+                  <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-tight">
+                    {language === "ar" ? "تحديد الكل" : (t("selectAll") || "Select All")}
                   </span>
                 </div>
               )}
@@ -1186,7 +1187,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                     animate={{ opacity: 1, scale: 1, x: 0 }}
                     exit={{ opacity: 0, scale: 0.9, x: 20 }}
                     onClick={() => handleBatchDelete("alert")}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-[var(--fg-danger)] text-[var(--surface-page)] text-[10px] font-bold uppercase tracking-wider hover:opacity-90 transition-theme shadow-xs active:scale-95"
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-shape-sm bg-[var(--fg-danger)] text-[var(--surface-page)] text-[10px] font-bold uppercase tracking-wider hover:opacity-90 transition-theme shadow-xs active:scale-95"
                   >
                     <Trash2 size={13} />
                     {t("deleteSelected")} ({selectedAlertIds.length})
@@ -1197,12 +1198,12 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
           </div>
 
           {/* Combined Maintenance Toolkit */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-6 p-4 rounded-lg bg-[var(--surface-card)] border border-[var(--border-default)] shadow-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-6 p-4 rounded-[var(--radius-md)] bg-[var(--surface-card)] border border-[var(--border-default)] shadow-2xs">
             <div className="col-span-full flex items-center justify-between mb-1 px-1">
-              <span className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em]">
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
                 {t("systemMaintenance")}
               </span>
-              <Settings2 size={13} className="text-[var(--text-muted)]" />
+              <Settings2 size={14} className="text-[var(--text-muted)]" />
             </div>
 
             <button
@@ -1239,13 +1240,13 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                   }
                 });
               }}
-              className="group flex flex-col items-center justify-center gap-1 p-2 rounded-md bg-amber-500/5 border border-amber-500/10 hover:bg-amber-500/10 hover:border-amber-500/30 transition-theme"
+              className="group flex flex-col items-center justify-center gap-1.5 p-2.5 min-h-[60px] rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all cursor-pointer active:scale-95 shadow-2xs"
             >
               <Database
-                size={15}
-                className="text-amber-500 group-hover:scale-110 transition-transform"
+                size={16}
+                className="text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors"
               />
-              <span className="text-[8px] font-bold text-amber-600 uppercase text-center leading-tight">
+              <span className="text-[11px] font-bold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] text-center leading-tight transition-colors">
                 {t("clearAllChats")}
               </span>
             </button>
@@ -1291,13 +1292,13 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                   }
                 });
               }}
-              className="group flex flex-col items-center justify-center gap-1 p-2 rounded-md bg-purple-500/5 border border-purple-500/10 hover:bg-purple-500/10 hover:border-purple-500/30 transition-theme"
+              className="group flex flex-col items-center justify-center gap-1.5 p-2.5 min-h-[60px] rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all cursor-pointer active:scale-95 shadow-2xs"
             >
               <Database
-                size={15}
-                className="text-purple-500 group-hover:scale-110 transition-transform"
+                size={16}
+                className="text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors"
               />
-              <span className="text-[8px] font-bold text-purple-600 uppercase text-center leading-tight">
+              <span className="text-[11px] font-bold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] text-center leading-tight transition-colors">
                 {language === "ar" ? "تطهير السجلات المعلقة" : "Prune Orphaned Records"}
               </span>
             </button>
@@ -1336,13 +1337,13 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                   }
                 });
               }}
-              className="group flex flex-col items-center justify-center gap-1 p-2 rounded-md bg-accent/5 border border-accent/10 hover:bg-accent/10 hover:border-accent/30 transition-theme"
+              className="group flex flex-col items-center justify-center gap-1.5 p-2.5 min-h-[60px] rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:border-[var(--border-accent)] hover:bg-[var(--surface-card)] transition-all cursor-pointer active:scale-95 shadow-2xs"
             >
               <BellRing
-                size={15}
-                className="text-accent group-hover:scale-110 transition-transform"
+                size={16}
+                className="text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors"
               />
-              <span className="text-[8px] font-bold text-accent uppercase text-center leading-tight">
+              <span className="text-[11px] font-bold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] text-center leading-tight transition-colors">
                 {t("maintenancePruneLegacy")}
               </span>
             </button>
@@ -1375,13 +1376,13 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                   }
                 });
               }}
-              className="group flex flex-col items-center justify-center gap-1 p-2 rounded-md bg-red-500/5 border border-red-500/10 hover:bg-red-500/10 hover:border-red-500/30 transition-theme"
+              className="group flex flex-col items-center justify-center gap-1.5 p-2.5 min-h-[60px] rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:border-[var(--fg-danger)]/40 hover:bg-[var(--fg-danger)]/5 transition-all cursor-pointer active:scale-95 shadow-2xs"
             >
               <Shield
-                size={15}
-                className="text-red-500 group-hover:scale-110 transition-transform"
+                size={16}
+                className="text-[var(--text-secondary)] group-hover:text-[var(--fg-danger)] transition-colors"
               />
-              <span className="text-[8px] font-bold text-red-600 uppercase text-center leading-tight">
+              <span className="text-[11px] font-bold text-[var(--text-secondary)] group-hover:text-[var(--fg-danger)] text-center leading-tight transition-colors">
                 {t("maintenanceClearAllNotifs")}
               </span>
             </button>
@@ -1409,7 +1410,7 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
               return (
                 <div
                   key={`cmd-alert-${alert.id || idx}-${idx}`}
-                  className={`flex items-start gap-3 group p-2 rounded-md transition-theme border border-transparent ${isSelected ? "bg-red-500/5 border-red-500/20" : "hover:bg-[var(--surface-subtle)]0/5"}`}
+                  className={`flex items-start gap-3 group p-2 rounded-shape-sm transition-theme border border-transparent ${isSelected ? "bg-[var(--status-danger-subtle)] border-[var(--fg-danger)]/20" : "hover:bg-[var(--surface-subtle)]0/5"}`}
                 >
                   <div className="pt-1 select-none">
                     <input
@@ -1422,13 +1423,13 @@ export const CommandCenterView: React.FC<CommandCenterViewProps> = ({
                             : [...prev, alert.id],
                         );
                       }}
-                      className="w-4 h-4 rounded border-[var(--border-default)] text-red-500 focus:ring-red-500 cursor-pointer accent-red-500"
+                      className="w-4 h-4 rounded border-[var(--border-default)] text-[var(--fg-danger)] focus:ring-red-500 cursor-pointer accent-red-500"
                     />
                   </div>
-                  <div className={`mt-0.5 p-1.5 rounded-md shrink-0 ${
+                  <div className={`mt-0.5 p-1.5 rounded-shape-sm shrink-0 ${
                       alert.severity === "high" || alert.severity === "critical"
-                        ? "bg-red-500/20 text-red-500"
-                        : "bg-amber-500/20 text-amber-500"
+                        ? "bg-[var(--status-danger-subtle)] text-[var(--fg-danger)]"
+                        : "bg-[var(--status-warning-subtle)] text-[var(--fg-warning)]"
                     }`}>
                     <AlertCircle size={15} />
                   </div>

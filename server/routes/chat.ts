@@ -18,9 +18,10 @@ import {
 } from '../services/chat.js';
 import { VideoResourceProvider } from '../services/videoResourceProvider.js';
 import { validatePromptLength } from '../utils/security.js';
-import { extractFollowUps } from '../utils/helpers.js';
+import { extractFollowUps, extractImmediateChatTitle } from '../utils/helpers.js';
 import { getUserWallet } from '../services/wallet.js';
 import { userLoader, subscriptionLoader } from '../db/queries.js';
+import { getCache, setCache, delCache } from '../utils/cache.js';
 
 const router = express.Router();
 
@@ -36,22 +37,20 @@ const checkActiveSubscription = async (userId: number): Promise<boolean> => {
     return true;
   }
 
-  try {
-    const wallet = await getUserWallet(userId);
-    const points = Number(wallet.points || 0);
-    const balance = Number(wallet.balance || 0);
-    return points > 0 || balance > 0;
-  } catch (err) {
-    console.warn('[CheckSubscription] Failed to fetch user wallet for fallback check:', err);
-    return false;
-  }
+  return false;
 };
 
 router.post("/", authenticateToken, chatLimiter, async (req: any, res) => {
   try {
     const hasActiveSub = await checkActiveSubscription(req.user.id);
     if (!hasActiveSub) {
-      return res.status(403).json({ error: 'subscription_required', message: 'An active subscription is required to create a chat.' });
+      return res.status(403).json({ 
+        error: 'subscription_required', 
+        code: 'PLAN_REQUIRED',
+        message: 'يرجى اختيار باقة اشتراك للبدء في استخدام المنصة.',
+        message_en: 'Please choose a subscription plan to start using the platform.',
+        redirect: '/subscription'
+      });
     }
     const { title, message, tool } = req.body;
     if (message) {
@@ -61,10 +60,12 @@ router.post("/", authenticateToken, chatLimiter, async (req: any, res) => {
         return res.status(400).json(JSON.parse(err.message));
       }
     }
-    const chat = await createChat(req.user.id, title);
+    const resolvedTitle = (title && title.trim()) ? title.trim() : (message ? extractImmediateChatTitle(message) : undefined);
+    const chat = await createChat(req.user.id, resolvedTitle);
+    delCache(`chats:user:${req.user.id}`);
     if (message) {
       await addChatMessage(chat.id, 'user', message, tool);
-      generateChatTitle(chat.id, message).catch(err => {
+      generateChatTitle(chat.id, message, req.user.id).catch(err => {
         console.error('[ChatRoute] Background title generation fail on chat create:', err);
       });
     }
@@ -77,7 +78,13 @@ router.post("/", authenticateToken, chatLimiter, async (req: any, res) => {
 
 router.get("/", authenticateToken, async (req: any, res) => {
   try {
+    const cacheKey = `chats:user:${req.user.id}`;
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
     const chats = await getUserChats(req.user.id);
+    await setCache(cacheKey, chats, 60);
     res.json(chats);
   } catch (error: any) {
     const status = error.message === 'Database initializing' ? 503 : 500;
@@ -98,9 +105,35 @@ router.get("/:id", authenticateToken, async (req: any, res) => {
 
 router.post("/:id/messages", authenticateToken, chatLimiter, async (req: any, res) => {
   try {
+    const userId = req.user.id;
+    const limits = (req as any).subscriptionLimits || { messagesPerDay: 10, activeChats: 1 };
+    
+    // Check daily message limit
+    const today = new Date().toISOString().split('T')[0];
+    const msgCountResult = await pool.query(
+      `SELECT COUNT(*) as count FROM messages m
+       JOIN chats c ON m.chat_id = c.id
+       WHERE c.user_id = $1 AND DATE(m.created_at) = $2`,
+      [userId, today]
+    );
+    
+    const msgCount = parseInt(msgCountResult.rows[0]?.count || '0');
+    if (limits && limits.messagesPerDay && msgCount >= limits.messagesPerDay) {
+      return res.status(403).json({
+        error: 'daily_limit_exceeded',
+        message: `Daily message limit exceeded (${limits.messagesPerDay} messages/day). Upgrade your plan for more.`
+      });
+    }
+
     const hasActiveSub = await checkActiveSubscription(req.user.id);
     if (!hasActiveSub) {
-      return res.status(403).json({ error: 'subscription_required', message: 'An active subscription is required to send messages.' });
+      return res.status(403).json({ 
+        error: 'subscription_required', 
+        code: 'PLAN_REQUIRED',
+        message: 'يرجى اختيار باقة اشتراك لإرسال الرسائل.',
+        message_en: 'An active subscription is required to send messages.',
+        redirect: '/subscription'
+      });
     }
     const { role: msgRole, content, tool } = req.body;
     if (msgRole === 'user' && content) {
@@ -112,6 +145,7 @@ router.post("/:id/messages", authenticateToken, chatLimiter, async (req: any, re
     }
     const chatId = req.params.id;
     await addChatMessage(chatId, msgRole, content, tool);
+    await delCache(`chat:messages:${chatId}:${req.user.id}`);
     res.json({ success: true });
     const count = await getMessageCount(chatId);
     if (count === 1 && msgRole === 'user') {
@@ -125,8 +159,14 @@ router.post("/:id/messages", authenticateToken, chatLimiter, async (req: any, re
 
 router.get("/:id/messages", authenticateToken, async (req: any, res) => {
   try {
+    const cacheKey = `chat:messages:${req.params.id}:${req.user.id}`;
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
     const messages = await getChatMessages(req.params.id, req.user.id);
     if (!messages) return res.status(404).json({ error: 'Chat not found' });
+    await setCache(cacheKey, messages, 30);
     res.json(messages);
   } catch (error: any) {
     const status = error.message === 'Database initializing' ? 503 : 500;
@@ -152,6 +192,12 @@ router.delete("/:id", authenticateToken, async (req: any, res) => {
   try {
     const success = await deleteUserChat(req.params.id, req.user.id);
     if (!success) return res.status(404).json({ error: 'Chat not found' });
+    delCache(`chats:user:${req.user.id}`);
+    delCache(`chat:messages:${req.params.id}:${req.user.id}`);
+    const { io } = await import('../config/socket.js');
+    if (io) {
+      io.to(`user_${req.user.id}`).emit('chat_updated', { chatId: req.params.id, deleted: true });
+    }
     res.json({ success: true });
   } catch (error: any) {
     const status = error.message === 'Database initializing' ? 503 : 500;
@@ -184,6 +230,12 @@ router.patch("/:id", authenticateToken, async (req: any, res) => {
     }
 
     if (!success) return res.status(404).json({ error: 'Chat not found' });
+    delCache(`chats:user:${req.user.id}`);
+    const { io } = await import('../config/socket.js');
+    if (io && updatedTitle) {
+      io.to(`user_${req.user.id}`).emit('chat_title_updated', { chatId: String(req.params.id), title: updatedTitle });
+      io.to(`user_${req.user.id}`).emit('chat_updated', { chatId: String(req.params.id) });
+    }
     res.json({ success: true, title: updatedTitle, context_summary: updatedContextSummary });
   } catch (error: any) {
     const status = error.message === 'Database initializing' ? 503 : 500;
@@ -195,7 +247,13 @@ router.post("/:id/fork", authenticateToken, chatLimiter, async (req: any, res) =
   try {
     const hasActiveSub = await checkActiveSubscription(req.user.id);
     if (!hasActiveSub) {
-      return res.status(403).json({ error: 'subscription_required', message: 'An active subscription is required to fork a chat.' });
+      return res.status(403).json({ 
+        error: 'subscription_required', 
+        code: 'PLAN_REQUIRED',
+        message: 'يرجى اختيار باقة اشتراك لمتابعة تفريع المحادثات.',
+        message_en: 'An active subscription is required to fork a chat.',
+        redirect: '/subscription'
+      });
     }
 
     const chatId = req.params.id;
@@ -252,6 +310,12 @@ router.post("/:id/fork", authenticateToken, chatLimiter, async (req: any, res) =
       );
     }
 
+    delCache(`chats:user:${req.user.id}`);
+    const { io } = await import('../config/socket.js');
+    if (io) {
+      io.to(`user_${req.user.id}`).emit('chat_updated', { chatId: String(newChat.id) });
+    }
+
     res.json(newChat);
   } catch (error: any) {
     const status = error.message === 'Database initializing' ? 503 : 500;
@@ -266,7 +330,13 @@ router.post("/sync-message", authenticateToken, chatLimiter, verifyBillingFunds,
   try {
     const hasActiveSub = await checkActiveSubscription(req.user.id);
     if (!hasActiveSub) {
-      return res.status(403).json({ error: 'subscription_required', message: 'An active subscription is required to sync messages.' });
+      return res.status(403).json({ 
+        error: 'subscription_required', 
+        code: 'PLAN_REQUIRED',
+        message: 'يرجى اختيار باقة اشتراك لإرسال الرسائل.',
+        message_en: 'An active subscription is required to sync messages.',
+        redirect: '/subscription'
+      });
     }
 
     const { chatId, content, toolId, modelId, imageSettings, videoSettings, fileData, forensicMode } = req.body;
@@ -285,6 +355,27 @@ router.post("/sync-message", authenticateToken, chatLimiter, verifyBillingFunds,
       [chatId, 'user', content, toolId || 'chat_fast', toolId || 'chat_fast']
     );
     userMessageId = userMsgResult.rows[0].id;
+
+    // Check if chat title needs immediate extraction/generation on first user message
+    try {
+      const chatTitleCheck = await pool.query('SELECT title FROM chats WHERE id = $1', [chatId]);
+      const currentTitle = chatTitleCheck.rows[0]?.title || '';
+      const isGenericTitle = !currentTitle || currentTitle === 'New Chat' || currentTitle === 'محادثة جديدة' || currentTitle === 'New Session' || currentTitle === 'New Conversation';
+      
+      if (isGenericTitle) {
+        const immediateTitle = extractImmediateChatTitle(content);
+        await pool.query('UPDATE chats SET title = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [immediateTitle, chatId]);
+        delCache(`chats:user:${req.user.id}`);
+        const { io } = await import('../config/socket.js');
+        if (io) {
+          io.to(`user_${req.user.id}`).emit('chat_title_updated', { chatId: String(chatId), title: immediateTitle });
+          io.to(`user_${req.user.id}`).emit('chat_updated', { chatId: String(chatId) });
+        }
+        generateChatTitle(chatId, content, req.user.id).catch(() => {});
+      }
+    } catch (titleErr) {
+      console.warn('[SyncMessage] Title auto-generation check non-fatal error:', titleErr);
+    }
 
     const assistantMsgResult = await pool.query(
       'INSERT INTO messages (chat_id, role, content, tool, tool_id, model) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
@@ -347,6 +438,7 @@ router.post("/sync-message", authenticateToken, chatLimiter, verifyBillingFunds,
 
     // Post-generation hooks
     await pool.query('UPDATE chats SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [chatId]);
+    delCache(`chats:user:${req.user.id}`);
 
     if (io) {
       io.to(`user_${req.user.id}`).emit('typing', { isTyping: false, role: 'assistant', name: 'Perplexta' });
@@ -369,7 +461,28 @@ router.post("/sync-message", authenticateToken, chatLimiter, verifyBillingFunds,
 
     res.json({ success: true, messageId: assistantMessageId });
   } catch (error: any) {
-    console.error('[SyncMessage Error]:', error);
+    let status = 500;
+    let errBody = { error: error.message || 'Failed to sync message in background' };
+    let isExpectedBusinessLimit = false;
+
+    try {
+      const parsed = JSON.parse(error.message);
+      if (parsed.type === 'QUOTA_EXCEEDED' || parsed.type === 'DUPLICATE_REQUEST_IN_FLIGHT') {
+        status = 429;
+        errBody = parsed;
+        isExpectedBusinessLimit = true;
+      } else if (parsed.type === 'SYSTEM_INACTIVE') {
+        status = 503;
+        errBody = parsed;
+        isExpectedBusinessLimit = true;
+      }
+    } catch (_) {}
+
+    if (isExpectedBusinessLimit) {
+      console.info(`[SyncMessage Notice]: User ${req.user?.id} received ${(errBody as any).type || 'notice'}: ${(errBody as any).error || error.message}`);
+    } else {
+      console.error('[SyncMessage Error]:', error);
+    }
     
     if (!messageSaved) {
       if (typeof assistantMessageId !== 'undefined' && assistantMessageId > 0) {
@@ -381,19 +494,6 @@ router.post("/sync-message", authenticateToken, chatLimiter, verifyBillingFunds,
     } else {
       console.info('[SyncMessage] Generation succeeded and saved. Skipping deletion cleanup despite post-generation write/socket error.');
     }
-
-    let status = 500;
-    let errBody = { error: error.message || 'Failed to sync message in background' };
-    try {
-      const parsed = JSON.parse(error.message);
-      if (parsed.type === 'QUOTA_EXCEEDED') {
-        status = 429;
-        errBody = parsed;
-      } else if (parsed.type === 'SYSTEM_INACTIVE') {
-        status = 503;
-        errBody = parsed;
-      }
-    } catch (_) {}
 
     res.status(status).json(errBody);
   }

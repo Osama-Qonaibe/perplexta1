@@ -116,11 +116,12 @@ router.post('/message', async (req, res) => {
         token = token.slice(1, -1);
       }
       const jwtSecret = process.env.JWT_SECRET;
-      if (jwtSecret) {
-        const decoded = jwt.verify(token, jwtSecret) as any;
-        if (decoded && decoded.id) {
-          userId = decoded.id;
-        }
+      if (!jwtSecret) {
+        throw new Error('JWT_SECRET is required but missing from environment variables.');
+      }
+      const decoded = jwt.verify(token, jwtSecret) as any;
+      if (decoded && decoded.id) {
+        userId = decoded.id;
       }
     } catch (err) {
       console.warn('[MCP Server] JWT validation warning:', err);

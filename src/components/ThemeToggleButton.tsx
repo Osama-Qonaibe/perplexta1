@@ -131,7 +131,7 @@ export const ThemeToggleButton: React.FC<ThemeToggleButtonProps> = ({
         </motion.span>
       </AnimatePresence>
       {showLabel && (
-        <span className="text-xs font-bold text-[var(--pub-text-primary)]">
+        <span className="text-xs font-bold text-[var(--text-primary)]">
           {isDark
             ? (language === 'ar' ? 'فاتح' : 'Light')
             : (language === 'ar' ? 'داكن' : 'Dark')}

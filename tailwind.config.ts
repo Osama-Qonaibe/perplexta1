@@ -7,7 +7,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Tajawal', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        display: ['Cormorant Garamond', 'Tajawal', 'serif'],
+        display: ['Tajawal', 'Geist', 'Inter', 'sans-serif'],
         mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
       },
       colors: {

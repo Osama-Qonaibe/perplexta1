@@ -54,7 +54,7 @@ export function parseVideoUrl(url: string): VideoInfo {
 export function getAspectRatioClass(aspectRatio?: string, adFormat?: string): string {
   // Vertical 9:16 Reels/Stories inside newsfeed cards
   if (aspectRatio === '9:16' || adFormat === 'reel' || adFormat === 'story') {
-    return 'aspect-[9/16] sm:aspect-[4/5] max-h-[520px] mx-auto';
+    return 'aspect-[9/16] max-h-[540px] mx-auto';
   }
   if (aspectRatio === '4:5' || adFormat === 'portrait') {
     return 'aspect-[4/5] max-h-[500px] mx-auto';
@@ -115,18 +115,16 @@ export interface VideoExtractedMetadata {
 
 export async function extractVideoMetadata(videoSource: File | string, seekTimeSeconds = 1.0): Promise<VideoExtractedMetadata> {
   return new Promise((resolve) => {
-    const video = document.createElement('video');
-    video.crossOrigin = 'anonymous';
-    video.muted = true;
-    video.playsInline = true;
-
-    let objectUrl = '';
-    if (typeof videoSource === 'string') {
-      video.src = videoSource;
-    } else {
-      objectUrl = URL.createObjectURL(videoSource);
-      video.src = objectUrl;
-    }
+    let isSettled = false;
+    const finish = (res: VideoExtractedMetadata) => {
+      if (isSettled) return;
+      isSettled = true;
+      clearTimeout(timer);
+      if (objectUrl) {
+        try { URL.revokeObjectURL(objectUrl); } catch (_) {}
+      }
+      resolve(res);
+    };
 
     const result: VideoExtractedMetadata = {
       thumbnail: '',
@@ -137,6 +135,27 @@ export async function extractVideoMetadata(videoSource: File | string, seekTimeS
       isVertical: false
     };
 
+    // Safety timeout: resolve within 3.5s max so UI never hangs
+    const timer = setTimeout(() => {
+      finish(result);
+    }, 3500);
+
+    const video = document.createElement('video');
+    if (typeof videoSource === 'string' && !videoSource.startsWith('blob:') && !videoSource.startsWith('data:')) {
+      video.crossOrigin = 'anonymous';
+    }
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'metadata';
+
+    let objectUrl = '';
+    if (typeof videoSource === 'string') {
+      video.src = videoSource;
+    } else {
+      objectUrl = URL.createObjectURL(videoSource);
+      video.src = objectUrl;
+    }
+
     video.addEventListener('loadedmetadata', () => {
       result.duration = video.duration || 0;
       result.width = video.videoWidth || 0;
@@ -144,25 +163,30 @@ export async function extractVideoMetadata(videoSource: File | string, seekTimeS
 
       if (result.width > 0 && result.height > 0) {
         const ratioNum = result.width / result.height;
-        if (ratioNum <= 0.65) {
+        if (ratioNum <= 0.68) {
           result.aspectRatio = '9:16';
           result.isVertical = true;
-        } else if (ratioNum >= 0.75 && ratioNum <= 0.85) {
+        } else if (ratioNum > 0.68 && ratioNum < 0.92) {
           result.aspectRatio = '4:5';
           result.isVertical = true;
-        } else if (ratioNum >= 0.95 && ratioNum <= 1.05) {
+        } else if (ratioNum >= 0.92 && ratioNum <= 1.15) {
           result.aspectRatio = '1:1';
           result.isVertical = false;
-        } else if (ratioNum >= 2.0) {
-          result.aspectRatio = '21:9';
+        } else if (ratioNum > 1.15 && ratioNum < 1.9) {
+          result.aspectRatio = '16:9';
           result.isVertical = false;
         } else {
-          result.aspectRatio = '16:9';
+          result.aspectRatio = '21:9';
           result.isVertical = false;
         }
       }
 
-      video.currentTime = Math.max(0, Math.min(seekTimeSeconds, video.duration ? video.duration - 0.1 : 0.5));
+      const targetSeek = Math.max(0, Math.min(seekTimeSeconds, video.duration ? Math.max(0.1, video.duration - 0.1) : 0.5));
+      try {
+        video.currentTime = targetSeek;
+      } catch (_) {
+        finish(result);
+      }
     });
 
     video.addEventListener('seeked', () => {
@@ -179,16 +203,129 @@ export async function extractVideoMetadata(videoSource: File | string, seekTimeS
       } catch {
         // Fallthrough
       }
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-      resolve(result);
+      finish(result);
     });
 
     video.addEventListener('error', () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-      resolve(result);
+      finish(result);
     });
 
     video.load();
+  });
+}
+
+export interface RecommendedFrameItem {
+  time: number;
+  timeLabel: string;
+  dataUrl: string;
+}
+
+/**
+ * Rapidly extracts 5-7 recommended stopping/cover keyframes from a video file or URL.
+ * Designed for sub-second execution with non-blocking per-frame timeouts.
+ */
+export async function extractRecommendedVideoFrames(
+  videoSource: File | string,
+  targetCount = 6
+): Promise<RecommendedFrameItem[]> {
+  return new Promise((resolve) => {
+    let objectUrl = '';
+    const src = typeof videoSource === 'string' ? videoSource : (objectUrl = URL.createObjectURL(videoSource));
+    
+    const video = document.createElement('video');
+    if (typeof videoSource === 'string' && !videoSource.startsWith('blob:') && !videoSource.startsWith('data:')) {
+      video.crossOrigin = 'anonymous';
+    }
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'metadata';
+    video.src = src;
+
+    const cleanup = () => {
+      if (objectUrl) {
+        try { URL.revokeObjectURL(objectUrl); } catch (_) {}
+      }
+    };
+
+    // Overall fail-safe timeout
+    const overallTimeout = setTimeout(() => {
+      cleanup();
+      resolve([]);
+    }, 8000);
+
+    video.onloadedmetadata = async () => {
+      const dur = video.duration || 1;
+      // Calculate evenly spaced time positions across the duration
+      const points = [];
+      const step = dur / (targetCount + 1);
+      for (let i = 1; i <= targetCount; i++) {
+        points.push(Math.min(dur - 0.05, Math.max(0.1, i * step)));
+      }
+
+      const results: RecommendedFrameItem[] = [];
+
+      for (const t of points) {
+        try {
+          const frameUrl = await new Promise<string>((res) => {
+            let done = false;
+            const singleTimer = setTimeout(() => {
+              if (!done) { done = true; res(''); }
+            }, 1200);
+
+            const onSeeked = () => {
+              if (done) return;
+              done = true;
+              clearTimeout(singleTimer);
+              video.removeEventListener('seeked', onSeeked);
+              try {
+                const canvas = document.createElement('canvas');
+                const vw = video.videoWidth || 640;
+                const vh = video.videoHeight || 480;
+                const maxDim = 480;
+                const scale = Math.min(1, maxDim / Math.max(vw, vh));
+                canvas.width = Math.max(80, Math.round(vw * scale));
+                canvas.height = Math.max(80, Math.round(vh * scale));
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                  res(canvas.toDataURL('image/jpeg', 0.82));
+                  return;
+                }
+              } catch (_) {}
+              res('');
+            };
+
+            video.addEventListener('seeked', onSeeked, { once: true });
+            if (typeof (video as any).fastSeek === 'function') {
+              try {
+                (video as any).fastSeek(t);
+              } catch (_) {
+                video.currentTime = t;
+              }
+            } else {
+              video.currentTime = t;
+            }
+          });
+
+          if (frameUrl) {
+            const mins = Math.floor(t / 60);
+            const secs = Math.floor(t % 60);
+            const timeLabel = `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+            results.push({ time: t, timeLabel, dataUrl: frameUrl });
+          }
+        } catch (_) {}
+      }
+
+      clearTimeout(overallTimeout);
+      cleanup();
+      resolve(results);
+    };
+
+    video.onerror = () => {
+      clearTimeout(overallTimeout);
+      cleanup();
+      resolve([]);
+    };
   });
 }
 
@@ -197,53 +334,74 @@ export async function extractVideoThumbnail(videoSource: File | string, seekTime
   return meta.thumbnail;
 }
 
+const mediaUrlCache = new Map<string, string>();
+
 export function getMediaUrl(url?: string | null): string {
   if (!url || typeof url !== 'string') return '';
-  let clean = url.trim();
-  if (!clean) return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
 
-  clean = clean.replace(/^https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d+)?/i, '');
-
-  if (
-    clean.startsWith('http://') ||
-    clean.startsWith('https://') ||
-    clean.startsWith('blob:') ||
-    clean.startsWith('data:')
-  ) {
-    if (clean.startsWith('data:')) return clean;
-    if (clean.includes(',')) {
-      clean = clean.split(',')[0].trim();
-    }
-    return clean;
+  if (mediaUrlCache.has(trimmed)) {
+    return mediaUrlCache.get(trimmed)!;
   }
 
-  if (clean.includes(',')) {
+  // Preserve data URLs and blob URLs directly
+  if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
+    return trimmed;
+  }
+
+  // Handle multiple comma-separated URLs if present (take the first)
+  let clean = trimmed;
+  if (clean.includes(',') && !clean.startsWith('data:')) {
     clean = clean.split(',')[0].trim();
   }
 
-  // Strip query parameters to avoid duplicate stacking (?v=...&t=...&t=...)
-  const [cleanPathOnly] = clean.split('?');
-
-  let resolved = '';
-  const uploadsMatch = cleanPathOnly.match(/(?:https?:\/\/[^\/]+)?\/?(?:uploads\/)+(.+)$/i);
+  // Check if it belongs to local /uploads/ directory (whether full domain, IP, or relative)
+  const uploadsMatch = clean.match(/(?:https?:\/\/[^\/]+)?\/?(?:uploads\/)+(.+)$/i);
   if (uploadsMatch && uploadsMatch[1]) {
-    resolved = `/uploads/${uploadsMatch[1].replace(/^\/+/, '')}`;
-  } else if (cleanPathOnly.startsWith('uploads/')) {
-    resolved = `/${cleanPathOnly}`;
-  } else if (cleanPathOnly.startsWith('/')) {
-    resolved = cleanPathOnly;
-  } else {
-    resolved = `/uploads/${cleanPathOnly}`;
+    const rawFileWithParams = uploadsMatch[1].replace(/^\/+/, '');
+    const cleanFileName = rawFileWithParams.split('?')[0];
+    
+    const normalized = `/uploads/${cleanFileName}?t=${BUILD_VERSION}`;
+    if (mediaUrlCache.size > 2000) mediaUrlCache.clear();
+    mediaUrlCache.set(trimmed, normalized);
+    return normalized;
   }
 
-  let finalUrl = getAssetUrl(resolved);
-  if (finalUrl.includes('/uploads/')) {
-    if (!finalUrl.includes('t=')) {
-      const sep = finalUrl.includes('?') ? '&' : '?';
-      finalUrl = `${finalUrl}${sep}t=${BUILD_VERSION}`;
+  // If it's an external HTTP/HTTPS URL (e.g. Unsplash, Google, CDN)
+  if (clean.startsWith('http://') || clean.startsWith('https://')) {
+    // Strip local hostnames if present
+    const relativeClean = clean.replace(/^https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d+)?/i, '');
+    if (relativeClean.startsWith('/uploads/')) {
+      const cleanFileName = relativeClean.replace(/^\/uploads\//, '').split('?')[0];
+      const normalized = `/uploads/${cleanFileName}?t=${BUILD_VERSION}`;
+      if (mediaUrlCache.size > 2000) mediaUrlCache.clear();
+      mediaUrlCache.set(trimmed, normalized);
+      return normalized;
     }
+    if (mediaUrlCache.size > 2000) mediaUrlCache.clear();
+    mediaUrlCache.set(trimmed, relativeClean);
+    return relativeClean;
   }
-  return finalUrl;
+
+  // Bare filename without slashes (e.g., "1726801234_photo.webp")
+  if (!clean.startsWith('/')) {
+    const cleanFileName = clean.split('?')[0];
+    const normalized = `/uploads/${cleanFileName}?t=${BUILD_VERSION}`;
+    if (mediaUrlCache.size > 2000) mediaUrlCache.clear();
+    mediaUrlCache.set(trimmed, normalized);
+    return normalized;
+  }
+
+  // Relative path starting with /
+  const [cleanPathOnly] = clean.split('?');
+  const normalized = cleanPathOnly.startsWith('/uploads/') 
+    ? `${cleanPathOnly}?t=${BUILD_VERSION}`
+    : getAssetUrl(cleanPathOnly);
+
+  if (mediaUrlCache.size > 2000) mediaUrlCache.clear();
+  mediaUrlCache.set(trimmed, normalized);
+  return normalized;
 }
 
 export function getMediaFallback(type: 'image' | 'video' | 'avatar' = 'image'): string {

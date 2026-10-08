@@ -16,6 +16,8 @@ lerna-debug.log*
 # =============================================================================
 dist/
 build/
+ios/App/App/public/
+android/app/src/main/assets/public/
 .next/
 out/
 .nuxt/
@@ -35,6 +37,7 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.production.example
 !.env.template
 !.env.local.example
 
@@ -47,6 +50,13 @@ coverage/
 *.csr
 *.jks
 *.keystore
+firebase-applet-config.json
+firebase-blueprint.json
+firebase_applet_config.xml
+google-services.json
+GoogleService-Info.plist
+*service-account*.json
+*.secret.json
 
 # =============================================================================
 # DOCUMENTATION, GUIDES & NON-RUNTIME BLOAT
@@ -54,12 +64,15 @@ coverage/
 README.md
 CONTRIBUTING.md
 CLEANUP_MANIFEST.md
-docs/
+/docs/
 mockups/
 design/
 *.md
 !AGENTS.md
 !GEMINI.md
+!DEPLOYMENT.md
+!ROLLBACK.md
+!MONITORING.md
 
 # =============================================================================
 # LOGS, TEMPORARY & SYSTEM FILES

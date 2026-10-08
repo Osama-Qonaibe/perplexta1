@@ -199,7 +199,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
             type="button"
             onClick={handleManualRefresh}
             disabled={isRefreshing}
-            className="p-1.5 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-muted)] hover:text-accent active:scale-90 transition-all cursor-pointer"
+            className="p-1.5 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-muted)] hover:text-accent active:scale-90 transition-all cursor-pointer"
             title={isRtl ? 'تحديث الرصيد يدوياً' : 'Refresh wallet'}
           >
             <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-accent' : ''} />
@@ -207,7 +207,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
           <button
             type="button"
             onClick={() => setShowBalance(!showBalance)}
-            className="p-1.5 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)] active:scale-90 transition-all cursor-pointer"
+            className="p-1.5 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)] active:scale-90 transition-all cursor-pointer"
             title={showBalance ? (isRtl ? 'إخفاء الرصيد' : 'Hide balance') : (isRtl ? 'إظهار الرصيد' : 'Show balance')}
           >
             {showBalance ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -221,13 +221,13 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
         <button
           type="button"
           onClick={() => setActiveTab('deposit')}
-          className={`flex flex-col items-center gap-1.5 p-2.5 rounded-2xl border transition-all active:scale-95 cursor-pointer shadow-xs ${
+          className={`flex flex-col items-center gap-1.5 p-2.5 rounded-[var(--radius-lg)] border transition-all active:scale-95 cursor-pointer shadow-xs ${
             activeTab === 'deposit'
               ? 'bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] border-transparent ring-2 ring-accent/30'
               : 'bg-[var(--surface-card)] border-[var(--border-default)] hover:border-accent/40'
           }`}
         >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+          <div className={`w-10 h-10 rounded-[var(--radius-md)] flex items-center justify-center transition-colors ${
             activeTab === 'deposit'
               ? 'bg-white/20 text-white'
               : 'bg-[var(--status-success-subtle)] text-[var(--fg-success)]'
@@ -235,7 +235,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
             <Plus size={20} strokeWidth={2.5} />
           </div>
           <span className={`text-[11px] font-bold leading-none ${activeTab === 'deposit' ? 'text-white' : 'text-[var(--text-primary)]'}`}>
-            {isRtl ? 'إيداع' : 'Top Up'}
+            {isRtl ? 'إيداع رصيد' : 'Deposit Funds'}
           </span>
         </button>
 
@@ -243,13 +243,13 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
         <button
           type="button"
           onClick={() => setActiveTab('withdraw')}
-          className={`flex flex-col items-center gap-1.5 p-2.5 rounded-2xl border transition-all active:scale-95 cursor-pointer shadow-xs ${
+          className={`flex flex-col items-center gap-1.5 p-2.5 rounded-[var(--radius-lg)] border transition-all active:scale-95 cursor-pointer shadow-xs ${
             activeTab === 'withdraw'
               ? 'bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] border-transparent ring-2 ring-accent/30'
               : 'bg-[var(--surface-card)] border-[var(--border-default)] hover:border-accent/40'
           }`}
         >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+          <div className={`w-10 h-10 rounded-[var(--radius-md)] flex items-center justify-center transition-colors ${
             activeTab === 'withdraw'
               ? 'bg-white/20 text-white'
               : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
@@ -265,13 +265,13 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
         <button
           type="button"
           onClick={() => setActiveTab('earnings')}
-          className={`flex flex-col items-center gap-1.5 p-2.5 rounded-2xl border transition-all active:scale-95 cursor-pointer shadow-xs ${
+          className={`flex flex-col items-center gap-1.5 p-2.5 rounded-[var(--radius-lg)] border transition-all active:scale-95 cursor-pointer shadow-xs ${
             activeTab === 'earnings'
               ? 'bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] border-transparent ring-2 ring-accent/30'
               : 'bg-[var(--surface-card)] border-[var(--border-default)] hover:border-accent/40'
           }`}
         >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+          <div className={`w-10 h-10 rounded-[var(--radius-md)] flex items-center justify-center transition-colors ${
             activeTab === 'earnings'
               ? 'bg-white/20 text-white'
               : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
@@ -287,13 +287,13 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
         <button
           type="button"
           onClick={() => setActiveTab('transactions')}
-          className={`flex flex-col items-center gap-1.5 p-2.5 rounded-2xl border transition-all active:scale-95 cursor-pointer shadow-xs ${
+          className={`flex flex-col items-center gap-1.5 p-2.5 rounded-[var(--radius-lg)] border transition-all active:scale-95 cursor-pointer shadow-xs ${
             activeTab === 'transactions' || activeTab === 'withdrawal_history' || activeTab === 'expenses'
               ? 'bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] border-transparent ring-2 ring-accent/30'
               : 'bg-[var(--surface-card)] border-[var(--border-default)] hover:border-accent/40'
           }`}
         >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+          <div className={`w-10 h-10 rounded-[var(--radius-md)] flex items-center justify-center transition-colors ${
             activeTab === 'transactions' || activeTab === 'withdrawal_history' || activeTab === 'expenses'
               ? 'bg-white/20 text-white'
               : 'bg-[var(--surface-subtle)] text-[var(--text-muted)]'
@@ -311,7 +311,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
       </div>
 
       {/* 3. Virtual Banking Digital Card (Hero Component) */}
-      <div className="relative w-full rounded-2xl p-5 bg-gradient-to-br from-[var(--surface-card)] via-[var(--surface-card)] to-[var(--surface-subtle)] border border-[var(--border-default)] shadow-sm overflow-hidden">
+      <div className="relative w-full rounded-[var(--radius-lg)] p-5 bg-gradient-to-br from-[var(--surface-card)] via-[var(--surface-card)] to-[var(--surface-subtle)] border border-[var(--border-default)] shadow-sm overflow-hidden">
         {/* Decorative background glow */}
         <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-accent/5 blur-2xl pointer-events-none" />
         <div className="absolute -bottom-12 -left-12 w-32 h-32 rounded-full bg-accent/5 blur-2xl pointer-events-none" />
@@ -320,7 +320,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
           {/* Card Top: Brand & Badge */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-[var(--bg-accent-emphasis)]/10 text-accent flex items-center justify-center border border-[var(--border-accent)]/30">
+              <div className="w-8 h-8 rounded-[var(--radius-md)] bg-[var(--bg-accent-emphasis)]/10 text-accent flex items-center justify-center border border-[var(--border-accent)]/30">
                 <Wallet size={16} strokeWidth={2.2} />
               </div>
               <div>
@@ -388,16 +388,16 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            className="p-4 sm:p-5 rounded-2xl bg-[var(--surface-card)] border border-[var(--border-default)] space-y-4 shadow-sm"
+            className="p-4 sm:p-5 rounded-[var(--radius-lg)] bg-[var(--surface-card)] border border-[var(--border-default)] space-y-4 shadow-sm"
           >
             <div className="flex items-center justify-between pb-2 border-b border-[var(--border-default)]">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[var(--status-success-subtle)] text-[var(--fg-success)] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-[var(--status-success-subtle)] text-[var(--fg-success)] flex items-center justify-center">
                   <Plus size={18} strokeWidth={2.5} />
                 </div>
                 <div>
                   <h3 className="text-xs font-black text-[var(--text-primary)]">
-                    {isRtl ? 'شحن رصيد المحفظة الفوري' : 'Instant Top Up Portal'}
+                    {isRtl ? 'بوابة إيداع الرصيد المباشر' : 'Instant Deposit Portal'}
                   </h3>
                   <p className="text-[10px] text-[var(--text-muted)]">
                     {isRtl ? 'الحد الأدنى: 10$ | الحد الأقصى: 1000$' : 'Min: $10 | Max: $1,000 USD'}
@@ -425,7 +425,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                       key={`mob-preset-${val}`}
                       type="button"
                       onClick={() => selectPredefinedAmount(val)}
-                      className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      className={`py-2 rounded-[var(--radius-md)] text-xs font-bold transition-all cursor-pointer ${
                         depositAmount === val
                           ? 'bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] shadow-xs'
                           : 'bg-[var(--surface-subtle)] text-[var(--text-primary)] border border-[var(--border-default)] hover:border-accent'
@@ -453,7 +453,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                     onChange={(e) => handleDepositAmountChange(e.target.value)}
                     onBlur={handleDepositAmountBlur}
                     placeholder="100.00"
-                    className="w-full pl-8 pr-12 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)] text-sm font-bold text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="w-full pl-8 pr-12 py-2.5 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-sm font-bold text-[var(--text-primary)] focus:border-accent focus:outline-none"
                   />
                   <span className="absolute inset-y-0 right-3 flex items-center text-[10px] font-bold text-[var(--text-muted)]">
                     USD
@@ -477,7 +477,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                       key={`mob-pay-${m.id}`}
                       type="button"
                       onClick={() => setDepositMethod(m.id as any)}
-                      className={`p-2.5 rounded-xl border flex items-center gap-2 transition-all cursor-pointer ${
+                      className={`p-2.5 rounded-[var(--radius-md)] border flex items-center gap-2 transition-all cursor-pointer ${
                         depositMethod === m.id
                           ? 'bg-[var(--bg-accent-emphasis)]/10 border-accent text-accent font-bold shadow-xs'
                           : 'bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -492,7 +492,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
 
               {/* Crypto USDT (TRC-20) Panel */}
               {depositMethod === 'crypto' && (
-                <div className="p-3.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-2.5">
+                <div className="p-3.5 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-2.5">
                   <div className="flex items-center justify-between text-[11px] font-bold text-[var(--text-primary)]">
                     <span>{isRtl ? 'عنوان المحفظة (USDT - TRC20):' : 'USDT TRC-20 Wallet Address:'}</span>
                     <button
@@ -504,7 +504,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                       <span>{isCopied ? (isRtl ? 'تم النسخ' : 'Copied') : (isRtl ? 'نسخ' : 'Copy')}</span>
                     </button>
                   </div>
-                  <code className="block p-2 rounded-lg bg-[var(--surface-card)] border border-[var(--border-default)] text-[11px] font-mono text-[var(--text-primary)] break-all select-all font-bold">
+                  <code className="block p-2 rounded-[var(--radius-sm)] bg-[var(--surface-card)] border border-[var(--border-default)] text-[11px] font-mono text-[var(--text-primary)] break-all select-all font-bold">
                     {wallet?.crypto_address || 'TPnB82hPZk7dZ6eU5rX9Y21pQ6'}
                   </code>
 
@@ -518,7 +518,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                       value={manualRefId}
                       onChange={(e) => setManualRefId(e.target.value)}
                       placeholder="e.g. 748f93021bc89..."
-                      className="w-full px-3 py-2 rounded-lg bg-[var(--surface-card)] border border-[var(--border-default)] text-xs font-mono text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                      className="w-full px-3 py-2 rounded-[var(--radius-sm)] bg-[var(--surface-card)] border border-[var(--border-default)] text-xs font-mono text-[var(--text-primary)] focus:border-accent focus:outline-none"
                     />
                   </div>
 
@@ -538,11 +538,11 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
 
               {/* Bank Wire Panel */}
               {depositMethod === 'bank' && (
-                <div className="p-3.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-2 text-xs">
+                <div className="p-3.5 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] space-y-2 text-xs">
                   <p className="text-[11px] font-bold text-[var(--text-primary)]">
                     {isRtl ? 'بيانات التحويل البنكي المعتمد:' : 'Direct Wire Banking Details:'}
                   </p>
-                  <div className="space-y-1.5 text-[10px] text-[var(--text-muted)] font-mono bg-[var(--surface-card)] p-2.5 rounded-lg border border-[var(--border-default)]">
+                  <div className="space-y-1.5 text-[10px] text-[var(--text-muted)] font-mono bg-[var(--surface-card)] p-2.5 rounded-[var(--radius-sm)] border border-[var(--border-default)]">
                     <div className="flex justify-between"><span>Bank:</span><span className="font-bold text-[var(--text-primary)]">{wallet?.bank_name || 'Standard Chartered'}</span></div>
                     <div className="flex justify-between"><span>Recipient:</span><span className="font-bold text-[var(--text-primary)]">{wallet?.bank_recipient || 'Perplexta Global Ltd'}</span></div>
                     <div className="flex justify-between"><span>IBAN:</span><span className="font-bold text-[var(--text-primary)]">{wallet?.bank_iban || 'GB29NWBK60161331926819'}</span></div>
@@ -559,7 +559,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                       value={manualRefId}
                       onChange={(e) => setManualRefId(e.target.value)}
                       placeholder="e.g. WIRE-89421"
-                      className="w-full px-3 py-2 rounded-lg bg-[var(--surface-card)] border border-[var(--border-default)] text-xs font-mono text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                      className="w-full px-3 py-2 rounded-[var(--radius-sm)] bg-[var(--surface-card)] border border-[var(--border-default)] text-xs font-mono text-[var(--text-primary)] focus:border-accent focus:outline-none"
                     />
                   </div>
                 </div>
@@ -569,7 +569,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
               <button
                 type="submit"
                 disabled={isSubmittingDeposit}
-                className="w-full py-3.5 rounded-xl bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm active:scale-98 transition-all disabled:opacity-50 cursor-pointer"
+                className="w-full py-3.5 rounded-[var(--radius-md)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm active:scale-98 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {isSubmittingDeposit ? (
                   <>
@@ -594,11 +594,11 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            className="p-4 rounded-2xl bg-[var(--surface-card)] border border-[var(--border-default)] space-y-4 shadow-sm"
+            className="p-4 rounded-[var(--radius-lg)] bg-[var(--surface-card)] border border-[var(--border-default)] space-y-4 shadow-sm"
           >
             <div className="flex items-center justify-between pb-2 border-b border-[var(--border-default)]">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-amber-500/10 text-amber-600 flex items-center justify-center">
                   <ArrowUpRight size={18} strokeWidth={2.5} />
                 </div>
                 <div>
@@ -631,7 +631,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                       key={`mob-w-preset-${val}`}
                       type="button"
                       onClick={() => selectWithdrawPredefinedAmount(val, safeBalance)}
-                      className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      className={`py-2 rounded-[var(--radius-md)] text-xs font-bold transition-all cursor-pointer ${
                         withdrawAmount === val
                           ? 'bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] shadow-xs'
                           : 'bg-[var(--surface-subtle)] text-[var(--text-primary)] border border-[var(--border-default)] hover:border-accent'
@@ -659,7 +659,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                     onChange={(e) => handleWithdrawAmountChange(e.target.value)}
                     onBlur={() => handleWithdrawAmountBlur(safeBalance)}
                     placeholder="50.00"
-                    className="w-full pl-8 pr-12 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)] text-sm font-bold text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="w-full pl-8 pr-12 py-2.5 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-sm font-bold text-[var(--text-primary)] focus:border-accent focus:outline-none"
                   />
                   <span className="absolute inset-y-0 right-3 flex items-center text-[10px] font-bold text-[var(--text-muted)]">
                     USD
@@ -682,7 +682,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                       key={`mob-w-channel-${m.id}`}
                       type="button"
                       onClick={() => setWithdrawMethod(m.id as any)}
-                      className={`p-2.5 rounded-xl border flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                      className={`p-2.5 rounded-[var(--radius-md)] border flex flex-col items-center gap-1 transition-all cursor-pointer ${
                         withdrawMethod === m.id
                           ? 'bg-[var(--bg-accent-emphasis)]/10 border-accent text-accent font-bold shadow-xs'
                           : 'bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -707,7 +707,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                     value={withdrawDetails}
                     onChange={(e) => setWithdrawDetails(e.target.value)}
                     placeholder="user@example.com"
-                    className="w-full px-3 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-bold text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="w-full px-3 py-2.5 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-bold text-[var(--text-primary)] focus:border-accent focus:outline-none"
                   />
                 </div>
               )}
@@ -723,7 +723,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                     value={withdrawDetails}
                     onChange={(e) => setWithdrawDetails(e.target.value)}
                     placeholder="T..."
-                    className="w-full px-3 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-mono text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="w-full px-3 py-2.5 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-mono text-[var(--text-primary)] focus:border-accent focus:outline-none"
                   />
                 </div>
               )}
@@ -736,7 +736,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                     value={withdrawHolderName}
                     onChange={(e) => setWithdrawHolderName(e.target.value)}
                     placeholder={isRtl ? 'اسم صاحب الحساب' : 'Account Holder Name'}
-                    className="w-full px-3 py-2 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-bold text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-bold text-[var(--text-primary)] focus:border-accent focus:outline-none"
                   />
                   <input
                     type="text"
@@ -744,7 +744,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                     value={withdrawBankName}
                     onChange={(e) => setWithdrawBankName(e.target.value)}
                     placeholder={isRtl ? 'اسم البنك' : 'Bank Name'}
-                    className="w-full px-3 py-2 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-bold text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-bold text-[var(--text-primary)] focus:border-accent focus:outline-none"
                   />
                   <input
                     type="text"
@@ -752,14 +752,14 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                     value={withdrawBankIBAN}
                     onChange={(e) => setWithdrawBankIBAN(e.target.value)}
                     placeholder={isRtl ? 'رقم IBAN أو الحساب' : 'IBAN / Account Number'}
-                    className="w-full px-3 py-2 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-mono text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-mono text-[var(--text-primary)] focus:border-accent focus:outline-none"
                   />
                   <input
                     type="text"
                     value={withdrawSwift}
                     onChange={(e) => setWithdrawSwift(e.target.value)}
                     placeholder={isRtl ? 'رمز SWIFT / BIC (اختياري)' : 'SWIFT / BIC Code'}
-                    className="w-full px-3 py-2 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-mono text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-mono text-[var(--text-primary)] focus:border-accent focus:outline-none"
                   />
                 </div>
               )}
@@ -768,7 +768,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
               <button
                 type="submit"
                 disabled={isSubmittingWithdraw || parseFloat(withdrawAmount) > safeBalance || safeBalance < 10}
-                className="w-full py-3.5 rounded-xl bg-amber-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm active:scale-98 transition-all disabled:opacity-50 cursor-pointer"
+                className="w-full py-3.5 rounded-[var(--radius-md)] bg-amber-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm active:scale-98 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {isSubmittingWithdraw ? (
                   <>
@@ -796,10 +796,10 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
             className="space-y-3.5"
           >
             {/* Points Conversion Card */}
-            <div className="p-4 rounded-2xl bg-[var(--surface-card)] border border-[var(--border-default)] space-y-3.5 shadow-sm">
+            <div className="p-4 rounded-[var(--radius-lg)] bg-[var(--surface-card)] border border-[var(--border-default)] space-y-3.5 shadow-sm">
               <div className="flex items-center justify-between pb-2 border-b border-[var(--border-default)]">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
                     <Sparkles size={18} strokeWidth={2.4} />
                   </div>
                   <div>
@@ -831,7 +831,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                       value={convertAmount}
                       onChange={(e) => setConvertAmount(e.target.value)}
                       placeholder="1000"
-                      className="w-full pl-4 pr-16 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)] text-sm font-bold text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                      className="w-full pl-4 pr-16 py-2.5 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-sm font-bold text-[var(--text-primary)] focus:border-accent focus:outline-none"
                     />
                     <span className="absolute inset-y-0 right-3 flex items-center text-[10px] font-bold text-accent">
                       PTS
@@ -846,7 +846,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                       key={`pts-preset-${idx}`}
                       type="button"
                       onClick={() => setConvertAmount(ptsVal)}
-                      className={`py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                      className={`py-1.5 rounded-[var(--radius-sm)] text-[10px] font-bold transition-all cursor-pointer ${
                         convertAmount === ptsVal
                           ? 'bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)]'
                           : 'bg-[var(--surface-subtle)] text-[var(--text-primary)] border border-[var(--border-default)]'
@@ -858,7 +858,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                 </div>
 
                 {/* Live Value Calculation Preview */}
-                <div className="p-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-center justify-between text-xs">
+                <div className="p-2.5 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-center justify-between text-xs">
                   <span className="text-[11px] font-bold text-[var(--text-muted)]">
                     {isRtl ? 'القيمة المالية الناتجة:' : 'Estimated USD Value:'}
                   </span>
@@ -871,7 +871,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                 <button
                   type="submit"
                   disabled={isConverting || pointsCount < 100 || parseInt(convertAmount, 10) > pointsCount}
-                  className="w-full py-3 rounded-xl bg-indigo-600 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm active:scale-98 transition-all disabled:opacity-50 cursor-pointer"
+                  className="w-full py-3 rounded-[var(--radius-md)] bg-indigo-600 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm active:scale-98 transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {isConverting ? (
                     <>
@@ -889,9 +889,9 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
             </div>
 
             {/* Referral Tree Card */}
-            <div className="p-4 rounded-2xl bg-[var(--surface-card)] border border-[var(--border-default)] space-y-3 shadow-sm">
+            <div className="p-4 rounded-[var(--radius-lg)] bg-[var(--surface-card)] border border-[var(--border-default)] space-y-3 shadow-sm">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center">
+                <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-accent/10 text-accent flex items-center justify-center">
                   <Share2 size={16} />
                 </div>
                 <div>
@@ -905,13 +905,13 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
               </div>
 
               <div className="flex items-center gap-2">
-                <code className="flex-1 p-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[10px] font-mono text-[var(--text-primary)] truncate">
+                <code className="flex-1 p-2.5 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[10px] font-mono text-[var(--text-primary)] truncate">
                   {referralLink}
                 </code>
                 <button
                   type="button"
                   onClick={() => copyToClipboard(referralLink)}
-                  className="px-3 py-2.5 rounded-xl bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] text-xs font-bold flex items-center gap-1 active:scale-95 cursor-pointer"
+                  className="px-3 py-2.5 rounded-[var(--radius-md)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] text-xs font-bold flex items-center gap-1 active:scale-95 cursor-pointer"
                 >
                   {isCopied ? <Check size={14} /> : <Copy size={14} />}
                   <span>{isCopied ? (isRtl ? 'تم' : 'Done') : (isRtl ? 'نسخ' : 'Copy')}</span>
@@ -931,7 +931,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
             className="space-y-3"
           >
             {/* Filter Pills */}
-            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)] overflow-x-auto touch-pan-x no-scrollbar scrollbar-none">
+            <div className="flex items-center gap-1.5 p-1 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] overflow-x-auto touch-pan-x custom-scrollbar">
               {transactionTabs.map((tab) => {
                 const isActive = activeTab === tab.id;
                 return (
@@ -939,7 +939,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                     key={`mob-tab-${tab.id}`}
                     type="button"
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex-1 py-1.5 px-2.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all text-center cursor-pointer shrink-0 ${
+                    className={`flex-1 py-1.5 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-bold whitespace-nowrap transition-all text-center cursor-pointer shrink-0 ${
                       isActive
                         ? 'bg-[var(--surface-card)] text-accent shadow-xs'
                         : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -953,13 +953,13 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
 
             {/* Pending Deposits Notice if any */}
             {activeTab === 'transactions' && manualDeposits.length > 0 && (
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-2">
+              <div className="p-3 rounded-[var(--radius-md)] bg-amber-500/10 border border-amber-500/20 space-y-2">
                 <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 text-xs font-bold">
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
                   <span>{isRtl ? 'عمليات إيداع قيد المراجعة الفورية' : 'Pending Review Deposits'}</span>
                 </div>
                 {manualDeposits.map((dep, idx) => (
-                  <div key={`mob-manual-${dep.id || idx}`} className="p-2 rounded-lg bg-[var(--surface-card)] border border-[var(--border-default)] flex items-center justify-between text-xs">
+                  <div key={`mob-manual-${dep.id || idx}`} className="p-2 rounded-[var(--radius-sm)] bg-[var(--surface-card)] border border-[var(--border-default)] flex items-center justify-between text-xs">
                     <div>
                       <p className="font-bold text-[var(--text-primary)]">${Number(dep.amount).toFixed(2)} USD</p>
                       <p className="text-[10px] text-[var(--text-muted)] font-mono">{dep.method}</p>
@@ -996,7 +996,7 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                   <span className="text-xs font-bold">{isRtl ? 'مزامنة السجل بالوقت الفعلي...' : 'Syncing Ledger in Real-time...'}</span>
                 </div>
               ) : transactions.length === 0 ? (
-                <div className="py-10 rounded-2xl bg-[var(--surface-card)] border border-[var(--border-default)] flex flex-col items-center justify-center text-center p-6 space-y-2">
+                <div className="py-10 rounded-[var(--radius-lg)] bg-[var(--surface-card)] border border-[var(--border-default)] flex flex-col items-center justify-center text-center p-6 space-y-2">
                   <div className="w-12 h-12 rounded-full bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--text-muted)]">
                     <History size={22} />
                   </div>
@@ -1015,10 +1015,10 @@ export const MobileWalletView: React.FC<MobileWalletViewProps> = ({
                   return (
                     <div
                       key={`mob-tx-${tx.id || idx}`}
-                      className="p-3.5 rounded-xl bg-[var(--surface-card)] border border-[var(--border-default)] flex items-center justify-between gap-3 shadow-xs"
+                      className="p-3.5 rounded-[var(--radius-md)] bg-[var(--surface-card)] border border-[var(--border-default)] flex items-center justify-between gap-3 shadow-xs"
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                        <div className={`w-9 h-9 rounded-[var(--radius-md)] flex items-center justify-center shrink-0 ${
                           isDeposit
                             ? 'bg-[var(--status-success-subtle)] text-[var(--fg-success)]'
                             : isWithdrawal

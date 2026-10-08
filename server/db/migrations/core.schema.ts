@@ -27,7 +27,7 @@ export const CORE_SCHEMA_TABLES: { name: string; query: string }[] = [
         kyc_submitted_at TIMESTAMP,
         referred_by INTEGER,
         language VARCHAR(5) DEFAULT 'en',
-        theme VARCHAR(10) DEFAULT 'dark',
+        theme VARCHAR(10) DEFAULT 'light',
         memory TEXT,
         support_notes TEXT,
         custom_instructions TEXT,
@@ -39,27 +39,8 @@ export const CORE_SCHEMA_TABLES: { name: string; query: string }[] = [
         avatar_asset_id UUID,
         referral_code VARCHAR(10) UNIQUE,
         email_notifications BOOLEAN DEFAULT true,
-        media_muted BOOLEAN DEFAULT true
-      )`
-  },
-  {
-    name: 'media_assets',
-    query: `CREATE TABLE IF NOT EXISTS media_assets (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        stored_path TEXT NOT NULL UNIQUE,
-        original_filename TEXT NOT NULL,
-        context TEXT NOT NULL DEFAULT 'general' CHECK (context IN ('avatar', 'bulletin', 'ad', 'system', 'general', 'video')),
-        format TEXT NOT NULL DEFAULT 'webp',
-        width INT NOT NULL DEFAULT 0,
-        height INT NOT NULL DEFAULT 0,
-        size_bytes INT NOT NULL DEFAULT 0,
-        sha256_hash TEXT NOT NULL UNIQUE,
-        is_public BOOLEAN DEFAULT FALSE,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        metadata JSONB DEFAULT '{}',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        file_data BYTEA
+        media_muted BOOLEAN DEFAULT true,
+        data_saver BOOLEAN DEFAULT false
       )`
   },
   {
@@ -141,12 +122,9 @@ export const CORE_SCHEMA_TABLES: { name: string; query: string }[] = [
         task_description TEXT,
         task_description_ar TEXT,
         is_active BOOLEAN DEFAULT true,
-        cost_per_usage INTEGER DEFAULT 10,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         protocol_config JSONB DEFAULT '{}',
-        max_history_depth INTEGER DEFAULT 16,
-        cost_per_1k_input_tokens INTEGER DEFAULT 5,
-        cost_per_1k_output_tokens INTEGER DEFAULT 15
+        max_history_depth INTEGER DEFAULT 16
       )`
   },
   {
@@ -208,8 +186,16 @@ export const CORE_SCHEMA_TABLES: { name: string; query: string }[] = [
         is_visible BOOLEAN DEFAULT true,
         is_popular BOOLEAN DEFAULT false,
         hide_tools BOOLEAN DEFAULT false,
-        monthly_price NUMERIC(10, 2) NOT NULL,
-        annual_price NUMERIC(10, 2) NOT NULL,
+        monthly_price NUMERIC(10, 2) NOT NULL DEFAULT 0,
+        annual_price NUMERIC(10, 2) NOT NULL DEFAULT 0,
+        is_monthly_enabled BOOLEAN DEFAULT true,
+        is_annual_enabled BOOLEAN DEFAULT true,
+        is_daily_enabled BOOLEAN DEFAULT false,
+        daily_price NUMERIC(10, 2) DEFAULT 0,
+        daily_days INTEGER DEFAULT 7,
+        daily_credits INTEGER DEFAULT 0,
+        monthly_credits INTEGER DEFAULT 0,
+        annual_credits INTEGER DEFAULT 0,
         color VARCHAR(50) DEFAULT 'accent',
         features JSONB DEFAULT '[]',
         limits JSONB DEFAULT '{}',
@@ -229,6 +215,9 @@ export const CORE_SCHEMA_TABLES: { name: string; query: string }[] = [
         status VARCHAR(50) DEFAULT 'active',
         billing_period VARCHAR(20) DEFAULT 'monthly',
         current_period_end TIMESTAMP,
+        cycle_credits INTEGER DEFAULT 0,
+        used_credits INTEGER DEFAULT 0,
+        last_reset_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_period_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -257,7 +246,29 @@ export const CORE_SCHEMA_TABLES: { name: string; query: string }[] = [
         message_ar TEXT NOT NULL,
         type VARCHAR(50) DEFAULT 'info',
         is_read BOOLEAN DEFAULT false,
+        is_sent BOOLEAN DEFAULT false,
+        sent_at TIMESTAMP,
+        retry_count INTEGER DEFAULT 0,
+        last_error TEXT,
         action_url TEXT,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`
+  },
+  {
+    name: 'email_logs',
+    query: `CREATE TABLE IF NOT EXISTS email_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        recipient_email VARCHAR(255) NOT NULL,
+        template_name VARCHAR(255) NOT NULL DEFAULT 'custom',
+        subject VARCHAR(255) NOT NULL DEFAULT '',
+        status VARCHAR(50) DEFAULT 'pending',
+        is_sent BOOLEAN DEFAULT false,
+        retry_count INTEGER DEFAULT 0,
+        last_error TEXT,
+        sent_at TIMESTAMP,
         metadata JSONB DEFAULT '{}',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -333,8 +344,8 @@ export const CORE_SCHEMA_TABLES: { name: string; query: string }[] = [
     name: 'system_settings',
     query: `CREATE TABLE IF NOT EXISTS system_settings (
         id SERIAL PRIMARY KEY,
-        site_name_en VARCHAR(255) DEFAULT 'Premium AI',
-        site_name_ar VARCHAR(255) DEFAULT 'منصة النخبة',
+        site_name_en VARCHAR(255) DEFAULT 'Perplexta',
+        site_name_ar VARCHAR(255) DEFAULT 'بيربليكستا',
         logo_url TEXT,
         logo_light_url TEXT,
         favicon_url TEXT,
@@ -591,6 +602,43 @@ export const CORE_SCHEMA_TABLES: { name: string; query: string }[] = [
         tagged_users JSONB DEFAULT '[]',
         is_ai_generated BOOLEAN DEFAULT FALSE,
         has_whatsapp_button BOOLEAN DEFAULT FALSE,
+        meta_title_en VARCHAR(255),
+        meta_title_ar VARCHAR(255),
+        meta_description_en TEXT,
+        meta_description_ar TEXT,
+        keywords_en TEXT,
+        keywords_ar TEXT,
+        og_image_url TEXT,
+        media_urls JSONB DEFAULT '[]'::JSONB,
+        metadata JSONB DEFAULT '{}'::JSONB,
+        post_code VARCHAR(50),
+        author_username VARCHAR(100),
+        audio_url TEXT,
+        audio_title VARCHAR(255),
+        audio_artist VARCHAR(255),
+        audio_track_id VARCHAR(100),
+        view_count INTEGER DEFAULT 0,
+        click_count INTEGER DEFAULT 0,
+        is_featured BOOLEAN DEFAULT FALSE,
+        is_pinned BOOLEAN DEFAULT FALSE,
+        priority INTEGER DEFAULT 0,
+        badge_text VARCHAR(100),
+        cta_label VARCHAR(100),
+        cta_action VARCHAR(50),
+        cta_payload TEXT,
+        cta_style VARCHAR(50),
+        badge_color VARCHAR(50),
+        tags TEXT[] DEFAULT '{}',
+        who_can_comment VARCHAR(50) DEFAULT 'anyone',
+        allow_translation BOOLEAN DEFAULT TRUE,
+        partnership_code VARCHAR(100),
+        is_partnership BOOLEAN DEFAULT FALSE,
+        partnership_brand VARCHAR(255),
+        deleted_at TIMESTAMP,
+        archived_at TIMESTAMP,
+        boost_goal VARCHAR(100) DEFAULT 'whatsapp_leads',
+        boost_daily_budget NUMERIC(10,2) DEFAULT 2.00,
+        boost_settings JSONB DEFAULT '{}',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )`
@@ -646,6 +694,7 @@ export const CORE_SCHEMA_TABLES: { name: string; query: string }[] = [
         is_verified BOOLEAN DEFAULT TRUE,
         followers_count INTEGER DEFAULT 0,
         ads_count INTEGER DEFAULT 0,
+        managers JSONB DEFAULT '[]'::JSONB,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )`
@@ -680,6 +729,7 @@ export const CORE_SCHEMA_TABLES: { name: string; query: string }[] = [
         id SERIAL PRIMARY KEY,
         ad_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,
+        reaction VARCHAR(20) DEFAULT 'like',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(ad_id, user_id)
       )`
@@ -791,6 +841,22 @@ export const CORE_SCHEMA_TABLES: { name: string; query: string }[] = [
         excluded_item_types JSONB DEFAULT '[]',
         explicit_interests JSONB DEFAULT '[]',
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`
+  },
+  {
+    name: 'platform_categories',
+    query: `CREATE TABLE IF NOT EXISTS platform_categories (
+        id VARCHAR(100) PRIMARY KEY,
+        name_ar VARCHAR(255) NOT NULL,
+        name_en VARCHAR(255) NOT NULL,
+        group_id VARCHAR(100) NOT NULL,
+        group_ar VARCHAR(255) NOT NULL,
+        group_en VARCHAR(255) NOT NULL,
+        icon VARCHAR(50) DEFAULT 'Layers',
+        audience_reach BIGINT DEFAULT 150000,
+        keywords TEXT[] DEFAULT '{}',
+        is_featured BOOLEAN DEFAULT false,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       )`
   },
   {
@@ -1037,6 +1103,101 @@ export const CORE_SCHEMA_TABLES: { name: string; query: string }[] = [
         is_slow BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )`
+  },
+  {
+    name: 'forms',
+    query: `CREATE TABLE IF NOT EXISTS forms (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        slug VARCHAR(255) UNIQUE,
+        description TEXT,
+        fields JSONB DEFAULT '[]',
+        settings JSONB DEFAULT '{}',
+        status VARCHAR(50) DEFAULT 'published',
+        submissions_count INTEGER DEFAULT 0,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`
+  },
+  {
+    name: 'form_submissions',
+    query: `CREATE TABLE IF NOT EXISTS form_submissions (
+        id SERIAL PRIMARY KEY,
+        form_id INTEGER NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        data JSONB NOT NULL DEFAULT '{}',
+        ip_address VARCHAR(100),
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`
+  },
+  {
+    name: 'map_providers',
+    query: `CREATE TABLE IF NOT EXISTS map_providers (
+        id SERIAL PRIMARY KEY,
+        provider_key VARCHAR(100) UNIQUE NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        api_key_encrypted TEXT,
+        is_enabled BOOLEAN DEFAULT true,
+        is_primary BOOLEAN DEFAULT false,
+        priority INTEGER DEFAULT 1,
+        capabilities JSONB DEFAULT '[]',
+        config JSONB DEFAULT '{}',
+        status VARCHAR(50) DEFAULT 'untested',
+        last_tested_at TIMESTAMP,
+        last_error TEXT,
+        latency_ms INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`
+  },
+  {
+    name: 'cached_locations',
+    query: `CREATE TABLE IF NOT EXISTS cached_locations (
+        id SERIAL PRIMARY KEY,
+        place_id VARCHAR(255),
+        title VARCHAR(255) NOT NULL,
+        city VARCHAR(255) NOT NULL,
+        state VARCHAR(255),
+        country VARCHAR(255),
+        country_code VARCHAR(10),
+        lat NUMERIC(10, 7),
+        lon NUMERIC(10, 7),
+        full_address TEXT,
+        category_label VARCHAR(100),
+        raw_type VARCHAR(100),
+        flag VARCHAR(20),
+        source VARCHAR(100) DEFAULT 'user_sync',
+        hits INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`
+  },
+  {
+    name: 'studio_workspaces',
+    query: `CREATE TABLE IF NOT EXISTS studio_workspaces (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        framework_mode VARCHAR(50) DEFAULT 'html',
+        files JSONB DEFAULT '{}',
+        chat_history JSONB DEFAULT '[]',
+        is_public BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`
+  },
+  {
+    name: 'studio_snapshots',
+    query: `CREATE TABLE IF NOT EXISTS studio_snapshots (
+        id SERIAL PRIMARY KEY,
+        workspace_id VARCHAR(255) REFERENCES studio_workspaces(id) ON DELETE CASCADE,
+        version_name VARCHAR(255) NOT NULL,
+        files JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`
   }
 ];
 
@@ -1052,7 +1213,8 @@ export async function applyCoreColumnEnforcements(targetPool: QueryClient) {
     kyc_rejection_reason: { type: 'TEXT' },
     kyc_submitted_at: { type: 'TIMESTAMP' },
     avatar_asset_id: { type: 'UUID' },
-    media_muted: { type: 'BOOLEAN', default: 'true' }
+    media_muted: { type: 'BOOLEAN', default: 'true' },
+    data_saver: { type: 'BOOLEAN', default: 'false' }
   });
 
   await ensureColumnsBulk(targetPool, 'chats', {
@@ -1086,7 +1248,6 @@ export async function applyCoreColumnEnforcements(targetPool: QueryClient) {
   await ensureColumnsBulk(targetPool, 'tool_orchestrator', {
     task_description: { type: 'TEXT' },
     task_description_ar: { type: 'TEXT' },
-    cost_per_usage: { type: 'INTEGER', default: 0 },
     fallback_1_provider: { type: 'VARCHAR(50)' },
     fallback_1_model: { type: 'VARCHAR(100)' },
     fallback_2_provider: { type: 'VARCHAR(50)' },
@@ -1120,7 +1281,7 @@ export async function applyCoreColumnEnforcements(targetPool: QueryClient) {
     description_en: { type: 'TEXT' },
     description_ar: { type: 'TEXT' },
     logo_url: { type: 'TEXT' },
-    theme: { type: 'VARCHAR(20)', default: "'dark'" },
+    theme: { type: 'VARCHAR(20)', default: "'light'" },
     default_language: { type: 'VARCHAR(10)', default: "'en'" },
     maintenance_mode: { type: 'BOOLEAN', default: false },
     allow_registrations: { type: 'BOOLEAN', default: true },
@@ -1143,6 +1304,15 @@ export async function applyCoreColumnEnforcements(targetPool: QueryClient) {
     media_muted_default: { type: 'BOOLEAN', default: 'true' },
     google_client_id: { type: 'VARCHAR(255)' },
     google_client_secret: { type: 'TEXT' },
+    github_client_id: { type: 'VARCHAR(255)' },
+    github_client_secret: { type: 'TEXT' },
+    apple_client_id: { type: 'VARCHAR(255)' },
+    apple_team_id: { type: 'VARCHAR(255)' },
+    apple_key_id: { type: 'VARCHAR(255)' },
+    apple_private_key: { type: 'TEXT' },
+    microsoft_client_id: { type: 'VARCHAR(255)' },
+    microsoft_client_secret: { type: 'TEXT' },
+    oauth_providers_config: { type: 'JSONB', default: "'{}'" },
     firebase_project_id: { type: 'VARCHAR(255)' },
     firebase_client_email: { type: 'VARCHAR(255)' },
     firebase_private_key: { type: 'TEXT' },
@@ -1166,6 +1336,9 @@ export async function applyCoreColumnEnforcements(targetPool: QueryClient) {
     aspect_ratio: { type: 'VARCHAR(50)', default: "'16:9'" },
     tags: { type: 'TEXT[]', default: "'{}'" },
     metadata: { type: 'JSONB', default: "'{}'" },
+    media_urls: { type: 'JSONB', default: "'[]'" },
+    post_code: { type: 'VARCHAR(50)' },
+    author_username: { type: 'VARCHAR(100)' },
     meta_title_en: { type: 'VARCHAR(255)' },
     meta_title_ar: { type: 'VARCHAR(255)' },
     meta_description_en: { type: 'TEXT' },
@@ -1178,8 +1351,34 @@ export async function applyCoreColumnEnforcements(targetPool: QueryClient) {
     partnership_code: { type: 'VARCHAR(100)' },
     is_partnership: { type: 'BOOLEAN', default: false },
     partnership_brand: { type: 'VARCHAR(255)' },
+    audio_url: { type: 'TEXT' },
+    audio_title: { type: 'VARCHAR(255)' },
+    audio_artist: { type: 'VARCHAR(255)' },
+    audio_track_id: { type: 'VARCHAR(100)' },
     deleted_at: { type: 'TIMESTAMP' },
-    archived_at: { type: 'TIMESTAMP' }
+    archived_at: { type: 'TIMESTAMP' },
+    boost_goal: { type: 'VARCHAR(100)', default: "'whatsapp_leads'" },
+    boost_daily_budget: { type: 'NUMERIC(10,2)', default: 2.00 },
+    boost_settings: { type: 'JSONB', default: "'{}'" },
+    location_city: { type: 'VARCHAR(100)', default: "'فلسطين'" },
+    phone_number: { type: 'VARCHAR(50)' },
+    video_url: { type: 'TEXT' },
+    is_boosted: { type: 'BOOLEAN', default: false },
+    boosted_until: { type: 'TIMESTAMP' },
+    boost_tier: { type: 'VARCHAR(50)' },
+    boost_price: { type: 'NUMERIC(10,2)', default: 0 },
+    audience: { type: 'VARCHAR(50)', default: "'public'" },
+    ad_format: { type: 'VARCHAR(50)', default: "'post'" },
+    feeling: { type: 'VARCHAR(100)' },
+    tagged_users: { type: 'JSONB', default: "'[]'" },
+    is_ai_generated: { type: 'BOOLEAN', default: false },
+    has_whatsapp_button: { type: 'BOOLEAN', default: false },
+    whatsapp_number: { type: 'VARCHAR(50)' },
+    likes_count: { type: 'INTEGER', default: 0 },
+    comments_count: { type: 'INTEGER', default: 0 },
+    shares_count: { type: 'INTEGER', default: 0 },
+    clicks_count: { type: 'INTEGER', default: 0 },
+    impressions_count: { type: 'INTEGER', default: 0 }
   });
 
   await ensureColumnsBulk(targetPool, 'bulletin_pages', {
@@ -1189,6 +1388,7 @@ export async function applyCoreColumnEnforcements(targetPool: QueryClient) {
     review_count: { type: 'INTEGER', default: 0 },
     is_verified: { type: 'BOOLEAN', default: false },
     is_featured: { type: 'BOOLEAN', default: false },
+    managers: { type: 'JSONB', default: "'[]'" },
     social_links: { type: 'JSONB', default: "'{}'" },
     custom_sections: { type: 'JSONB', default: "'[]'" }
   });
@@ -1207,7 +1407,8 @@ export async function applyCoreColumnEnforcements(targetPool: QueryClient) {
 
   await ensureColumnsBulk(targetPool, 'bulletin_ad_likes', {
     user_id: { type: 'INTEGER' },
-    ad_id: { type: 'INTEGER' }
+    ad_id: { type: 'INTEGER' },
+    reaction: { type: 'VARCHAR(20)', default: `'like'` }
   });
 
   await ensureColumnsBulk(targetPool, 'bulletin_page_followers', {
@@ -1253,6 +1454,35 @@ export async function applyCoreColumnEnforcements(targetPool: QueryClient) {
     metadata: { type: 'JSONB', default: "'{}'" }
   });
 
+  await ensureColumnsBulk(targetPool, 'map_providers', {
+    api_key_encrypted: { type: 'TEXT' },
+    is_enabled: { type: 'BOOLEAN', default: true },
+    is_primary: { type: 'BOOLEAN', default: false },
+    priority: { type: 'INTEGER', default: 1 },
+    capabilities: { type: 'JSONB', default: "'[]'" },
+    config: { type: 'JSONB', default: "'{}'" },
+    status: { type: 'VARCHAR(50)', default: "'untested'" },
+    latency_ms: { type: 'INTEGER' },
+    last_error: { type: 'TEXT' }
+  });
+
+  await ensureColumnsBulk(targetPool, 'cached_locations', {
+    place_id: { type: 'VARCHAR(255)' },
+    title: { type: 'VARCHAR(255)' },
+    city: { type: 'VARCHAR(255)' },
+    state: { type: 'VARCHAR(255)' },
+    country: { type: 'VARCHAR(255)' },
+    country_code: { type: 'VARCHAR(10)' },
+    lat: { type: 'NUMERIC(10, 7)' },
+    lon: { type: 'NUMERIC(10, 7)' },
+    full_address: { type: 'TEXT' },
+    category_label: { type: 'VARCHAR(100)' },
+    raw_type: { type: 'VARCHAR(100)' },
+    flag: { type: 'VARCHAR(20)' },
+    source: { type: 'VARCHAR(100)', default: "'user_sync'" },
+    hits: { type: 'INTEGER', default: 1 }
+  });
+
   await ensureColumnsBulk(targetPool, 'user_activity_logs', {
     user_id: { type: 'INTEGER' },
     activity_type: { type: 'VARCHAR(50)' },
@@ -1260,22 +1490,6 @@ export async function applyCoreColumnEnforcements(targetPool: QueryClient) {
     ip_address: { type: 'VARCHAR(45)' },
     user_agent: { type: 'TEXT' },
     metadata: { type: 'JSONB', default: "'{}'" }
-  });
-
-  await ensureColumnsBulk(targetPool, 'media_assets', {
-    id: { type: 'UUID' },
-    stored_path: { type: 'TEXT' },
-    original_filename: { type: 'TEXT' },
-    context: { type: 'TEXT', default: 'general' },
-    format: { type: 'TEXT', default: 'webp' },
-    width: { type: 'INT', default: 0 },
-    height: { type: 'INT', default: 0 },
-    size_bytes: { type: 'INT', default: 0 },
-    sha256_hash: { type: 'TEXT' },
-    is_public: { type: 'BOOLEAN', default: false },
-    user_id: { type: 'INTEGER' },
-    metadata: { type: 'JSONB', default: "'{}'" },
-    file_data: { type: 'BYTEA' }
   });
 
   await ensureColumnsBulk(targetPool, 'advertisements', {
@@ -1305,7 +1519,16 @@ export async function applyCoreColumnEnforcements(targetPool: QueryClient) {
     hide_tools: { type: 'BOOLEAN', default: 'false' },
     color: { type: 'VARCHAR(20)', default: '#3b82f6' },
     badge: { type: 'VARCHAR(50)' },
-    is_popular: { type: 'BOOLEAN', default: false }
+    is_popular: { type: 'BOOLEAN', default: false },
+    daily_credits: { type: 'INTEGER', default: 0 },
+    monthly_credits: { type: 'INTEGER', default: 0 },
+    annual_credits: { type: 'INTEGER', default: 0 }
+  });
+
+  await ensureColumnsBulk(targetPool, 'subscriptions', {
+    cycle_credits: { type: 'INTEGER', default: 0 },
+    used_credits: { type: 'INTEGER', default: 0 },
+    last_reset_at: { type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP' }
   });
 
   await ensureColumnsBulk(targetPool, 'video_resources', {
@@ -1493,11 +1716,71 @@ export async function applyCoreColumnEnforcements(targetPool: QueryClient) {
     created_at: { type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP' },
     completed_at: { type: 'TIMESTAMP' }
   });
+
+  await ensureColumnsBulk(targetPool, 'forms', {
+    title: { type: 'VARCHAR(255)' },
+    slug: { type: 'VARCHAR(255)' },
+    description: { type: 'TEXT' },
+    fields: { type: 'JSONB', default: "'[]'" },
+    settings: { type: 'JSONB', default: "'{}'" },
+    status: { type: 'VARCHAR(50)', default: "'published'" },
+    submissions_count: { type: 'INTEGER', default: 0 },
+    created_by: { type: 'INTEGER' },
+    created_at: { type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP' },
+    updated_at: { type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP' }
+  });
+
+  await ensureColumnsBulk(targetPool, 'form_submissions', {
+    form_id: { type: 'INTEGER' },
+    user_id: { type: 'INTEGER' },
+    data: { type: 'JSONB', default: "'{}'" },
+    ip_address: { type: 'VARCHAR(100)' },
+    user_agent: { type: 'TEXT' },
+    created_at: { type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP' }
+  });
+
+  await ensureColumnsBulk(targetPool, 'studio_workspaces', {
+    description: { type: 'TEXT' },
+    framework_mode: { type: 'VARCHAR(50)', default: "'html'" },
+    files: { type: 'JSONB', default: "'{}'" },
+    chat_history: { type: 'JSONB', default: "'[]'" },
+    is_public: { type: 'BOOLEAN', default: false }
+  });
+
+  await ensureColumnsBulk(targetPool, 'studio_snapshots', {
+    files: { type: 'JSONB', default: "'{}'" },
+    version_name: { type: 'VARCHAR(255)' }
+  });
+
+  // === Migration: Data synchronization and unification of tool inside tool_id ===
+  try {
+    await targetPool.query(`
+      UPDATE chats 
+      SET tool_id = COALESCE(tool_id, tool, 'chat_fast'),
+          tool = COALESCE(tool, tool_id, 'chat_fast')
+      WHERE tool_id IS NULL OR tool IS NULL OR tool_id != tool;
+    `);
+    await targetPool.query(`
+      UPDATE messages 
+      SET tool_id = COALESCE(tool_id, tool, 'chat_fast'),
+          tool = COALESCE(tool, tool_id, 'chat_fast')
+      WHERE tool_id IS NULL OR tool IS NULL OR tool_id != tool;
+    `);
+  } catch (syncErr: any) {
+    console.warn('[Migrations] Warning synchronizing tool/tool_id columns:', syncErr?.message || syncErr);
+  }
 }
 
 export const CORE_INDEXES: string[] = [
+  `CREATE INDEX IF NOT EXISTS idx_studio_workspaces_user_id ON studio_workspaces(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_studio_workspaces_updated_at ON studio_workspaces(updated_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_studio_snapshots_workspace_id ON studio_snapshots(workspace_id)`,
   `CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON push_tokens(user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_push_tokens_active ON push_tokens(is_active) WHERE is_active = true`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS forms_pkey ON forms(id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS forms_slug_key ON forms(slug)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS form_submissions_pkey ON form_submissions(id)`,
+  `CREATE INDEX IF NOT EXISTS idx_form_submissions_form_id ON form_submissions(form_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS referral_invitations_pkey ON referral_invitations(id)`,
   `CREATE INDEX IF NOT EXISTS idx_referral_invitations_referrer ON referral_invitations(referrer_id)`,
   `CREATE INDEX IF NOT EXISTS idx_referral_invitations_email ON referral_invitations(email)`,
@@ -1511,12 +1794,13 @@ export const CORE_INDEXES: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_chats_user_id ON chats(user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_chats_user_id_updated_at ON chats(user_id, updated_at DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS db_connections_registry_pkey ON db_connections_registry(id)`,
-  `CREATE INDEX IF NOT EXISTS idx_db_connections_id ON db_connections_registry(id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS email_settings_pkey ON email_settings(id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS email_templates_name_key ON email_templates(name)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS email_templates_pkey ON email_templates(id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS message_reports_pkey ON message_reports(id)`,
   `CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON messages(chat_id, created_at DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS messages_pkey ON messages(id)`,
   `CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS notifications_pkey ON notifications(id)`,
@@ -1530,6 +1814,7 @@ export const CORE_INDEXES: string[] = [
   `CREATE UNIQUE INDEX IF NOT EXISTS support_tickets_pkey ON support_tickets(id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS system_broadcasts_pkey ON system_broadcasts(id)`,
   `CREATE INDEX IF NOT EXISTS idx_system_logs_user_id ON system_logs(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON system_logs(created_at DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS system_logs_pkey ON system_logs(id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS system_settings_pkey ON system_settings(id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS oauth_states_pkey ON oauth_states(id)`,
@@ -1537,6 +1822,13 @@ export const CORE_INDEXES: string[] = [
   `CREATE UNIQUE INDEX IF NOT EXISTS tool_orchestrator_pkey ON tool_orchestrator(id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS tool_orchestrator_tool_id_key ON tool_orchestrator(tool_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS user_files_pkey ON user_files(id)`,
+  `CREATE INDEX IF NOT EXISTS idx_user_files_user_id ON user_files(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_user_files_chat_id ON user_files(chat_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_user_files_file_url ON user_files(file_url)`,
+  `CREATE INDEX IF NOT EXISTS idx_user_files_created_at ON user_files(created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_user_activity_logs_user_id ON user_activity_logs(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_user_activity_logs_event_type ON user_activity_logs(event_type)`,
+  `CREATE INDEX IF NOT EXISTS idx_user_activity_logs_created_at ON user_activity_logs(created_at DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS user_shortcuts_pkey ON user_shortcuts(id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS user_usage_pkey ON user_usage(id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS users_email_key ON users(email)`,
@@ -1544,11 +1836,6 @@ export const CORE_INDEXES: string[] = [
   `CREATE UNIQUE INDEX IF NOT EXISTS video_resources_pkey ON video_resources(id)`,
   `CREATE INDEX IF NOT EXISTS idx_video_resources_chat_id ON video_resources(chat_id)`,
   `CREATE INDEX IF NOT EXISTS idx_video_resources_user_id ON video_resources(user_id)`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS media_assets_pkey ON media_assets(id)`,
-  `CREATE INDEX IF NOT EXISTS idx_media_assets_context ON media_assets(context)`,
-  `CREATE INDEX IF NOT EXISTS idx_media_assets_hash ON media_assets(sha256_hash)`,
-  `CREATE INDEX IF NOT EXISTS idx_media_assets_stored_path ON media_assets(stored_path)`,
-  `CREATE INDEX IF NOT EXISTS idx_media_assets_user_id ON media_assets(user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_users_avatar_asset_id ON users(avatar_asset_id)`,
   `CREATE INDEX IF NOT EXISTS idx_bulletin_ads_user_id ON bulletin_ads(user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_bulletin_ads_page_id ON bulletin_ads(page_id)`,
@@ -1579,7 +1866,6 @@ export const CORE_INDEXES: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_ad_stats_created_at ON ad_stats(created_at)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS seo_metadata_pkey ON seo_metadata(id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS seo_metadata_route_path_key ON seo_metadata(route_path)`,
-  `CREATE INDEX IF NOT EXISTS idx_seo_metadata_route_path ON seo_metadata(route_path)`,
   `CREATE INDEX IF NOT EXISTS idx_seo_metadata_entity ON seo_metadata(entity_type, entity_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS gpu_providers_pkey ON gpu_providers(id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS gpu_providers_provider_id_key ON gpu_providers(provider_id)`,
@@ -1598,7 +1884,13 @@ export const CORE_INDEXES: string[] = [
   `CREATE UNIQUE INDEX IF NOT EXISTS api_performance_logs_pkey ON api_performance_logs(id)`,
   `CREATE INDEX IF NOT EXISTS idx_api_performance_logs_created_at ON api_performance_logs(created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_api_performance_logs_duration ON api_performance_logs(duration_ms)`,
-  `CREATE INDEX IF NOT EXISTS idx_api_performance_logs_endpoint ON api_performance_logs(endpoint)`
+  `CREATE INDEX IF NOT EXISTS idx_api_performance_logs_endpoint ON api_performance_logs(endpoint)`,
+  `CREATE EXTENSION IF NOT EXISTS pg_trgm`,
+  `CREATE INDEX IF NOT EXISTS idx_bulletin_ads_title_trgm ON bulletin_ads USING gin (title gin_trgm_ops)`,
+  `CREATE INDEX IF NOT EXISTS idx_bulletin_ads_desc_trgm ON bulletin_ads USING gin (description gin_trgm_ops)`,
+  `CREATE INDEX IF NOT EXISTS idx_bulletin_ads_hashtags_trgm ON bulletin_ads USING gin (hashtags gin_trgm_ops)`,
+  `CREATE INDEX IF NOT EXISTS idx_bulletin_ads_category_trgm ON bulletin_ads USING gin (category gin_trgm_ops)`,
+  `CREATE INDEX IF NOT EXISTS idx_bulletin_ads_status_expires_created ON bulletin_ads(status, expires_at DESC, created_at DESC)`
 ];
 
 export const CORE_RELATIONS: ForeignKeyRelation[] = [
@@ -1611,14 +1903,16 @@ export const CORE_RELATIONS: ForeignKeyRelation[] = [
   { table: 'user_files', constraint: 'user_files_chat_id_fkey', column: 'chat_id', ref: 'chats', onDelete: 'SET NULL' },
   { table: 'user_files', constraint: 'user_files_user_id_fkey', column: 'user_id', ref: 'users' },
   { table: 'users', constraint: 'users_referred_by_fkey', column: 'referred_by', ref: 'users', onDelete: 'SET NULL' },
-  { table: 'media_assets', constraint: 'fk_media_assets_user_id', column: 'user_id', ref: 'users', onDelete: 'SET NULL' },
-  { table: 'users', constraint: 'fk_users_avatar_asset_id', column: 'avatar_asset_id', ref: 'media_assets', onDelete: 'SET NULL' },
   { table: 'user_sessions', constraint: 'fk_user_sessions_user', column: 'user_id', ref: 'users', onDelete: 'CASCADE' },
   { table: 'admin_approval_queue', constraint: 'fk_admin_approval_queue_requester', column: 'requester_id', ref: 'users', onDelete: 'CASCADE' },
   { table: 'ad_pricing_audit', constraint: 'fk_ad_pricing_audit_admin', column: 'admin_id', ref: 'users', onDelete: 'CASCADE' },
   { table: 'gpu_provider_models', constraint: 'fk_gpu_provider_models_provider', column: 'provider_id', ref: 'gpu_providers', onDelete: 'CASCADE' },
   { table: 'gpu_execution_jobs', constraint: 'fk_gpu_execution_jobs_user', column: 'user_id', ref: 'users', onDelete: 'SET NULL' },
-  { table: 'gpu_execution_jobs', constraint: 'fk_gpu_execution_jobs_provider', column: 'provider_id', ref: 'gpu_providers', onDelete: 'SET NULL' }
+  { table: 'gpu_execution_jobs', constraint: 'fk_gpu_execution_jobs_provider', column: 'provider_id', ref: 'gpu_providers', onDelete: 'SET NULL' },
+  { table: 'forms', constraint: 'fk_forms_created_by', column: 'created_by', ref: 'users', onDelete: 'SET NULL' },
+  { table: 'form_submissions', constraint: 'fk_form_submissions_form', column: 'form_id', ref: 'forms', onDelete: 'CASCADE' },
+  { table: 'studio_workspaces', constraint: 'fk_studio_workspaces_user', column: 'user_id', ref: 'users', onDelete: 'CASCADE' },
+  { table: 'studio_snapshots', constraint: 'fk_studio_snapshots_workspace', column: 'workspace_id', ref: 'studio_workspaces', onDelete: 'CASCADE' }
 ];
 
 export async function applyCoreRelations(targetPool: QueryClient) {
@@ -1638,20 +1932,22 @@ export async function seedCoreDatabase(targetPool: QueryClient, targetLedgerPool
   }
 
   // Admin User Seed
-  const adminEmails = Array.from(new Set([
-    process.env.ADMIN_EMAIL,
-    process.env.VITE_ADMIN_EMAIL,
-    'admin@perplexta.com',
-    'admin@example.com'
-  ].filter(Boolean))) as string[];
+  const adminEmail = process.env.ADMIN_EMAIL || process.env.VITE_ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD;
 
-  const defaultPassword = process.env.ADMIN_PASSWORD || 'Admin@123456';
-  const sharedHash = await bcrypt.hash(defaultPassword, 10);
+  if (!adminEmail || !adminPassword) {
+    throw new Error('FATAL CONFIGURATION ERROR: ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required and must be configured in your env/environment file.');
+  }
+
+  const adminEmails = [adminEmail];
+  const defaultPassword = adminPassword;
+  let sharedHash: string | null = null;
 
   for (const email of adminEmails) {
     const adminCheck = await targetPool.query('SELECT * FROM users WHERE email = $1', [email]);
 
     if (adminCheck.rows.length === 0) {
+      if (!sharedHash) sharedHash = await bcrypt.hash(defaultPassword, 10);
       const newAdmin = await targetPool.query(
         `INSERT INTO users (email, name, password_hash, role, status) VALUES ($1, $2, $3, 'admin', 'active') RETURNING id`,
         [email, 'Master Admin', sharedHash]
@@ -1666,10 +1962,14 @@ export async function seedCoreDatabase(targetPool: QueryClient, targetLedgerPool
       console.log(`[Seed] Seeded default admin account: ${email}`);
     } else {
       const user = adminCheck.rows[0];
-      await targetPool.query(`UPDATE users SET role = 'admin', status = 'active' WHERE email = $1`, [email]);
+      if (user.role !== 'admin' || user.status !== 'active') {
+        await targetPool.query(`UPDATE users SET role = 'admin', status = 'active' WHERE email = $1`, [email]);
+      }
+      
       if (process.env.ADMIN_PASSWORD) {
         const isMatch = await bcrypt.compare(process.env.ADMIN_PASSWORD, user.password_hash);
         if (!isMatch) {
+          if (!sharedHash) sharedHash = await bcrypt.hash(defaultPassword, 10);
           console.log(`[Migrations] Force updating admin password for: ${email} to match environment configuration`);
           await targetPool.query(
             'UPDATE users SET password_hash = $1, role = $2, status = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
@@ -1706,26 +2006,75 @@ export async function seedCoreDatabase(targetPool: QueryClient, targetLedgerPool
 
   // Tool Orchestrator Seed
   await targetPool.query(`
-    INSERT INTO tool_orchestrator (tool_id, primary_provider, primary_model, task_description, task_description_ar, cost_per_usage)
+    INSERT INTO tool_orchestrator (tool_id, primary_provider, primary_model, task_description, task_description_ar)
     VALUES
-      ('chat_fast', '', '', 'High-speed technical intelligence agent for quick insights.', 'عميل ذكاء تقني سريع للاستفسارات الفورية.', 5),
-      ('chat_pro', '', '', 'Advanced perplexta reasoning engine for deep technical problem solving.', 'محرك استنتاج استراتيجي متقدم لحل المشكلات التقنية العميقة.', 25),
-      ('chat_reasoning', '', '', 'Complex multi-step reasoning protocol for high-stakes intelligence.', 'بروتوكول تفكير معقد متعدد الخطوات للمهام فائقة الأهمية.', 50),
-      ('perplexta_analysis', '', '', 'Perplexta Document, File & Vision Forensic Analysis Protocol.', 'استخراج وتدقيق المستندات والملفات والصور والمخططات.', 15),
-      ('image', '', '', 'High-precision visual synthesis engine for professional assets.', 'محرك توليد بصري عالي الدقة للأصول المهنية.', 30),
-      ('video', '', '', 'Global standard video generation and cinematic synthesis.', 'توليد فيديو بمعايير عالمية وتوليد سينمائي متقدم.', 100),
-      ('tts', '', '', 'Elite natural acoustic synthesis and voice engineering.', 'توليد صوتي طبيعي متطور وهندسة صوتية نخبوية.', 10),
-      ('stt', '', '', 'High-fidelity acoustic transcription and linguistic extraction.', 'تحويل صوتي عالي الدقة واستخراج لغوي متقن.', 5),
-      ('ads_copilot', '', '', 'Perplexta Ads & Growth Copilot for Meta, Google, TikTok, and ViralBook campaigns.', 'مساعد الإعلانات والنمو التجاري لمنصة فيرال بوك والمنصات العالمية.', 25),
-      ('code', '', '', 'Master-level software engineering workstation and logic constructor.', 'محطة عمل هندسة البرمجيات وبناء المنطق البرمجي المتقدم.', 20),
-      ('canvas', '', '', 'Perplexta creative studio and multi-modal design canvas.', 'استوديو الإبداع المتقدم ولوحة التصميم متعددة الوسائط.', 25),
-      ('sovereign_memory', '', '', 'Unified sovereign system intelligence and long-term memory synthesis.', 'ذاكرة النظام السيادية الموحدة وتركيب المعارف طويلة الأمد.', 5),
-      ('sovereign_search', '', '', 'Perplexta Research & Studies Protocol for comprehensive academic literature synthesis.', 'منظومة البحوث والدراسات الأكاديمية والمراجعة المنهجية.', 10),
-      ('perplexta_music', '', '', 'Advanced acoustic composition and structural music synthesis.', 'التأليف الصوتي المتقدم والتركيب الموسيقي الهيكلي.', 50),
-      ('x402_api', '', '', 'Dynamic high-fidelity artificial intelligence analytics gateway for programmatic developer clients connected via x402 payment protocol.', 'بوابة تحليلات الذكاء الاصطناعي عالية الدقة الديناميكية لعملاء الوكلاء البرمجيين المتصلين ببروتوكول دفع x402.', 15),
-      ('vision', '', '', 'High-performance visual understanding, computer vision and multimodal document analysis.', 'نظام الرؤية الحاسوبية والفهم البصري المتقدم وتحليل الوثائق والصور.', 20)
+      ('chat_fast', '', '', 'High-speed technical intelligence agent for quick insights.', 'عميل ذكاء تقني سريع للاستفسارات الفورية.'),
+      ('chat_pro', '', '', 'Advanced perplexta reasoning engine for deep technical problem solving.', 'محرك استنتاج استراتيجي متقدم لحل المشكلات التقنية العميقة.'),
+      ('chat_reasoning', '', '', 'Complex multi-step reasoning protocol for high-stakes intelligence.', 'بروتوكول تفكير معقد متعدد الخطوات للمهام فائقة الأهمية.'),
+      ('perplexta_analysis', '', '', 'Perplexta Document, File & Vision Forensic Analysis Protocol.', 'استخراج وتدقيق المستندات والملفات والصور والمخططات.'),
+      ('image', '', '', 'High-precision visual synthesis engine for professional assets.', 'محرك توليد بصري عالي الدقة للأصول المهنية.'),
+      ('video', '', '', 'Global standard video generation and cinematic synthesis.', 'توليد فيديو بمعايير عالمية وتوليد سينمائي متقدم.'),
+      ('tts', '', '', 'Elite natural acoustic synthesis and voice engineering.', 'توليد صوتي طبيعي متطور وهندسة صوتية نخبوية.'),
+      ('stt', '', '', 'High-fidelity acoustic transcription and linguistic extraction.', 'تحويل صوتي عالي الدقة واستخراج لغوي متقن.'),
+      ('ads_copilot', '', '', 'Perplexta Ads & Growth Copilot for Meta, Google, TikTok, and ViralBook campaigns.', 'مساعد الإعلانات والنمو التجاري لمنصة فيرال بوك والمنصات العالمية.'),
+      ('code', '', '', 'Master-level software engineering workstation and logic constructor.', 'محطة عمل هندسة البرمجيات وبناء المنطق البرمجي المتقدم.'),
+      ('canvas', '', '', 'Perplexta creative studio and multi-modal design canvas.', 'استوديو الإبداع المتقدم ولوحة التصميم متعددة الوسائط.'),
+      ('sovereign_search', '', '', 'Perplexta Research & Studies Protocol for comprehensive academic literature synthesis.', 'منظومة البحوث والدراسات الأكاديمية والمراجعة المنهجية.'),
+      ('perplexta_music', '', '', 'Advanced acoustic composition and structural music synthesis.', 'التأليف الصوتي المتقدم والتركيب الموسيقي الهيكلي.'),
+      ('x402_api', '', '', 'Dynamic high-fidelity artificial intelligence analytics gateway for programmatic developer clients connected via x402 payment protocol.', 'بوابة تحليلات الذكاء الاصطناعي عالية الدقة الديناميكية لعملاء الوكلاء البرمجيين المتصلين ببروتوكول دفع x402.'),
+      ('vision', '', '', 'High-performance visual understanding, computer vision and multimodal document analysis.', 'نظام الرؤية الحاسوبية والفهم البصري المتقدم وتحليل الوثائق والصور.')
     ON CONFLICT (tool_id) DO NOTHING
   `);
 
-  await targetPool.query("DELETE FROM tool_orchestrator WHERE tool_id IN ('notebook', 'learning', 'legal_analysis')");
+  await targetPool.query("DELETE FROM tool_orchestrator WHERE tool_id IN ('notebook', 'learning', 'legal_analysis', 'sovereign_memory')");
+
+  // Map Providers Seed
+  const mapCheck = await targetPool.query('SELECT count(*) FROM map_providers');
+  if (parseInt(mapCheck.rows[0].count, 10) === 0) {
+    await targetPool.query(`
+      INSERT INTO map_providers (provider_key, name, is_enabled, is_primary, priority, status, capabilities, config)
+      VALUES
+        (
+          'openstreetmap', 
+          'OpenStreetMap / Photon Engine (Zero-Cost Free Tier)', 
+          true, 
+          true, 
+          1, 
+          'free_tier',
+          '["places_autocomplete", "geocoding", "reverse_geocoding"]',
+          '{"portal_url": "https://photon.komoot.io/"}'
+        ),
+        (
+          'google_maps', 
+          'Google Maps Platform (Places & Geocoding APIs)', 
+          true, 
+          false, 
+          2, 
+          'untested',
+          '["places_autocomplete", "geocoding", "reverse_geocoding", "places_details", "vector_tiles"]',
+          '{"portal_url": "https://console.cloud.google.com/google/maps-apis/credentials"}'
+        ),
+        (
+          'mapbox', 
+          'Mapbox Search & Geocoding v5', 
+          false, 
+          false, 
+          3, 
+          'untested',
+          '["places_autocomplete", "geocoding", "reverse_geocoding", "vector_tiles"]',
+          '{"portal_url": "https://account.mapbox.com/access-tokens/"}'
+        ),
+        (
+          'locationiq', 
+          'LocationIQ Geocoding & Forward Search', 
+          false, 
+          false, 
+          4, 
+          'untested',
+          '["places_autocomplete", "geocoding", "reverse_geocoding"]',
+          '{"portal_url": "https://my.locationiq.com/dashboard#accesstoken"}'
+        )
+      ON CONFLICT (provider_key) DO NOTHING
+    `);
+  }
 }

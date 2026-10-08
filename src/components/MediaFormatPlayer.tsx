@@ -30,7 +30,7 @@ export const MediaFormatPlayer: React.FC<MediaFormatPlayerProps> = ({
   resourceId,
   adFormat = 'feed',
   aspectRatio = 'auto',
-  defaultFitMode = 'cover',
+  defaultFitMode = 'contain',
   posterUrl,
   title,
   autoPlay = false,

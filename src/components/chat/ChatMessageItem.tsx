@@ -44,7 +44,7 @@ interface ChatMessageItemProps {
   ProductionSuite?: React.ComponentType<{ content: string; dir: 'ltr' | 'rtl'; theme: string }>;
 }
 
-export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
+export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(({
   msg,
   idx,
   dir,
@@ -147,4 +147,4 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
       </div>
     </motion.div>
   );
-};
+});

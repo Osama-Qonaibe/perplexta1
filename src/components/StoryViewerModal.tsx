@@ -4,6 +4,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Eye, Volume2, VolumeX, Trash2, AlertTriangle, ZoomIn, ZoomOut, Pause } from 'lucide-react';
 import { getMediaUrl } from '../utils/mediaUtils';
 import { BulletinAvatar } from './BulletinAvatar';
+
+function isValidVideoUrl(url?: string | null): boolean {
+  if (!url) return false;
+  const clean = getMediaUrl(url);
+  if (!clean) return false;
+  // Verify it has a valid video file extension or prefix
+  return /\.(mp4|webm|mov|ogg|m4v|processed)$/i.test(clean) || clean.startsWith('blob:') || clean.startsWith('data:video/');
+}
 import { useAppContext } from '../context/AppContext';
 import { triggerHaptic } from '../utils/haptics';
 import { useModalScrollLock } from '../hooks/useModalScrollLock';
@@ -156,7 +164,7 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
           img.src = getMediaUrl(story.image_url);
         }
 
-        if (story.video_url) {
+        if (isValidVideoUrl(story.video_url)) {
           const video = document.createElement('video');
           video.src = getMediaUrl(story.video_url);
           video.preload = 'auto';
@@ -325,11 +333,11 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[60] bg-[var(--surface-overlay)] flex items-center justify-center overflow-hidden"
+        className="fixed inset-0 z-[60] bg-[var(--surface-overlay)] flex items-center justify-center overflow-hidden pt-[56px] pb-[64px] md:py-0"
       >
         {/* Ambient Blurred Backdrop for Desktop */}
         <div className="hidden md:block absolute inset-0 overflow-hidden pointer-events-none z-0 select-none">
-          {getMediaUrl(currentStory.video_url) ? (
+          {isValidVideoUrl(currentStory.video_url) ? (
             <video
               key={`ambient-vid-${currentStory.id}`}
               src={getMediaUrl(currentStory.video_url)}
@@ -351,7 +359,7 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
           <div className="absolute inset-0 bg-[var(--surface-overlay)] backdrop-blur-2xl" />
         </div>
 
-        <div className="relative w-full h-full md:w-auto md:aspect-[9/16] md:max-w-none md:h-[95vh] md:rounded-[var(--radius-xl)] bg-[var(--surface-page)] shadow-2xl overflow-hidden z-10 border-0 md:border md:border-[var(--border-default)] flex items-center justify-center">
+        <div className="relative w-full h-full rounded-2xl md:rounded-[var(--radius-lg)] bg-[var(--surface-page)] shadow-2xl overflow-hidden z-10 border-0 md:border md:border-[var(--border-default)] flex items-center justify-center md:w-auto md:aspect-[9/16] md:max-w-none md:h-[95vh]">
           {/* Progress Bars (Persistent) */}
           <div className="absolute top-4 inset-x-0 z-50 flex items-center gap-1 px-4 pointer-events-none">
             {stories.map((story, idx) => (
@@ -411,11 +419,11 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
                     }}
                   />
 
-                  {getMediaUrl(currentStory.video_url) ? (
+                   {isValidVideoUrl(currentStory.video_url) ? (
                     <video
                       ref={videoRef}
                       src={getMediaUrl(currentStory.video_url)}
-                      className="relative z-10 w-full h-full object-contain max-h-[100dvh]"
+                      className="relative z-10 w-full h-full object-contain max-h-full"
                       playsInline
                       autoPlay
                       muted={isMuted}
@@ -429,7 +437,7 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
                     <img
                       src={getMediaUrl(currentStory.image_url)}
                       alt="Story"
-                      className="relative z-10 w-full h-full object-contain max-h-[100dvh]"
+                      className="relative z-10 w-full h-full object-contain max-h-full"
                       referrerPolicy="no-referrer"
                       onError={(e) => {
                         const target = e.currentTarget;
@@ -493,46 +501,42 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                {isOwnStory && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsPaused(true);
+                      setShowDeleteConfirm(true);
+                    }}
+                    disabled={isDeleting}
+                    className="w-8 h-8 rounded-shape-sm bg-red-600/85 hover:bg-red-700/95 border border-red-500/20 flex items-center justify-center text-white transition-colors cursor-pointer active:scale-95 shadow-md"
+                    title={isRtl ? 'حذف القصة' : 'Delete Story'}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
                 {currentStory.video_url && (
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }}
                     aria-label={isMuted ? 'Unmute' : 'Mute'}
-                    className="w-9 h-9 min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/20 transition-colors cursor-pointer"
+                    className="w-8 h-8 rounded-shape-sm bg-black/40 hover:bg-black/60 border border-white/10 flex items-center justify-center text-white transition-colors cursor-pointer active:scale-95 shadow-md"
                   >
-                    {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                    {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onClose(); }}
                   aria-label="Close"
-                  className="w-9 h-9 min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/20 transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-shape-sm bg-black/40 hover:bg-black/60 border border-white/10 flex items-center justify-center text-white transition-colors cursor-pointer active:scale-95 shadow-md"
                 >
-                  <X size={20} />
+                  <X size={15} />
                 </button>
               </div>
             </div>
-            
-            {/* Delete Button for Own Story / Admin */}
-            {isOwnStory && (
-              <div className="flex justify-end mt-4">
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={(e: React.MouseEvent) => {
-                    e.stopPropagation();
-                    setIsPaused(true);
-                    setShowDeleteConfirm(true);
-                  }}
-                  disabled={isDeleting}
-                >
-                  <Trash2 size={14} />
-                  <span>{isRtl ? 'حذف القصة' : 'Delete Story'}</span>
-                </Button>
-              </div>
-            )}
           </div>
 
           {/* Delete Confirmation Modal Overlay */}
@@ -606,13 +610,15 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
 
           {/* Bottom Overlay for Own Story View Count */}
           {isOwnStory && (
-            <div className="absolute bottom-8 right-4 z-50 bg-[var(--surface-card)]/90 backdrop-blur-md px-4 py-2 rounded-[var(--radius-sm)] flex items-center gap-2 border border-[var(--border-default)] shadow-2xl pointer-events-auto">
-              <Eye size={18} className="text-white/90" />
-              <div className="flex flex-col">
-                <span className="text-white text-xs font-bold leading-none">
+            <div className="absolute bottom-4 right-4 z-50 pointer-events-auto">
+              <div 
+                className="w-8 h-8 rounded-shape-sm bg-black/40 border border-white/10 flex flex-col items-center justify-center text-white shadow-md select-none"
+                title={isRtl ? 'عدد المشاهدات' : 'Views Count'}
+              >
+                <Eye size={12} className="text-white/95" />
+                <span className="text-[9px] font-black leading-none mt-0.5">
                   {currentStory.impressions_count || 0}
                 </span>
-                <span className="text-white/50 text-[8px] uppercase tracking-tighter">Views</span>
               </div>
             </div>
           )}

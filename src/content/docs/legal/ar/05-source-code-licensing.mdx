@@ -1,0 +1,72 @@
+# ميثاق تراخيص الأكواد والمكونات مفتوحة المصدر وحزم المطورين
+
+تاريخ السريان: 21 سبتمبر 2026  
+الجهة المطورة: الفريق الهندسي لشركة **فيرال لينك اب المحدوده** (المملكة المتحدة، شركة رقم: **16804604**).
+
+---
+
+## 1. التمييز الهيكلي بين أنواع البرمجيات
+
+تعتمد منصة **بيربليكستا** نهجاً هندسياً دقيقاً يفصل بين ثلاث طبقات برمجية مختلفة التراخيص:
+
+<div class="overflow-x-auto my-6 border border-[var(--border-default)] rounded-[var(--radius-md)] bg-[var(--surface-card)] shadow-2xs">
+  <table class="w-full text-start text-xs sm:text-sm border-collapse">
+    <thead class="bg-[var(--surface-subtle)] border-b border-[var(--border-default)] text-[var(--text-primary)]">
+      <tr>
+        <th class="p-3.5 font-bold text-start border-e border-[var(--border-default)]">الطبقة الهندسية</th>
+        <th class="p-3.5 font-bold text-start border-e border-[var(--border-default)]">المكونات والنطاق</th>
+        <th class="p-3.5 font-bold text-start">نموذج الترخيص</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-[var(--border-subtle)] text-[var(--text-secondary)]">
+      <tr class="hover:bg-[var(--surface-subtle)]/50 transition-colors">
+        <td class="p-3.5 font-semibold text-[var(--text-primary)] whitespace-nowrap border-e border-[var(--border-subtle)]">الطبقة الأولى: البرمجيات السحابية</td>
+        <td class="p-3.5 border-e border-[var(--border-subtle)]">نواة الخوادم، محرك التوجيه الصامت، سجل المحفظة المالي</td>
+        <td class="p-3.5">
+          <span class="px-2.5 py-1 text-xs font-mono font-bold rounded-[var(--radius-xs)] bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/80 shadow-2xs whitespace-nowrap inline-flex items-center">
+            احتكارية مغلقة (Proprietary)
+          </span>
+        </td>
+      </tr>
+      <tr class="hover:bg-[var(--surface-subtle)]/50 transition-colors">
+        <td class="p-3.5 font-semibold text-[var(--text-primary)] whitespace-nowrap border-e border-[var(--border-subtle)]">الطبقة الثانية: حزم المطورين (SDKs)</td>
+        <td class="p-3.5 border-e border-[var(--border-subtle)]">واجهات الربط البرمجي، مكتبات العملاء الرسمية</td>
+        <td class="p-3.5">
+          <span class="px-2.5 py-1 text-xs font-mono font-bold rounded-[var(--radius-xs)] bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/80 shadow-2xs whitespace-nowrap inline-flex items-center">
+            رخصة معتمدة للمطورين
+          </span>
+        </td>
+      </tr>
+      <tr class="hover:bg-[var(--surface-subtle)]/50 transition-colors">
+        <td class="p-3.5 font-semibold text-[var(--text-primary)] whitespace-nowrap border-e border-[var(--border-subtle)]">الطبقة الثالثة: المكتبات مفتوحة المصدر</td>
+        <td class="p-3.5 border-e border-[var(--border-subtle)]">المكونات الخارجية وأدوات الطرف الثالث المدمجة</td>
+        <td class="p-3.5">
+          <span class="px-2.5 py-1 text-xs font-mono font-bold rounded-[var(--radius-xs)] bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 shadow-2xs whitespace-nowrap inline-flex items-center">
+            MIT / Apache 2.0
+          </span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+---
+
+## 2. البرمجيات الاحتكارية المغلقة
+
+تخضع الشيفرات المصدرية لخدمات الواجهة الخلفية، وبوابات التوجيه الذكية، ومنظومة إدارة مفاتيح الذكاء الاصطناعي لرخصة احتكارية مغلقة مملوكة بنسبة 100% لشركة **فيرال لينك اب المحدوده**. لا يجوز لأي عميل أو مستخدم تنزيل أو استضافة هذه المكونات على مخدمات خاصة ما لم يتم توقيع عقد ترخيص سحابي مخصص للمؤسسات الكبرى معتمد ورسمي.
+
+---
+
+## 3. حزم تطوير البرمجيات وواجهات الربط المعتمدة
+
+- تُنشر حزم تطوير البرمجيات الرسمية المخصصة لتكامل العملاء مع المنصة عبر المستودعات العامة بموجب **رخصة إم آي تي (MIT License)**.
+- يُسمح للمطورين والشركات بدمج هذه الحزم بحرية داخل تطبيقاتهم التجارية، مع الالتزام بالإبقاء على إشعار حقوق النشر الأصلي للشركة في ملفات الحزمة.
+
+---
+
+## 4. الالتزام بتراخيص البرمجيات مفتوحة المصدر
+
+تستخدم المنصة مجموعة من المكتبات البرمجية مفتوحة المصدر عالية الكفاءة (مثل React, Tailwind CSS, Lucide, Express). تلتزم الشركة بالامتثال التام لشروط هذه التراخيص:
+- تُحفظ كافة إشعارات حقوق الطبع والنشر الأصلية للمطورين المستقلين في سجل حزم النظام.
+- لا تفرض البرمجيات مفتوحة المصدر المستخدمة أي قيود عدائية على ملكية العميل لبياناته أو مخرجات مشاريعه البرمجية.

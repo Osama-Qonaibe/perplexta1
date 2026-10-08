@@ -30,12 +30,12 @@ export const Copyright: React.FC = () => {
       icon: Building2,
       title: isAr ? "1. ملكية العلامة التجارية والبرمجيات" : "1. Trademark & Software Ownership",
       content: isAr 
-        ? "جميع الحقوق البرمجية، الأكواد المصدرية، منطق التوجيه والأوركسترا الذكي، العلامات التجارية، والشعارات الخاصة بـ بيربليكستا وكافة مشاريعنا هي ملكية حصرية لشركة فيرال لينك اب المحدودة."
-        : "All software rights, source codes, smart routing & orchestration logic, trademarks, and logos of PERPLEXTA and all our projects are the exclusive property of VIRALLINKUP LTD.",
+        ? "جميع الحقوق البرمجية، الأكواد المصدرية، منطق التوجيه والأوركسترا الذكي، العلامات التجارية، والشعارات الخاصة بـ بيربليكستا وكافة الخدمات التابعة هي ملكية فكرية محمية بالكامل."
+        : "All software rights, source codes, smart routing & orchestration logic, trademarks, and logos of PERPLEXTA and all associated services are protected intellectual property.",
       subItems: [
         {
           label: isAr ? "العلامات التجارية والشركاء" : "Trademarks & Affiliates",
-          desc: isAr ? "يُمنع تماماً استخدام أو نسخ اسم 'بيربليكستا' أو 'فيرال لينك اب' أو أي شعارات مرتبطة بهما لأغراض تجارية دون موافقة كتابية صريحة مسبقة." : "The use or reproduction of the names 'PERPLEXTA' or 'VIRALLINKUP' or any associated logos for commercial purposes is strictly prohibited without prior explicit written consent."
+          desc: isAr ? "يُمنع تماماً استخدام أو نسخ اسم 'بيربليكستا' أو أي شعارات مرتبطة به لأغراض تجارية دون موافقة كتابية صريحة مسبقة." : "The use or reproduction of the name 'PERPLEXTA' or any associated logos for commercial purposes is strictly prohibited without prior explicit written consent."
         },
         {
           label: isAr ? "حقوق الملكية الفكرية البرمجية" : "Software Intellectual Property",
@@ -81,8 +81,8 @@ export const Copyright: React.FC = () => {
       icon: Scale,
       title: isAr ? "4. الملاحقة القضائية والتدابير القانونية" : "4. Legal Action & Enforcement",
       content: isAr 
-        ? "تحتفظ شركة فيرال لينك اب بالحق الكامل في اتخاذ التدابير التقنية والقانونية الصارمة ضد أي انتهاك لحقوق ملكيتها الفكرية أو البرمجية."
-        : "VIRALLINKUP LTD reserves the absolute right to take stringent technical and legal actions against any breach of its software intellectual property rights.",
+        ? "تحتفظ إدارة بيربليكستا بالحق الكامل في اتخاذ التدابير التقنية والقانونية الصارمة ضد أي انتهاك لحقوق ملكيتها الفكرية أو البرمجية."
+        : "PERPLEXTA reserves the absolute right to take stringent technical and legal actions against any breach of its software intellectual property rights.",
       subItems: [
         {
           label: isAr ? "الملاحقة القانونية" : "International Legal Pursuit",
@@ -103,7 +103,6 @@ export const Copyright: React.FC = () => {
         className="space-y-8 select-none py-2"
         dir={dir}
       >
-        {/* Floating Header */}
         <div className="flex items-center justify-between pb-4 border-b border-[var(--border-subtle)]">
           <button 
             type="button"
@@ -122,27 +121,25 @@ export const Copyright: React.FC = () => {
           </div>
         </div>
 
-        {/* Brand Banner */}
-        <div className="relative overflow-hidden rounded-[var(--radius)] border border-[var(--border-default)] bg-[var(--surface-card)] p-6 md:p-8 space-y-4 shadow-inner">
+        <div className="relative overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] p-6 md:p-8 space-y-4 shadow-inner">
           <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full blur-2xl pointer-events-none" />
           <h2 className="text-xl md:text-2xl font-black text-[var(--text-primary)] tracking-tight leading-snug">
             {isAr ? "حقوق الملكية الفكرية وحماية الابتكار" : "Intellectual Property & Innovation Protection"}
           </h2>
           <p className="text-xs md:text-sm text-[var(--text-muted)] font-semibold leading-relaxed max-w-3xl">
             {isAr 
-              ? "بيان شامل يوضح حقوق الملكية الفكرية، شروط حماية البرمجيات والعلامات التجارية لشركة فيرال لينك اب المحدودة ومجموعتها التقنية الفعالة."
-              : "Comprehensive statement highlighting the intellectual property, trademark protections, and software rights under VIRALLINKUP LTD and its operational portfolio."}
+              ? "بيان شامل يوضح حقوق الملكية الفكرية، شروط حماية البرمجيات والعلامات التجارية لمنصة بيربليكستا ومجموعتها التقنية الفعالة."
+              : "Comprehensive statement highlighting the intellectual property, trademark protections, and software rights under PERPLEXTA and its operational portfolio."}
           </p>
         </div>
 
-        {/* Main Content Grid */}
         <div className="grid grid-cols-1 gap-6">
           {sections.map((section, idx) => {
             const Icon = section.icon;
             return (
               <div 
                 key={idx}
-                className="p-5 md:p-6 rounded-[var(--radius)] border border-[var(--border-default)] bg-[var(--surface-card)] hover:border-accent/40 transition-all duration-300 space-y-4"
+                className="p-5 md:p-6 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] hover:border-accent/40 transition-all duration-300 space-y-4"
               >
                 <div className="flex items-center gap-3 text-[var(--text-primary)] pb-3 border-b border-[var(--border-subtle)]">
                   <div className="p-2 rounded-[var(--radius-xs)] bg-accent/5 text-accent">
@@ -179,15 +176,14 @@ export const Copyright: React.FC = () => {
           })}
         </div>
 
-        {/* Footer Section */}
         <footer className="pt-8 border-t border-[var(--border-subtle)] space-y-8">
           <div className="text-center">
             <p className="text-base md:text-lg font-black text-[var(--text-primary)] tracking-widest uppercase font-mono">
-              {isAr ? "فيرال لينك اب - نبتكر لنحمي بياناتك" : "VIRALLINKUP - INNOVATING TO PROTECT YOUR DATA"}
+              {isAr ? "بيربليكستا - نبتكر لنحمي بياناتك" : "PERPLEXTA - INNOVATING TO PROTECT YOUR DATA"}
             </p>
           </div>
 
-          <div className="p-5 md:p-6 rounded-[var(--radius)] border border-[var(--border-default)] bg-[var(--surface-card)] space-y-3 max-w-4xl mx-auto shadow-inner text-center">
+          <div className="p-5 md:p-6 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] space-y-3 max-w-4xl mx-auto shadow-inner text-center">
             <div className="flex items-center justify-center gap-2 text-[var(--text-primary)]">
               <ShieldCheck className="w-5 h-5 text-accent" />
               <h3 className="text-xs md:text-sm font-black">

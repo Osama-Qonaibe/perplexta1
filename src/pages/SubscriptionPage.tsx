@@ -31,12 +31,14 @@ import {
   GraduationCap, 
   Server, 
   Key, 
-  Music 
+  Music,
+  Clock
 } from 'lucide-react';
 
 import { ContentContainer } from '../components/ContentContainer';
 import { ALL_TOOLS } from '../constants';
 import { trackPremiumSubscriptionEvent } from '../utils/analytics';
+import { triggerTierUnlockConfetti } from '../utils/confetti';
 
 const ModalPortal: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [mounted, setMounted] = useState(false);
@@ -89,8 +91,10 @@ export const SubscriptionPage: React.FC = () => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [expandedPlans, setExpandedPlans] = useState<Record<string, boolean>>({});
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  const [selectedPlanCycles, setSelectedPlanCycles] = useState<Record<string, 'daily' | 'monthly' | 'annual'>>({});
   const [loading, setLoading] = useState<string | null>(null);
   const [confirmingPlan, setConfirmingPlan] = useState<any>(null);
+  const [confirmingCycle, setConfirmingCycle] = useState<'daily' | 'monthly' | 'annual'>('monthly');
   const [selectedPlanForModal, setSelectedPlanForModal] = useState<any>(null);
   const [resultModal, setResultModal] = useState<'success' | 'insufficient' | null>(null);
   const [copied, setCopied] = useState(false);
@@ -184,22 +188,48 @@ export const SubscriptionPage: React.FC = () => {
     return !plan.planType || plan.planType === 'user';
   });
 
+  const getPlanAvailableCycles = (plan: any): Array<'daily' | 'monthly' | 'annual'> => {
+    const cycles: Array<'daily' | 'monthly' | 'annual'> = [];
+    if (plan.isDailyEnabled) cycles.push('daily');
+    if (plan.isMonthlyEnabled !== false) cycles.push('monthly');
+    if (plan.isAnnualEnabled !== false) cycles.push('annual');
+    return cycles.length > 0 ? cycles : ['monthly'];
+  };
+
+  const getEffectiveCycleForPlan = (plan: any): 'daily' | 'monthly' | 'annual' => {
+    const planSpecific = selectedPlanCycles[plan.id];
+    const avail = getPlanAvailableCycles(plan);
+    if (planSpecific && avail.includes(planSpecific)) return planSpecific;
+    if (avail.includes(billingCycle)) return billingCycle;
+    return avail[0];
+  };
+
   if (!plansLoaded) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-      <div className="w-9 h-9 border-2 border-[var(--border-main)] border-t-[var(--sys-color-primary)] rounded-shape-full animate-spin" />
+      <div className="w-9 h-9 border-2 border-[var(--border-main)] border-t-[var(--fg-accent)] rounded-shape-full animate-spin" />
       <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
         {dir === 'rtl' ? 'جاري تحميل الخطط...' : 'Loading plans...'}
       </p>
     </div>
   );
 
-  const getDisplayPrice = (plan: any, cycle: 'monthly' | 'annual') => {
+  const getDisplayPrice = (plan: any, cycle: 'daily' | 'monthly' | 'annual') => {
+    if (cycle === 'daily') return Number(plan.dailyPrice || 0);
     const m = Number(plan.monthlyPrice || 0);
     const a = Number(plan.annualPrice || 0);
     const d = Number(plan.discount || 0);
     if (cycle === 'monthly') return m;
     if (a > 0) return a;
     return m * 12 * (1 - d / 100);
+  };
+
+  const getCycleLabel = (cycle: 'daily' | 'monthly' | 'annual', plan: any) => {
+    if (cycle === 'daily') {
+      const days = plan.dailyDays || 7;
+      return dir === 'rtl' ? `${days} أيام` : `${days} Days`;
+    }
+    if (cycle === 'annual') return t('annual');
+    return t('monthly');
   };
 
   const getSavingPercentage = (plan: any) => {
@@ -250,10 +280,11 @@ export const SubscriptionPage: React.FC = () => {
     if (!plan) return;
     if (isActivePlan(planId)) return;
     
-    const price = getDisplayPrice(plan, billingCycle);
+    const effectiveCycle = getEffectiveCycleForPlan(plan);
+    const price = getDisplayPrice(plan, effectiveCycle);
     if (price === 0) {
       setLoading(`${planId}-stripe`);
-      const res = await payWithBalance(planId, billingCycle);
+      const res = await payWithBalance(planId, effectiveCycle);
       if (res.success) {
         await refreshUser();
         setResultModal('success');
@@ -266,7 +297,7 @@ export const SubscriptionPage: React.FC = () => {
 
     setSelectedPlanForModal(plan);
     setLoading(`${planId}-stripe`);
-    const res = await stripeCheckout(planId, billingCycle);
+    const res = await stripeCheckout(planId, effectiveCycle);
     if (res.error) toast.error(res.error);
     setLoading(null);
   };
@@ -275,31 +306,32 @@ export const SubscriptionPage: React.FC = () => {
     if (!user) { setIsAuthModalOpen(true); return; }
     const plan = plans.find(p => p.id === planId);
     if (!plan) return;
+    const effectiveCycle = getEffectiveCycleForPlan(plan);
     setSelectedPlanForModal(plan);
-    const price = getDisplayPrice(plan, billingCycle);
+    const price = getDisplayPrice(plan, effectiveCycle);
     if (balanceUSD < price) { setResultModal('insufficient'); return; }
     setConfirmingPlan(plan);
+    setConfirmingCycle(effectiveCycle);
   };
 
   const executePayment = async () => {
     if (!confirmingPlan) return;
     setLoading(`${confirmingPlan.id}-balance`);
-    const res = await payWithBalance(confirmingPlan.id, billingCycle);
+    const res = await payWithBalance(confirmingPlan.id, confirmingCycle);
     if (res.success) {
+      triggerTierUnlockConfetti();
       setConfirmingPlan(null);
       await refreshUser();
       setResultModal('success');
       try {
-        const price = billingCycle === 'annual' 
-          ? (confirmingPlan.annualPrice || confirmingPlan.monthlyPrice * 12) 
-          : (confirmingPlan.monthlyPrice || 0);
+        const price = getDisplayPrice(confirmingPlan, confirmingCycle);
         trackPremiumSubscriptionEvent(
           user?.id?.toString() || 'unknown',
           confirmingPlan.id.toString(),
           confirmingPlan.nameEn || confirmingPlan.name || 'Premium Plan',
           Number(price),
           'USD',
-          billingCycle
+          confirmingCycle
         );
       } catch (e) {
         console.error('[Analytics Error]:', e);
@@ -316,7 +348,7 @@ export const SubscriptionPage: React.FC = () => {
     >
       {isVerifying && (
         <div className="fixed inset-0 z-[999] flex flex-col items-center justify-center bg-[var(--surface-overlay)] backdrop-blur-md">
-          <Loader2 className="animate-spin text-[var(--sys-color-primary)] mb-4" size={48} />
+          <Loader2 className="animate-spin text-[var(--fg-accent)] mb-4" size={48} />
           <h2 className="text-lg md:text-xl font-black text-[var(--text-primary)] uppercase tracking-wider mb-2">
             {dir === 'rtl' ? 'جاري تفعيل الاشتراك...' : 'Activating Subscription...'}
           </h2>
@@ -331,7 +363,7 @@ export const SubscriptionPage: React.FC = () => {
           <div className="flex items-center gap-3 md:gap-4">
             <button 
               onClick={() => navigate(-1)}
-              className="w-9 h-9 min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] sm:w-9 sm:h-9 rounded-shape-sm flex items-center justify-center transition-theme bg-[var(--surface-subtle)] border border-[var(--border-main)] text-[var(--text-secondary)] hover:text-[var(--sys-color-primary)] hover:border-[var(--border-accent)] active:scale-95 cursor-pointer touch-target-44"
+              className="w-9 h-9 min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] sm:w-9 sm:h-9 rounded-shape-sm flex items-center justify-center transition-theme bg-[var(--surface-subtle)] border border-[var(--border-main)] text-[var(--text-secondary)] hover:text-[var(--fg-accent)] hover:border-[var(--border-accent)] active:scale-95 cursor-pointer touch-target-44"
               title={dir === 'rtl' ? 'رجوع' : 'Back'}
             >
               {dir === 'rtl' ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
@@ -365,7 +397,7 @@ export const SubscriptionPage: React.FC = () => {
             >
               <span>{t('annual')}</span>
               {Math.max(...plans.map(p => getSavingPercentage(p)), 0) > 0 && (
-                <span className="px-1.5 py-0.5 rounded-shape-xs bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
+                <span className="px-1.5 py-0.5 rounded-shape-xs bg-[var(--status-success-subtle)] text-[var(--fg-success)] dark:text-[var(--fg-success)] text-[10px] font-bold">
                   -{Math.max(...plans.map(p => getSavingPercentage(p)), 0)}%
                 </span>
               )}
@@ -373,6 +405,58 @@ export const SubscriptionPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Active Subscription Credit Meter */}
+      {user?.subscription && user.subscription.status === 'active' && (
+        <div className="mb-8 p-4 md:p-5 rounded-shape-md bg-gradient-to-r from-[var(--surface-card)] to-[var(--surface-subtle)] border border-[var(--border-main)] shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-shape-sm flex items-center justify-center bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)] border border-[var(--border-accent)]/30 shrink-0">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-[var(--text-primary)]">
+                    {dir === 'rtl' ? user.subscription.plan_name_ar || user.subscription.plan_name_en : user.subscription.plan_name_en}
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-[var(--status-success-subtle)] text-[var(--fg-success)]">
+                    {dir === 'rtl' ? 'اشتراكك الحالي' : 'Active Plan'}
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--text-muted)] font-medium mt-0.5">
+                  {dir === 'rtl' 
+                    ? `دورة الاشتراك: ${user.subscription.billing_period === 'annual' ? 'سنوي' : user.subscription.billing_period === 'daily' ? 'أيام مخصصة' : 'شهري'}` 
+                    : `Billing Cycle: ${user.subscription.billing_period || 'Monthly'}`}
+                  {user.subscription.current_period_end && ` • ${dir === 'rtl' ? 'موعد التجديد:' : 'Renewal:'} ${new Date(user.subscription.current_period_end).toLocaleDateString()}`}
+                </p>
+              </div>
+            </div>
+            <div className="text-left sm:text-right">
+              <div className="flex items-baseline sm:justify-end gap-1 font-mono">
+                <span className="text-xl md:text-2xl font-black text-[var(--text-primary)]">
+                  {(user.subscription.remaining_credits ?? ((user.subscription.cycle_credits || 0) - (user.subscription.used_credits || 0))).toLocaleString()}
+                </span>
+                <span className="text-xs text-[var(--text-muted)] font-bold">
+                  / {(user.subscription.cycle_credits || 0).toLocaleString()} {dir === 'rtl' ? 'كريديت' : 'credits'}
+                </span>
+              </div>
+              <p className="text-[11px] text-[var(--text-secondary)] font-bold mt-0.5">
+                {dir === 'rtl' ? 'رصيد نقاط الذكاء الاصطناعي المتبقي لدورتك الحالية' : 'Remaining AI credits in this billing cycle'}
+              </p>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="w-full h-2.5 bg-[var(--surface-subtle)] rounded-full overflow-hidden border border-[var(--border-main)]">
+            <div 
+              className="h-full bg-gradient-to-r from-[var(--fg-accent)] to-[var(--fg-success)] transition-all duration-500 rounded-full"
+              style={{ 
+                width: `${Math.min(100, Math.max(0, 100 - (user.subscription.usage_percentage || ((user.subscription.used_credits || 0) / (user.subscription.cycle_credits || 1) * 100))))}%` 
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="flex justify-center mb-8">
         <div className="p-1 rounded-shape-md flex items-center bg-[var(--surface-subtle)] border border-[var(--border-main)] max-w-lg w-full">
@@ -384,7 +468,7 @@ export const SubscriptionPage: React.FC = () => {
                 : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <Sparkles size={14} className={activeTab === 'user' ? 'text-[var(--sys-color-primary)]' : ''} />
+            <Sparkles size={14} className={activeTab === 'user' ? 'text-[var(--fg-accent)]' : ''} />
             <span>
               {dir === 'rtl' ? 'خطط الاستخدام العام' : 'Performance Plans'}
             </span>
@@ -397,7 +481,7 @@ export const SubscriptionPage: React.FC = () => {
                 : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <Code2 size={14} className={activeTab === 'developer' ? 'text-[var(--sys-color-primary)]' : ''} />
+            <Code2 size={14} className={activeTab === 'developer' ? 'text-[var(--fg-accent)]' : ''} />
             <span>
               {dir === 'rtl' ? 'خطط المطورين والوكلاء' : 'Developer & Agent Plans'}
             </span>
@@ -409,7 +493,7 @@ export const SubscriptionPage: React.FC = () => {
         <div
           className="w-full max-w-3xl mx-auto rounded-shape-lg border border-[var(--border-main)] bg-[var(--surface-card)] p-8 md:p-12 text-center relative overflow-hidden flex flex-col items-center justify-center min-h-[350px] shadow-sm"
         >
-          <div className="w-14 h-14 rounded-shape-md bg-[var(--surface-subtle)] flex items-center justify-center mb-5 border border-[var(--border-main)] text-[var(--sys-color-primary)]">
+          <div className="w-14 h-14 rounded-shape-md bg-[var(--surface-subtle)] flex items-center justify-center mb-5 border border-[var(--border-main)] text-[var(--fg-accent)]">
             <Code2 size={26} className="animate-pulse" />
           </div>
 
@@ -427,12 +511,12 @@ export const SubscriptionPage: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
             <div className="flex items-center gap-2 px-4 py-2 rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-main)] text-xs text-[var(--text-muted)] font-bold">
-              <span className="w-2.5 h-2.5 rounded-shape-full bg-[var(--sys-color-primary)] animate-ping" />
+              <span className="w-2.5 h-2.5 rounded-shape-full bg-[var(--fg-accent)] animate-ping" />
               <span>{dir === 'rtl' ? 'المرحلة: التأسيس المعماري والنمذجة' : 'Phase: Architectural Ingestion & Setup'}</span>
             </div>
             <button
               onClick={() => navigate('/')}
-              className="px-6 py-2.5 min-h-[44px] rounded-shape-sm bg-[var(--sys-color-primary)] text-[var(--sys-color-on-primary)] font-bold text-xs hover:opacity-90 transition-all duration-150 shadow-sm active:scale-95 cursor-pointer touch-target-44"
+              className="px-6 py-2.5 min-h-[44px] rounded-shape-sm bg-[var(--fg-accent)] text-[var(--comp-button-primary-fg,#ffffff)] font-bold text-xs hover:opacity-90 transition-all duration-150 shadow-sm active:scale-95 cursor-pointer touch-target-44"
             >
               {dir === 'rtl' ? 'العودة لمساحة العمل' : 'Return to Workspace'}
             </button>
@@ -441,8 +525,12 @@ export const SubscriptionPage: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6 items-start">
           {displayedPlans.map((plan, planIdx) => {
-            const planColor = plan.color || 'var(--sys-color-primary)';
+            const planColor = plan.color || 'var(--fg-accent)';
             const isPlanActive = isActivePlan(plan.id);
+            const availableCycles = getPlanAvailableCycles(plan);
+            const effectiveCycle = getEffectiveCycleForPlan(plan);
+            const planPrice = getDisplayPrice(plan, effectiveCycle);
+
             return (
               <div 
                 key={`sub-plan-${plan.id || planIdx}-${planIdx}`} 
@@ -472,7 +560,7 @@ export const SubscriptionPage: React.FC = () => {
                   </div>
                 )}
 
-                <div className="mb-4 pt-1">
+                <div className="mb-3 pt-1">
                   <h3 className="text-xl md:text-2xl font-bold mb-1 flex items-center gap-2 text-[var(--text-primary)]">
                     <span 
                       className="w-2.5 h-2.5 rounded-shape-full shrink-0 shadow-xs" 
@@ -483,45 +571,111 @@ export const SubscriptionPage: React.FC = () => {
                   <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{dir === 'rtl' ? plan.descAr : plan.descEn}</p>
                 </div>
 
+                {/* Plan-Specific Billing Cycle Options */}
+                {availableCycles.length > 1 ? (
+                  <div className="p-1 rounded-shape-sm flex items-center bg-[var(--surface-subtle)] border border-[var(--border-main)] mb-3">
+                    {availableCycles.map((c) => (
+                      <button
+                        key={`plan-c-${plan.id}-${c}`}
+                        type="button"
+                        onClick={() => setSelectedPlanCycles((prev) => ({ ...prev, [plan.id]: c }))}
+                        className={`flex-1 py-1.5 px-2 rounded-shape-xs text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                          effectiveCycle === c
+                            ? 'bg-[var(--surface-card)] text-[var(--text-primary)] border border-[var(--border-main)] shadow-xs'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                        }`}
+                      >
+                        {getCycleLabel(c, plan)}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mb-3">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-shape-xs text-[11px] font-bold bg-[var(--surface-subtle)] border border-[var(--border-main)] text-[var(--text-secondary)]">
+                      <Clock size={12} style={{ color: planColor }} />
+                      <span>{dir === 'rtl' ? `الفترة: ${getCycleLabel(effectiveCycle, plan)}` : `Duration: ${getCycleLabel(effectiveCycle, plan)}`}</span>
+                    </span>
+                  </div>
+                )}
+
                 <div className="mb-5 text-[var(--text-primary)]">
                   <div className="flex items-baseline gap-1.5">
                     <span className="text-3xl md:text-4xl font-extrabold text-[var(--text-primary)] tracking-tight">
-                      ${getDisplayPrice(plan, billingCycle).toFixed(2)}
+                      ${planPrice.toFixed(2)}
                     </span>
-                    <span className="text-xs text-[var(--text-muted)] font-medium">/ {billingCycle === 'annual' ? t('annual') : t('monthly')}</span>
+                    <span className="text-xs text-[var(--text-muted)] font-medium">/ {getCycleLabel(effectiveCycle, plan)}</span>
                   </div>
-                  {billingCycle === 'monthly' && getSavingPercentage(plan) > 0 ? (
+                  {effectiveCycle === 'monthly' && plan.isAnnualEnabled !== false && getSavingPercentage(plan) > 0 && (
                     <div className="mt-1 text-xs font-semibold" style={{ color: planColor }}>
                       {dir === 'rtl' ? `وفر ${getSavingPercentage(plan)}% مع الدفع السنوي` : `Save ${getSavingPercentage(plan)}% with annual billing`}
                     </div>
-                  ) : (
-                    <div className="mt-1 text-xs font-medium text-transparent select-none">Spacer</div>
                   )}
+
+                  {/* Plan Credits Allowance Badge */}
+                  <div className="mt-2.5 p-2 rounded-shape-xs bg-[var(--surface-subtle)] border border-[var(--border-main)] flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-black text-[var(--text-primary)]">
+                      <Sparkles size={14} style={{ color: planColor }} />
+                      <span>
+                        {Number(
+                          effectiveCycle === 'daily'
+                            ? (plan.dailyCredits || Math.round((plan.dailyPrice || 0) * 1000))
+                            : effectiveCycle === 'annual'
+                              ? (plan.annualCredits || (plan.monthlyCredits ? plan.monthlyCredits * 12 : Math.round((plan.annualPrice || 0) * 1000)))
+                              : (plan.monthlyCredits || Math.round((plan.monthlyPrice || 0) * 1000))
+                        ).toLocaleString()}
+                      </span>
+                      <span className="text-[10px] text-[var(--text-muted)] font-bold">
+                        {dir === 'rtl' ? 'كريديت ذكاء اصطناعي' : 'AI Credits'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[var(--surface-card)] border border-[var(--border-main)] text-[var(--text-secondary)]">
+                      {getCycleLabel(effectiveCycle, plan)}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5 mb-6 relative z-10">
-                  <button 
-                    onClick={() => handleUpgrade(plan.id)}
-                    disabled={loading !== null || isPlanActive}
-                    className={`py-2.5 md:py-3 min-h-[44px] rounded-shape-sm text-white font-bold text-xs md:text-sm transition-all duration-150 shadow-sm flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-95 active:scale-[0.98] cursor-pointer touch-target-44 ${loading === `${plan.id}-stripe` ? 'animate-pulse' : ''}`}
-                    style={{ 
-                      backgroundColor: planColor, 
-                      boxShadow: isPlanActive ? `0 0 16px ${planColor}30` : `0 2px 10px 0 ${planColor}35`,
-                      opacity: isPlanActive ? 0.9 : 1
-                    }}
-                  >
-                    {isPlanActive ? (
-                      <div className="flex items-center gap-1.5"><CheckCircle2 size={16} />{dir === 'rtl' ? 'نشط' : 'Active'}</div>
-                    ) : (loading === `${plan.id}-stripe` ? '...' : (dir === 'rtl' ? 'اشتراك' : 'Subscribe'))}
-                  </button>
-                  <button 
-                    onClick={() => handlePayWithBalance(plan.id)}
-                    disabled={loading !== null || isPlanActive}
-                    className={`py-2.5 md:py-3 min-h-[44px] rounded-shape-sm font-bold text-xs md:text-sm transition-all duration-150 border bg-transparent hover:bg-[var(--surface-subtle)] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] cursor-pointer touch-target-44 ${loading === `${plan.id}-balance` ? 'animate-pulse' : ''}`}
-                    style={{ borderColor: planColor, color: planColor, opacity: isPlanActive ? 0.8 : 1 }}
-                  >
-                    {isPlanActive ? (dir === 'rtl' ? 'نشط' : 'Active') : (loading === `${plan.id}-balance` ? '...' : t('payWithBalance'))}
-                  </button>
+                  {planPrice === 0 ? (
+                    <button 
+                      onClick={() => handleUpgrade(plan.id)}
+                      disabled={loading !== null || isPlanActive}
+                      className={`col-span-2 py-2.5 md:py-3 min-h-[44px] rounded-shape-sm text-white font-bold text-xs md:text-sm transition-all duration-150 shadow-sm flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-95 active:scale-[0.98] cursor-pointer touch-target-44 ${loading === `${plan.id}-stripe` ? 'animate-pulse' : ''}`}
+                      style={{ 
+                        backgroundColor: planColor, 
+                        boxShadow: isPlanActive ? `0 0 16px ${planColor}30` : `0 2px 10px 0 ${planColor}35`,
+                        opacity: isPlanActive ? 0.9 : 1
+                      }}
+                    >
+                      {isPlanActive ? (
+                        <div className="flex items-center gap-1.5"><CheckCircle2 size={16} />{dir === 'rtl' ? 'الخطة الحالية النشطة' : 'Current Active Plan'}</div>
+                      ) : (loading === `${plan.id}-stripe` ? '...' : (dir === 'rtl' ? 'تفعيل الخطة المجانية' : 'Activate Free Plan'))}
+                    </button>
+                  ) : (
+                    <>
+                      <button 
+                        onClick={() => handleUpgrade(plan.id)}
+                        disabled={loading !== null || isPlanActive}
+                        className={`py-2.5 md:py-3 min-h-[44px] rounded-shape-sm text-white font-bold text-xs md:text-sm transition-all duration-150 shadow-sm flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-95 active:scale-[0.98] cursor-pointer touch-target-44 ${loading === `${plan.id}-stripe` ? 'animate-pulse' : ''}`}
+                        style={{ 
+                          backgroundColor: planColor, 
+                          boxShadow: isPlanActive ? `0 0 16px ${planColor}30` : `0 2px 10px 0 ${planColor}35`,
+                          opacity: isPlanActive ? 0.9 : 1
+                        }}
+                      >
+                        {isPlanActive ? (
+                          <div className="flex items-center gap-1.5"><CheckCircle2 size={16} />{dir === 'rtl' ? 'نشط' : 'Active'}</div>
+                        ) : (loading === `${plan.id}-stripe` ? '...' : (dir === 'rtl' ? 'اشتراك' : 'Subscribe'))}
+                      </button>
+                      <button 
+                        onClick={() => handlePayWithBalance(plan.id)}
+                        disabled={loading !== null || isPlanActive}
+                        className={`py-2.5 md:py-3 min-h-[44px] rounded-shape-sm font-bold text-xs md:text-sm transition-all duration-150 border bg-transparent hover:bg-[var(--surface-subtle)] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] cursor-pointer touch-target-44 ${loading === `${plan.id}-balance` ? 'animate-pulse' : ''}`}
+                        style={{ borderColor: planColor, color: planColor, opacity: isPlanActive ? 0.8 : 1 }}
+                      >
+                        {isPlanActive ? (dir === 'rtl' ? 'نشط' : 'Active') : (loading === `${plan.id}-balance` ? '...' : t('payWithBalance'))}
+                      </button>
+                    </>
+                  )}
                 </div>
 
                 <div className="flex-1 space-y-2.5 mb-6">
@@ -564,17 +718,16 @@ export const SubscriptionPage: React.FC = () => {
                                   chat_fast: <MessageSquare size={12} className="md:w-3.5 md:h-3.5" />,
                                   chat_pro: <Sparkles size={12} className="md:w-3.5 md:h-3.5" />,
                                   chat_reasoning: <Cpu size={12} className="md:w-3.5 md:h-3.5" />,
+                                  sovereign_search: <Search size={12} className="md:w-3.5 md:h-3.5" />,
                                   perplexta_analysis: <Search size={12} className="md:w-3.5 md:h-3.5" />,
                                   ads_copilot: <Megaphone size={12} className="md:w-3.5 md:h-3.5" />,
                                   image: <Sparkles size={12} className="md:w-3.5 md:h-3.5" />,
                                   video: <Tv size={12} className="md:w-3.5 md:h-3.5" />,
+                                  code: <Code2 size={12} className="md:w-3.5 md:h-3.5" />,
+                                  audio_studio: <Music size={12} className="md:w-3.5 md:h-3.5" />,
                                   stt: <Mic size={12} className="md:w-3.5 md:h-3.5" />,
                                   tts: <Volume2 size={12} className="md:w-3.5 md:h-3.5" />,
-                                  code: <Code2 size={12} className="md:w-3.5 md:h-3.5" />,
-                                  canvas: <LayoutGrid size={12} className="md:w-3.5 md:h-3.5" />,
                                   perplexta_music: <Music size={12} className="md:w-3.5 md:h-3.5" />,
-                                  sovereign_memory: <Server size={12} className="md:w-3.5 md:h-3.5" />,
-                                  sovereign_search: <Search size={12} className="md:w-3.5 md:h-3.5" />,
                                   x402_api: <Key size={12} className="md:w-3.5 md:h-3.5" />,
                                   storage_mb: <Cloud size={12} className="md:w-3.5 md:h-3.5" />,
                                 };
@@ -583,7 +736,7 @@ export const SubscriptionPage: React.FC = () => {
                                     ? plan.limits[toolId]
                                     : { daily: 0, monthly: 0 };
                                   
-                                  if (limitVal?.isHidden) return null;
+                                  if (limitVal?.isHidden === true || limitVal?.isHidden === 'true') return null;
 
                                   const label = t(toolId) || toolId;
                                   const icon = toolIcons[toolId] || <CheckCircle2 size={12} className="md:w-3.5 md:h-3.5" />;
@@ -621,7 +774,7 @@ export const SubscriptionPage: React.FC = () => {
               >
                 <div className="p-5 md:p-6 border-b border-[var(--border-main)] flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-shape-sm bg-[var(--sys-color-primary-container)] text-[var(--sys-color-primary)]">
+                    <div className="p-2.5 rounded-shape-sm bg-[var(--surface-subtle)] text-[var(--fg-accent)]">
                       <Wallet size={20} />
                     </div>
                     <h3 className="text-lg font-bold text-[var(--text-primary)]">{t('confirmSubscription')}</h3>
@@ -644,17 +797,19 @@ export const SubscriptionPage: React.FC = () => {
                       <span className="font-bold text-[var(--text-primary)]">${Number(balanceUSD || 0).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs md:text-sm">
-                      <span className="text-[var(--text-muted)]">{t('planPrice')}</span>
-                      <span className="font-bold text-[var(--sys-color-primary)]">-${getDisplayPrice(confirmingPlan, billingCycle).toFixed(2)}</span>
+                      <span className="text-[var(--text-muted)]">
+                        {t('planPrice')} ({getCycleLabel(confirmingCycle, confirmingPlan)})
+                      </span>
+                      <span className="font-bold text-[var(--fg-accent)]">-${getDisplayPrice(confirmingPlan, confirmingCycle).toFixed(2)}</span>
                     </div>
                     <div className="pt-2.5 border-t border-[var(--border-main)] flex justify-between items-center text-xs md:text-sm">
                       <span className="font-medium text-[var(--text-primary)]">{t('remainingBalance')}</span>
-                      <span className={`font-bold ${balanceUSD - getDisplayPrice(confirmingPlan, billingCycle) < 0 ? 'text-rose-500' : 'text-[var(--text-primary)]'}`}>
-                        ${(Number(balanceUSD || 0) - getDisplayPrice(confirmingPlan, billingCycle)).toFixed(2)}
+                      <span className={`font-bold ${balanceUSD - getDisplayPrice(confirmingPlan, confirmingCycle) < 0 ? 'text-rose-500' : 'text-[var(--text-primary)]'}`}>
+                        ${(Number(balanceUSD || 0) - getDisplayPrice(confirmingPlan, confirmingCycle)).toFixed(2)}
                       </span>
                     </div>
                   </div>
-                  {balanceUSD - getDisplayPrice(confirmingPlan, billingCycle) < 0 && (
+                  {balanceUSD - getDisplayPrice(confirmingPlan, confirmingCycle) < 0 && (
                     <div className="flex items-start gap-2.5 p-3.5 rounded-shape-sm bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400">
                       <AlertCircle size={18} className="shrink-0 mt-0.5" />
                       <p className="text-xs font-semibold leading-relaxed">{t('insufficientBalance')}</p>
@@ -671,8 +826,8 @@ export const SubscriptionPage: React.FC = () => {
                   </button>
                   <button 
                     onClick={executePayment}
-                    disabled={loading !== null || balanceUSD - getDisplayPrice(confirmingPlan, billingCycle) < 0}
-                    className="flex-1 py-2.5 min-h-[44px] rounded-shape-sm bg-[var(--sys-color-primary)] hover:opacity-90 text-[var(--sys-color-on-primary)] font-bold text-xs md:text-sm transition-all duration-150 shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer touch-target-44 active:scale-95"
+                    disabled={loading !== null || balanceUSD - getDisplayPrice(confirmingPlan, confirmingCycle) < 0}
+                    className="flex-1 py-2.5 min-h-[44px] rounded-shape-sm bg-[var(--fg-accent)] hover:opacity-90 text-[var(--comp-button-primary-fg,#ffffff)] font-bold text-xs md:text-sm transition-all duration-150 shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer touch-target-44 active:scale-95"
                   >
                     {loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
                     {t('confirmAndActivate')}
@@ -701,7 +856,7 @@ export const SubscriptionPage: React.FC = () => {
                 className="relative w-full max-w-md rounded-shape-lg shadow-2xl overflow-hidden border p-5 md:p-7 text-center bg-[var(--surface-card)] border-[var(--border-main)]"
               >
                 {/* Admin Defined Plan Color Stripe */}
-                <div className="absolute top-0 left-0 right-0 h-1.5" style={{ backgroundColor: selectedPlanForModal?.color || 'var(--sys-color-primary)' }} />
+                <div className="absolute top-0 left-0 right-0 h-1.5" style={{ backgroundColor: selectedPlanForModal?.color || 'var(--fg-accent)' }} />
                 
                 <button 
                   onClick={() => {
@@ -721,12 +876,12 @@ export const SubscriptionPage: React.FC = () => {
                   <div 
                     className="w-16 h-16 md:w-18 md:h-18 rounded-shape-md flex items-center justify-center"
                     style={{ 
-                      backgroundColor: `${selectedPlanForModal?.color || 'var(--sys-color-primary)'}18`, 
-                      color: selectedPlanForModal?.color || 'var(--sys-color-primary)' 
+                      backgroundColor: `${selectedPlanForModal?.color || 'var(--fg-accent)'}18`, 
+                      color: selectedPlanForModal?.color || 'var(--fg-accent)' 
                     }}
                   >
                     {resultModal === 'success' ? (
-                      <CheckCircle2 size={32} className="md:w-9 md:h-9" style={{ filter: `drop-shadow(0 0 10px ${selectedPlanForModal?.color || '#06b6d4'}50)` }} />
+                      <CheckCircle2 size={32} className="md:w-9 md:h-9" style={{ filter: `drop-shadow(0 0 10px ${selectedPlanForModal?.color || '#0969da'}50)` }} />
                     ) : (
                       <AlertCircle size={32} className="md:w-9 md:h-9 text-amber-500" />
                     )}
@@ -746,7 +901,7 @@ export const SubscriptionPage: React.FC = () => {
                   >
                     <div 
                       className="flex items-center gap-2 text-xs font-bold mb-2"
-                      style={{ color: selectedPlanForModal?.color || 'var(--sys-color-primary)' }}
+                      style={{ color: selectedPlanForModal?.color || 'var(--fg-accent)' }}
                     >
                       <Loader2 size={14} className="animate-spin" />
                       <span>
@@ -759,7 +914,7 @@ export const SubscriptionPage: React.FC = () => {
                     <div className="w-full bg-[var(--border-main)] h-1.5 rounded-shape-full overflow-hidden">
                       <div 
                         className="h-full transition-all duration-1000"
-                        style={{ width: `${(redirectCountdown / 5) * 100}%`, backgroundColor: selectedPlanForModal?.color || 'var(--sys-color-primary)' }}
+                        style={{ width: `${(redirectCountdown / 5) * 100}%`, backgroundColor: selectedPlanForModal?.color || 'var(--fg-accent)' }}
                       />
                     </div>
                   </div>
@@ -783,7 +938,7 @@ export const SubscriptionPage: React.FC = () => {
                     <button 
                       onClick={handleCopyLink}
                       className="shrink-0 w-8 h-8 rounded-shape-xs flex items-center justify-center transition-all text-white cursor-pointer active:scale-95"
-                      style={{ backgroundColor: copied ? '#059669' : selectedPlanForModal?.color || 'var(--sys-color-primary)' }}
+                      style={{ backgroundColor: copied ? '#059669' : selectedPlanForModal?.color || 'var(--fg-accent)' }}
                       title={copied ? 'Copied' : 'Copy link'}
                     >
                       {copied ? <CheckCircle2 size={15} /> : <Copy size={15} />}
@@ -799,8 +954,8 @@ export const SubscriptionPage: React.FC = () => {
                     onClick={handleShare}
                     className="flex-1 py-2.5 min-h-[44px] rounded-shape-sm text-white font-bold text-xs md:text-sm transition-all duration-150 shadow-sm flex items-center justify-center gap-2 cursor-pointer active:scale-95 touch-target-44"
                     style={{ 
-                      backgroundColor: selectedPlanForModal?.color || 'var(--sys-color-primary)', 
-                      boxShadow: `0 4px 14px -2px ${(selectedPlanForModal?.color || '#06b6d4')}40` 
+                      backgroundColor: selectedPlanForModal?.color || 'var(--fg-accent)', 
+                      boxShadow: `0 4px 14px -2px ${(selectedPlanForModal?.color || '#0969da')}40` 
                     }}
                   >
                     <Share2 size={16} />
@@ -817,7 +972,7 @@ export const SubscriptionPage: React.FC = () => {
                   >
                     {resultModal === 'success' ? (
                       <>
-                        <CheckCircle2 size={16} style={{ color: selectedPlanForModal?.color || 'var(--sys-color-primary)' }} />
+                        <CheckCircle2 size={16} style={{ color: selectedPlanForModal?.color || 'var(--fg-accent)' }} />
                         <span>{dir === 'rtl' ? 'الانتقال للرئيسية' : 'Go to Homepage'}</span>
                       </>
                     ) : (

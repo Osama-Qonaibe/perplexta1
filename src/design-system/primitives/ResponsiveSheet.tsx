@@ -56,19 +56,19 @@ export const ResponsiveSheet: React.FC<ResponsiveSheetProps> = ({
             exit="exit"
             onClick={(e) => e.stopPropagation()}
             className={`
-              w-full sm:max-w-lg max-h-[85dvh] flex flex-col rounded-t-2xl sm:rounded-xl
-              bg-[#0d131f]/95 border border-slate-800/90 shadow-2xl backdrop-blur-xl
-              text-slate-100 overflow-hidden transform-gpu
+              w-full sm:max-w-lg max-h-[85dvh] flex flex-col rounded-t-[var(--radius-lg)] sm:rounded-[var(--radius-md)]
+              bg-[var(--surface-card)] border border-[var(--border-default)] shadow-2xl backdrop-blur-xl
+              text-[var(--text-primary)] overflow-hidden transform-gpu
               ${className}
             `}
           >
             {/* Sheet Handle for Mobile */}
             <div className="w-full flex items-center justify-center pt-2.5 pb-1 sm:hidden cursor-grab active:cursor-grabbing">
-              <div className="w-10 h-1 rounded-full bg-slate-700/80" />
+              <div className="w-10 h-1 rounded-full bg-[var(--border-default)]" />
             </div>
 
             {title && (
-              <div className="px-4 py-3 border-b border-slate-800/80 font-bold text-sm text-slate-200">
+              <div className="px-4 py-3 border-b border-[var(--border-default)] font-bold text-sm text-[var(--text-primary)]">
                 {title}
               </div>
             )}

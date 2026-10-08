@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 import { useAppContext } from '../context/AppContext';
 import { getMediaUrl } from '../utils/mediaUtils';
-import { useConfirm, toast } from '@/design-system';
+import { useConfirm, toast, SelectDropdown } from '@/design-system';
 import {
   Megaphone,
   Plus,
@@ -1056,38 +1056,71 @@ export const AdsManagementView: React.FC<{
   const totalClicks = ads.reduce((acc, a) => acc + (a.click_count || 0), 0);
   const avgCtr = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(1) : '0.0';
 
+  useEffect(() => {
+    const handleAddAdEvent = () => {
+      handleOpenCreateModal();
+    };
+    const handleRefreshAdsEvent = () => {
+      fetchAds();
+      fetchBulletinAds();
+    };
+    window.addEventListener("admin-add-ad", handleAddAdEvent);
+    window.addEventListener("admin-refresh-ads", handleRefreshAdsEvent);
+    return () => {
+      window.removeEventListener("admin-add-ad", handleAddAdEvent);
+      window.removeEventListener("admin-refresh-ads", handleRefreshAdsEvent);
+    };
+  }, []);
+
   return (
-    <div className="space-y-6 ads-management-container transition-theme [will-change:background-color,border-color,color]">
-      {/* Top Header & Stat Cards */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--surface-subtle)] border border-[var(--border-default)] p-5 rounded-lg shadow-sm">
-        <div>
-          <div className="flex items-center gap-2 text-accent  mb-1">
-            <Megaphone size={20} />
-            <h2 className="text-xl font-black text-[var(--text-primary)]">
-              {isRtl ? 'إدارة الإعلانات والشريط الجانبي' : 'Ads & Sidebar Sponsored Management'}
-            </h2>
+    <div className="w-full max-w-full space-y-6 ads-management-container transition-theme [will-change:background-color,border-color,color] px-1 md:px-2">
+      {/* Top Sovereign Orchestrator Diagnostic Header */}
+      <div className="p-6 rounded-[var(--radius-lg)] border bg-[var(--surface-card)] border-[var(--border-default)] shadow-xs transition-theme flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-center justify-center text-[var(--fg-accent)] shadow-xs">
+            <Megaphone size={22} />
           </div>
-          <p className="text-xs text-[var(--text-muted)]">
-            {isRtl
-              ? 'التحكم المباشر بالإعلانات الجانبية التي تظهر للمستخدمين.'
-              : 'Directly control sidebar sponsored cards shown to users.'}
-          </p>
+          <div>
+            <h1 className="text-xl font-black tracking-tight flex items-center gap-3 text-[var(--text-primary)]">
+              <span>{isRtl ? 'إدارة الإعلانات والتبويبات التجاريّة' : 'Ads & Commercial Bulletin Control Center'}</span>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-[var(--radius-xs)] bg-[var(--bg-accent-emphasis)]/10 text-[var(--fg-accent)] border border-[var(--border-accent)]/30 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-[var(--radius-full)] bg-[var(--fg-accent)] animate-pulse" />
+                {totalActive} {isRtl ? 'نشط' : 'Active'}
+              </span>
+            </h1>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+              {isRtl
+                ? 'إدارة إعلانات المنصة، التبويبات التجارية، مراجعة الاعتمادات، وتحليلات الأداء لحظياً'
+                : 'Real-time administration for platform ads, bulletin posts, 2FA approvals, and performance analytics'}
+            </p>
+          </div>
         </div>
 
-        <button
-          onClick={handleOpenCreateModal}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-accent hover:bg-accent text-white font-bold text-xs shadow-lg shadow-none transition-theme shrink-0"
-        >
-          <Plus size={16} />
-          <span>{isRtl ? 'إضافة إعلان جديد' : 'Create New Ad'}</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Quick Metrics Bar */}
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[11px] font-mono text-[var(--text-secondary)]">
+            <span>{isRtl ? 'المشاهدات:' : 'Impressions:'} <strong className="text-[var(--text-primary)]">{totalImpressions.toLocaleString()}</strong></span>
+            <span className="text-[var(--border-default)]">|</span>
+            <span>{isRtl ? 'النقرات:' : 'Clicks:'} <strong className="text-[var(--text-primary)]">{totalClicks.toLocaleString()}</strong></span>
+            <span className="text-[var(--border-default)]">|</span>
+            <span>CTR: <strong className="text-[var(--fg-accent)]">{avgCtr}%</strong></span>
+          </div>
+
+          <button
+            onClick={handleOpenCreateModal}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 min-h-[44px] touch-target-44 rounded-[var(--radius-sm)] bg-[var(--bg-accent-emphasis)] hover:opacity-90 text-[var(--fg-on-emphasis)] font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer shrink-0"
+          >
+            <Plus size={16} />
+            <span>{isRtl ? 'إضافة إعلان جديد' : 'Create New Ad'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Sub-Tab Switcher */}
       <div className="flex items-center gap-3 border-b border-[var(--border-default)] pb-3">
         <button
           onClick={() => setActiveTab('platform')}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-theme flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-theme flex items-center gap-2 ${
             activeTab === 'platform'
               ? 'bg-accent text-white shadow-md shadow-none'
               : 'bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-accent'
@@ -1105,16 +1138,16 @@ export const AdsManagementView: React.FC<{
             setActiveTab('bulletin');
             fetchBulletinAds();
           }}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-theme flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-theme flex items-center gap-2 ${
             activeTab === 'bulletin'
               ? 'bg-accent text-white shadow-md shadow-none'
               : 'bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-accent'
           }`}
         >
           <Sparkles size={15} />
-          <span>{isRtl ? 'إعلانات فايرال بوك والمجتمع' : 'ViralBook Community Ads'}</span>
+          <span>{isRtl ? 'إعلانات فيرال بوك والمجتمع' : 'ViralBook Community Ads'}</span>
           {bulletinAds.filter(b => b.status === 'pending').length > 0 && (
-            <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500 text-white font-extrabold animate-pulse">
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-[var(--fg-warning)] text-white font-extrabold animate-pulse">
               {bulletinAds.filter(b => b.status === 'pending').length} {isRtl ? 'معلّق' : 'Pending'}
             </span>
           )}
@@ -1125,7 +1158,7 @@ export const AdsManagementView: React.FC<{
             setActiveTab('analytics');
             fetchAdminAnalytics();
           }}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-theme flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-theme flex items-center gap-2 ${
             activeTab === 'analytics'
               ? 'bg-accent text-white shadow-md shadow-none'
               : 'bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-accent'
@@ -1141,7 +1174,7 @@ export const AdsManagementView: React.FC<{
             fetchEconomySettings();
             fetchGiftCatalog();
           }}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-theme flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-theme flex items-center gap-2 ${
             activeTab === 'economy'
               ? 'bg-accent text-white shadow-md shadow-none'
               : 'bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-accent'
@@ -1156,16 +1189,16 @@ export const AdsManagementView: React.FC<{
             setActiveTab('approval');
             fetchApprovalQueue();
           }}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-theme flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-theme flex items-center gap-2 ${
             activeTab === 'approval'
-              ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
-              : 'bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-amber-500'
+              ? 'bg-[var(--fg-warning)] text-white shadow-md shadow-amber-500/20'
+              : 'bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--fg-warning)]'
           }`}
         >
           <CheckCircle2 size={15} />
           <span>{isRtl ? 'قائمة الموافقات (2FA)' : 'Approval Queue (2FA)'}</span>
           {approvalRequests.filter(r => r.status === 'pending').length > 0 && (
-            <span className="px-2 py-0.5 rounded-full text-[10px] bg-red-500 text-white font-extrabold animate-pulse">
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-[var(--fg-danger)] text-white font-extrabold animate-pulse">
               {approvalRequests.filter(r => r.status === 'pending').length}
             </span>
           )}
@@ -1176,10 +1209,10 @@ export const AdsManagementView: React.FC<{
             setActiveTab('audit');
             fetchAuditLogs();
           }}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-theme flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-theme flex items-center gap-2 ${
             activeTab === 'audit'
-              ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20'
-              : 'bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-blue-500'
+              ? 'bg-[var(--fg-accent)] text-white shadow-md shadow-blue-500/20'
+              : 'bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--fg-accent)]'
           }`}
         >
           <History size={15} />
@@ -1191,7 +1224,7 @@ export const AdsManagementView: React.FC<{
       {activeTab === 'analytics' ? (
         <div className="space-y-6">
           {isAnalyticsLoading || !analyticsData ? (
-            <div className="p-12 text-center text-xs text-gray-400 flex flex-col items-center gap-2 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-xl">
+            <div className="p-12 text-center text-xs text-[var(--text-muted)] flex flex-col items-center gap-2 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-md)]">
               <RefreshCw size={24} className="animate-spin text-accent" />
               <span>{isRtl ? 'جاري تحميل تحليلات وإيرادات الإعلانات...' : 'Loading ad analytics & revenue...'}</span>
             </div>
@@ -1199,8 +1232,8 @@ export const AdsManagementView: React.FC<{
             <>
               {/* Summary Metrics */}
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] p-4 rounded-xl flex items-center gap-3 shadow-sm">
-                  <div className="p-2.5 rounded-lg bg-accent/10 text-accent ">
+                <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] p-4 rounded-[var(--radius-md)] flex items-center gap-3 shadow-sm">
+                  <div className="p-2.5 rounded-[var(--radius-sm)] bg-accent/10 text-accent ">
                     <DollarSign size={22} />
                   </div>
                   <div>
@@ -1209,8 +1242,8 @@ export const AdsManagementView: React.FC<{
                   </div>
                 </div>
 
-                <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] p-4 rounded-xl flex items-center gap-3 shadow-sm">
-                  <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-500">
+                <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] p-4 rounded-[var(--radius-md)] flex items-center gap-3 shadow-sm">
+                  <div className="p-2.5 rounded-[var(--radius-sm)] bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)]">
                     <Eye size={22} />
                   </div>
                   <div>
@@ -1219,8 +1252,8 @@ export const AdsManagementView: React.FC<{
                   </div>
                 </div>
 
-                <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] p-4 rounded-xl flex items-center gap-3 shadow-sm">
-                  <div className="p-2.5 rounded-lg bg-purple-500/10 text-purple-500">
+                <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] p-4 rounded-[var(--radius-md)] flex items-center gap-3 shadow-sm">
+                  <div className="p-2.5 rounded-[var(--radius-sm)] bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)]">
                     <MousePointerClick size={22} />
                   </div>
                   <div>
@@ -1229,18 +1262,18 @@ export const AdsManagementView: React.FC<{
                   </div>
                 </div>
 
-                <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] p-4 rounded-xl flex items-center gap-3 shadow-sm">
-                  <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-500">
+                <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] p-4 rounded-[var(--radius-md)] flex items-center gap-3 shadow-sm">
+                  <div className="p-2.5 rounded-[var(--radius-sm)] bg-[var(--status-warning-subtle)] text-[var(--fg-warning)]">
                     <TrendingUp size={22} />
                   </div>
                   <div>
                     <div className="text-[11px] text-[var(--text-muted)] font-bold">{isRtl ? 'متوسط نسبة النقر (CTR)' : 'Average CTR'}</div>
-                    <div className="text-xl font-black text-amber-500">{analyticsData.summary.avgCTR}%</div>
+                    <div className="text-xl font-black text-[var(--fg-warning)]">{analyticsData.summary.avgCTR}%</div>
                   </div>
                 </div>
 
-                <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] p-4 rounded-xl flex items-center gap-3 shadow-sm col-span-2 lg:col-span-1">
-                  <div className="p-2.5 rounded-lg bg-teal-500/10 text-teal-500">
+                <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] p-4 rounded-[var(--radius-md)] flex items-center gap-3 shadow-sm col-span-2 lg:col-span-1">
+                  <div className="p-2.5 rounded-[var(--radius-sm)] bg-teal-500/10 text-teal-500">
                     <Users size={22} />
                   </div>
                   <div>
@@ -1253,7 +1286,7 @@ export const AdsManagementView: React.FC<{
               {/* Charts Section */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Time Series Area Chart */}
-                <div className="lg:col-span-2 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-2xl p-5 space-y-4 shadow-sm">
+                <div className="lg:col-span-2 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-lg)] p-5 space-y-4 shadow-sm">
                   <div className="flex items-center justify-between pb-3 border-b border-[var(--border-default)]">
                     <div>
                       <h3 className="font-black text-sm text-[var(--text-primary)] flex items-center gap-2">
@@ -1316,10 +1349,10 @@ export const AdsManagementView: React.FC<{
                 </div>
 
                 {/* Placement & Type Breakdown */}
-                <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-2xl p-5 space-y-4 shadow-sm">
+                <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-lg)] p-5 space-y-4 shadow-sm">
                   <div className="pb-3 border-b border-[var(--border-default)]">
                     <h3 className="font-black text-sm text-[var(--text-primary)] flex items-center gap-2">
-                      <PieIcon size={18} className="text-purple-500" />
+                      <PieIcon size={18} className="text-[var(--fg-accent)]" />
                       <span>{isRtl ? 'توزيع أنواع وأماكن الإعلانات' : 'Ad Placement Breakdown'}</span>
                     </h3>
                     <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
@@ -1360,7 +1393,7 @@ export const AdsManagementView: React.FC<{
                     {analyticsData.placementData.map((item: any, idx: number) => (
                       <div key={`placement-item-${idx}-${item.name}`} className="flex justify-between items-center">
                         <span className="text-[var(--text-muted)] font-medium">{item.name}</span>
-                        <span className="font-extrabold text-accent">${item.revenue}</span>
+                        <span className="font-extrabold text-[var(--fg-accent)]">${item.revenue}</span>
                       </div>
                     ))}
                   </div>
@@ -1368,11 +1401,11 @@ export const AdsManagementView: React.FC<{
               </div>
 
               {/* Advertisers Revenue Leaderboard Table */}
-              <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-2xl p-5 space-y-4 shadow-sm">
+              <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-lg)] p-5 space-y-4 shadow-sm">
                 <div className="pb-3 border-b border-[var(--border-default)] flex items-center justify-between">
                   <div>
                     <h3 className="font-black text-sm text-[var(--text-primary)] flex items-center gap-2">
-                      <Award size={18} className="text-accent" />
+                      <Award size={18} className="text-[var(--fg-accent)]" />
                       <span>{isRtl ? 'قائمة المعلنين والشركاء حسب الإيرادات والإنفاق' : 'Advertiser Revenue Leaderboard'}</span>
                     </h3>
                     <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
@@ -1398,31 +1431,31 @@ export const AdsManagementView: React.FC<{
                         <tr key={`adv-rank-${idx}-${adv.sponsor_name || adv.user_email}`} className="hover:bg-[var(--surface-page)]/50 transition-colors">
                           <td className="p-3">
                             <div className="font-extrabold text-[var(--text-primary)] flex items-center gap-2">
-                              <span className="w-5 h-5 rounded-full bg-accent/10 text-accent flex items-center justify-center text-[10px] shrink-0 font-mono">
+                              <span className="w-5 h-5 rounded-[var(--radius-full)] bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] flex items-center justify-center text-[10px] shrink-0 font-mono">
                                 #{idx + 1}
                               </span>
                               <span>{adv.sponsor_name}</span>
                             </div>
-                            <div className="text-[10px] text-gray-400 ms-7">{adv.user_email}</div>
+                            <div className="text-[10px] text-[var(--text-muted)] ms-7">{adv.user_email}</div>
                           </td>
 
                           <td className="p-3 text-center font-bold text-[var(--text-primary)]">
                             {adv.ads_count}
                           </td>
 
-                          <td className="p-3 text-center font-black text-accent font-mono text-sm">
+                          <td className="p-3 text-center font-black text-[var(--fg-accent)] font-mono text-sm">
                             ${adv.total_revenue}
                           </td>
 
-                          <td className="p-3 text-center font-bold text-blue-500 font-mono">
+                          <td className="p-3 text-center font-bold text-[var(--fg-accent)] font-mono">
                             {adv.impressions.toLocaleString()}
                           </td>
 
-                          <td className="p-3 text-center font-bold text-purple-500 font-mono">
+                          <td className="p-3 text-center font-bold text-[var(--fg-accent)] font-mono">
                             {adv.clicks.toLocaleString()}
                           </td>
 
-                          <td className="p-3 text-center font-black text-amber-500 font-mono">
+                          <td className="p-3 text-center font-black text-[var(--fg-warning)] font-mono">
                             {adv.ctr}%
                           </td>
                         </tr>
@@ -1433,11 +1466,11 @@ export const AdsManagementView: React.FC<{
               </div>
 
               {/* Campaign ROI Correlation Widget */}
-              <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-2xl p-6 shadow-sm space-y-6">
+              <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-lg)] p-6 shadow-sm space-y-6">
                 <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-4">
                   <div>
                     <h3 className="font-black text-sm text-[var(--text-primary)] flex items-center gap-2">
-                      <TrendingUp size={18} className="text-accent" />
+                      <TrendingUp size={18} className="text-[var(--fg-accent)]" />
                       <span>{isRtl ? 'تحليل عائد الاستثمار (Campaign ROI Analysis)' : 'Campaign ROI & Revenue Correlation'}</span>
                     </h3>
                     <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
@@ -1449,7 +1482,7 @@ export const AdsManagementView: React.FC<{
                   <button
                     onClick={fetchRoiData}
                     disabled={isRoiLoading}
-                    className="p-2 rounded-lg bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-muted)] hover:text-accent transition-theme"
+                    className="p-2 rounded-[var(--radius-sm)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-muted)] hover:text-accent transition-theme"
                   >
                     <RefreshCw size={14} className={isRoiLoading ? 'animate-spin' : ''} />
                   </button>
@@ -1527,23 +1560,23 @@ export const AdsManagementView: React.FC<{
                 </div>
 
                 <div className="grid grid-cols-3 gap-4 pt-4 border-t border-[var(--border-default)]">
-                  <div className="bg-[var(--surface-page)]/50 p-3 rounded-xl border border-[var(--border-default)]">
+                  <div className="bg-[var(--surface-page)]/50 p-3 rounded-[var(--radius-md)] border border-[var(--border-default)]">
                     <div className="text-[9px] text-[var(--text-muted)] font-black uppercase tracking-wider mb-1">{isRtl ? 'متوسط العائد' : 'Avg ROI'}</div>
-                    <div className="text-sm font-black text-accent">
+                    <div className="text-sm font-black text-[var(--fg-accent)]">
                       {roiData.length > 0 
                         ? (roiData.reduce((acc, curr) => acc + Number(curr.roi_percent), 0) / roiData.length).toFixed(1)
                         : '0.0'}%
                     </div>
                   </div>
-                  <div className="bg-[var(--surface-page)]/50 p-3 rounded-xl border border-[var(--border-default)]">
+                  <div className="bg-[var(--surface-page)]/50 p-3 rounded-[var(--radius-md)] border border-[var(--border-default)]">
                     <div className="text-[9px] text-[var(--text-muted)] font-black uppercase tracking-wider mb-1">{isRtl ? 'إجمالي الإنفاق' : 'Total Spend'}</div>
-                    <div className="text-sm font-black text-indigo-500">
+                    <div className="text-sm font-black text-[var(--fg-accent)]">
                       ${roiData.reduce((acc, curr) => acc + Number(curr.spend), 0).toLocaleString()}
                     </div>
                   </div>
-                  <div className="bg-[var(--surface-page)]/50 p-3 rounded-xl border border-[var(--border-default)]">
+                  <div className="bg-[var(--surface-page)]/50 p-3 rounded-[var(--radius-md)] border border-[var(--border-default)]">
                     <div className="text-[9px] text-[var(--text-muted)] font-black uppercase tracking-wider mb-1">{isRtl ? 'إجمالي الإيرادات' : 'Total Revenue'}</div>
-                    <div className="text-sm font-black text-accent">
+                    <div className="text-sm font-black text-[var(--fg-success)]">
                       ${roiData.reduce((acc, curr) => acc + Number(curr.revenue), 0).toLocaleString()}
                     </div>
                   </div>
@@ -1551,11 +1584,11 @@ export const AdsManagementView: React.FC<{
               </div>
 
               {/* Ad Performance Heatmap Section */}
-              <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-2xl p-6 shadow-sm space-y-6">
+              <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-lg)] p-6 shadow-sm space-y-6">
                 <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-4">
                   <div>
                     <h3 className="font-black text-sm text-[var(--text-primary)] flex items-center gap-2">
-                      <Monitor size={18} className="text-amber-500" />
+                      <Monitor size={18} className="text-[var(--fg-warning)]" />
                       <span>{isRtl ? 'خريطة الأداء الحرارية (Conversion Heatmap)' : 'Performance Heatmap (CR%)'}</span>
                     </h3>
                     <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
@@ -1566,16 +1599,16 @@ export const AdsManagementView: React.FC<{
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded bg-gray-800 border border-[var(--border-default)]"></div>
+                      <div className="w-3 h-3 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] border border-[var(--border-default)]"></div>
                       <span className="text-[9px] text-[var(--text-muted)] font-bold">0%</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded bg-accent shadow-[0_0_8px_rgba(156,163,175,0.5)]"></div>
+                      <div className="w-3 h-3 rounded-[var(--radius-xs)] bg-[var(--bg-accent-emphasis)]"></div>
                       <span className="text-[9px] text-[var(--text-muted)] font-bold">10%+</span>
                     </div>
                     <button
                       onClick={fetchHeatmapData}
-                      className="p-2 rounded-lg bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-muted)] hover:text-amber-500 transition-theme"
+                      className="p-2 rounded-[var(--radius-sm)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--fg-warning)] transition-theme cursor-pointer"
                     >
                       <RefreshCw size={14} className={isHeatmapLoading ? 'animate-spin' : ''} />
                     </button>
@@ -1606,17 +1639,17 @@ export const AdsManagementView: React.FC<{
                             const cell = heatmapData.find(item => item.day_of_week === dIdx && item.hour_of_day === hour);
                             const cr = cell ? Number(cell.conversion_rate) : 0;
                             
-                            let bgColor = 'bg-gray-800/20';
+                            let bgColor = 'bg-[var(--surface-subtle)]';
                             let opacity = 'opacity-20';
                             let glow = '';
 
                             if (cr > 0) {
                               opacity = 'opacity-100';
-                              if (cr < 2) bgColor = 'bg-accent/40';
-                              else if (cr < 5) bgColor = 'bg-accent/60';
-                              else if (cr < 8) bgColor = 'bg-accent/80';
+                              if (cr < 2) bgColor = 'bg-[var(--accent)]/40';
+                              else if (cr < 5) bgColor = 'bg-[var(--accent)]/60';
+                              else if (cr < 8) bgColor = 'bg-[var(--accent)]/80';
                               else {
-                                bgColor = 'bg-accent';
+                                bgColor = 'bg-[var(--accent)]';
                                 glow = 'shadow-[0_0_10px_rgba(156,163,175,0.4)]';
                               }
                             }
@@ -1625,7 +1658,7 @@ export const AdsManagementView: React.FC<{
                               <div 
                                 key={`heat-cell-${day}-${hour}`}
                                 title={`${day} ${hour}:00 - CR: ${cr.toFixed(2)}%`}
-                                className={`flex-1 h-8 rounded-sm border border-[var(--border-default)]/50 transition-theme cursor-help group relative ${bgColor} ${opacity} ${glow} hover:scale-110 hover:z-10 hover:border-accent`}
+                                className={`flex-1 h-8 rounded-shape-xs border border-[var(--border-default)]/50 transition-theme cursor-help group relative ${bgColor} ${opacity} ${glow} hover:scale-110 hover:z-10 hover:border-[var(--border-accent)]`}
                               >
                                 {cr > 5 && (
                                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -1641,21 +1674,21 @@ export const AdsManagementView: React.FC<{
                   </div>
                 </div>
 
-                <div className="flex items-center justify-center gap-8 py-2 bg-[var(--surface-page)]/50 rounded-xl border border-[var(--border-default)]">
+                <div className="flex items-center justify-center gap-8 py-2 bg-[var(--surface-page)]/50 rounded-[var(--radius-md)] border border-[var(--border-default)]">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-accent"></div>
+                    <div className="w-2 h-2 rounded-[var(--radius-full)] bg-[var(--accent)]"></div>
                     <span className="text-[10px] text-[var(--text-muted)] font-bold">
                       {isRtl ? 'تحويل مرتفع (>8%)' : 'High Conversion (>8%)'}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-accent"></div>
+                    <div className="w-2 h-2 rounded-[var(--radius-full)] bg-[var(--accent)]/60"></div>
                     <span className="text-[10px] text-[var(--text-muted)] font-bold">
                       {isRtl ? 'تحويل متوسط (2-5%)' : 'Moderate Conversion (2-5%)'}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-gray-800"></div>
+                    <div className="w-2 h-2 rounded-[var(--radius-full)] bg-[var(--surface-subtle)] border border-[var(--border-default)]"></div>
                     <span className="text-[10px] text-[var(--text-muted)] font-bold">
                       {isRtl ? 'بيانات منخفضة / صفرية' : 'Low / Zero Data'}
                     </span>
@@ -1667,11 +1700,11 @@ export const AdsManagementView: React.FC<{
         </div>
       ) : activeTab === 'approval' ? (
         <div className="space-y-6">
-          <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-2xl p-6 shadow-sm space-y-6">
+          <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-lg)] p-6 shadow-sm space-y-6">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-4">
               <div>
                 <h3 className="font-black text-sm text-[var(--text-primary)] flex items-center gap-2">
-                  <CheckCircle2 size={18} className="text-amber-500" />
+                  <CheckCircle2 size={18} className="text-[var(--fg-warning)]" />
                   <span>{isRtl ? 'قائمة الموافقات الإدارية (Approval Queue)' : 'Administrative Approval Queue'}</span>
                 </h3>
                 <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
@@ -1682,23 +1715,23 @@ export const AdsManagementView: React.FC<{
               </div>
               <button
                 onClick={fetchApprovalQueue}
-                className="p-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-page)] text-gray-400 hover:text-amber-500 transition-colors"
+                className="p-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-page)] text-[var(--text-muted)] hover:text-[var(--fg-warning)] transition-colors"
               >
                 <RefreshCw size={15} />
               </button>
             </div>
 
             {approvalRequests.length === 0 ? (
-              <div className="p-12 text-center text-xs text-gray-400 bg-[var(--surface-page)]/50 rounded-xl border border-dashed border-[var(--border-default)]">
+              <div className="p-12 text-center text-xs text-[var(--text-muted)] bg-[var(--surface-page)]/50 rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)]">
                 {isRtl ? 'لا توجد طلبات معلقة حالياً' : 'No pending approval requests.'}
               </div>
             ) : (
               <div className="space-y-4">
                 {/* Bulk Actions Bar */}
                 {selectedRequests.length > 0 && (
-                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+                  <div className="bg-[var(--status-warning-subtle)] border border-[var(--fg-warning)]/20 rounded-[var(--radius-md)] p-4 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center font-black text-xs">
+                      <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-[var(--fg-warning)] text-white flex items-center justify-center font-black text-xs">
                         {selectedRequests.length}
                       </div>
                       <span className="text-xs font-bold text-[var(--text-primary)]">
@@ -1708,13 +1741,13 @@ export const AdsManagementView: React.FC<{
                     <div className="flex items-center gap-3">
                       <button
                         onClick={handleBulkReject}
-                        className="px-4 py-2 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 text-[10px] font-black hover:bg-red-500 hover:text-white transition-theme"
+                        className="px-4 py-2 rounded-[var(--radius-sm)] bg-[var(--status-danger-subtle)] text-[var(--status-danger)] border border-[var(--status-danger)]/20 text-[10px] font-black hover:bg-[var(--status-danger)] hover:text-white transition-theme cursor-pointer"
                       >
                         {isRtl ? 'رفض المحدد' : 'Reject Selected'}
                       </button>
                       <button
                         onClick={handleBulkVerifyOpen}
-                        className="px-6 py-2 rounded-lg bg-accent text-white shadow-lg shadow-none text-[10px] font-black hover:bg-accent active:scale-95 transition-theme"
+                        className="px-6 py-2 rounded-[var(--radius-sm)] bg-[var(--accent)] text-white text-[10px] font-black hover:opacity-90 active:scale-95 transition-theme shadow-sm cursor-pointer"
                       >
                         {isRtl ? 'موافقة جماعية (2FA)' : 'Bulk Approve (2FA)'}
                       </button>
@@ -1737,7 +1770,7 @@ export const AdsManagementView: React.FC<{
                                 setSelectedRequests([]);
                               }
                             }}
-                            className="w-4 h-4 rounded border-[var(--border-default)] bg-[var(--surface-subtle)] accent-accent"
+                            className="w-4 h-4 rounded-[var(--radius-xs)] border-[var(--border-default)] bg-[var(--surface-subtle)] accent-[var(--accent)] cursor-pointer"
                           />
                         </th>
                         <th className="p-3 text-start">{isRtl ? 'الطلب' : 'Request'}</th>
@@ -1752,11 +1785,11 @@ export const AdsManagementView: React.FC<{
                         <tr 
                           key={`ad-req-${req.id || rIdx}-${rIdx}`} 
                           className={`group transition-theme border-l-4 ${
-                            selectedRequests.includes(req.id) ? 'bg-accent/5 border-accent' : 'hover:bg-[var(--surface-page)]/80 border-transparent'
+                            selectedRequests.includes(req.id) ? 'bg-[var(--bg-accent-muted)] border-[var(--border-accent)]' : 'hover:bg-[var(--surface-page)]/80 border-transparent'
                           } ${
-                            req.status === 'approved' ? 'hover:border-accent/50' :
-                            req.status === 'rejected' ? 'hover:border-red-500/50' :
-                            'hover:border-amber-500/50'
+                            req.status === 'approved' ? 'hover:border-[var(--border-accent)]/50' :
+                            req.status === 'rejected' ? 'hover:border-[var(--fg-danger)]/50' :
+                            'hover:border-[var(--fg-warning)]/50'
                           }`}
                         >
                           <td className="p-3">
@@ -1771,24 +1804,24 @@ export const AdsManagementView: React.FC<{
                                   setSelectedRequests(prev => prev.filter(id => id !== req.id));
                                 }
                               }}
-                              className="w-4 h-4 rounded border-[var(--border-default)] bg-[var(--surface-subtle)] accent-accent disabled:opacity-30 cursor-pointer"
+                              className="w-4 h-4 rounded-[var(--radius-xs)] border-[var(--border-default)] bg-[var(--surface-subtle)] accent-[var(--accent)] disabled:opacity-30 cursor-pointer"
                             />
                           </td>
                           <td className="p-3">
                             <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-lg ${
-                                req.status === 'approved' ? 'bg-accent/10 text-accent' :
-                                req.status === 'rejected' ? 'bg-red-500/10 text-red-500' :
-                                'bg-amber-500/10 text-amber-500'
+                              <div className={`p-2 rounded-[var(--radius-xs)] ${
+                                req.status === 'approved' ? 'bg-[var(--bg-accent-muted)] text-[var(--fg-accent)]' :
+                                req.status === 'rejected' ? 'bg-[var(--status-danger-subtle)] text-[var(--fg-danger)]' :
+                                'bg-[var(--status-warning-subtle)] text-[var(--fg-warning)]'
                               }`}>
                                 {req.action_type.includes('batch') ? <Zap size={14} /> : <Coins size={14} />}
                               </div>
                               <div>
-                                <div className="font-black text-[var(--text-primary)] uppercase tracking-tight group-hover:text-accent transition-colors">
+                                <div className="font-black text-[var(--text-primary)] uppercase tracking-tight group-hover:text-[var(--fg-accent)] transition-colors">
                                   {req.action_type.replace(/_/g, ' ')}
                                 </div>
                                 <div className="text-[9px] text-[var(--text-muted)] font-mono mt-0.5">
-                                  REF: <span className="text-accent/70">#{req.id.toString().padStart(5, '0')}</span>
+                                  REF: <span className="text-[var(--fg-accent)]">#{req.id.toString().padStart(5, '0')}</span>
                                 </div>
                               </div>
                             </div>
@@ -1801,15 +1834,15 @@ export const AdsManagementView: React.FC<{
                           </td>
                           <td className="p-3 text-center">
                             <div className="flex flex-col items-center gap-1">
-                              <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider shadow-sm border ${
-                                req.status === 'approved' ? 'bg-accent/10 text-accent border-accent/20' :
-                                req.status === 'pending' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20 animate-pulse' :
-                                'bg-red-500/10 text-red-500 border-red-500/20'
+                              <span className={`px-2.5 py-1 rounded-[var(--radius-full)] text-[9px] font-black uppercase tracking-wider shadow-sm border ${
+                                req.status === 'approved' ? 'bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border-[var(--border-accent)]/20' :
+                                req.status === 'pending' ? 'bg-[var(--status-warning-subtle)] text-[var(--fg-warning)] border-[var(--fg-warning)]/20 animate-pulse' :
+                                'bg-[var(--status-danger-subtle)] text-[var(--fg-danger)] border-[var(--fg-danger)]/20'
                               }`}>
                                 {req.status}
                               </span>
                               {req.status === 'rejected' && req.rejection_reason && (
-                                <span className="text-[8px] text-red-400 max-w-[100px] truncate" title={req.rejection_reason}>
+                                <span className="text-[8px] text-[var(--fg-danger)] max-w-[100px] truncate" title={req.rejection_reason}>
                                   {req.rejection_reason}
                                 </span>
                               )}
@@ -1832,7 +1865,7 @@ export const AdsManagementView: React.FC<{
                                     actionType: req.action_type,
                                     payload: req.payload
                                   })}
-                                  className="px-3 py-1.5 rounded-lg bg-accent text-white font-black text-[9px] hover:bg-accent shadow-lg shadow-none active:scale-95 transition-theme"
+                                  className="px-3 py-1.5 rounded-[var(--radius-xs)] bg-[var(--accent)] text-white font-black text-[9px] hover:opacity-90 shadow-sm active:scale-95 transition-theme cursor-pointer"
                                 >
                                   {isRtl ? 'اعتماد' : 'APPROVE'}
                                 </button>
@@ -1849,7 +1882,7 @@ export const AdsManagementView: React.FC<{
                                     });
                                     if (reason && typeof reason === 'string') handleRejectApproval(req.id, reason);
                                   }}
-                                  className="p-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-theme"
+                                  className="p-1.5 rounded-[var(--radius-sm)] bg-[var(--status-danger-subtle)] text-[var(--status-danger)] hover:bg-[var(--status-danger)] hover:text-white transition-theme"
                                 >
                                   <X size={14} />
                                 </button>
@@ -1872,11 +1905,11 @@ export const AdsManagementView: React.FC<{
         </div>
       ) : activeTab === 'audit' ? (
         <div className="space-y-6">
-          <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-2xl p-6 shadow-sm">
+          <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-lg)] p-6 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-sm font-black text-[var(--text-primary)] flex items-center gap-2 uppercase tracking-tight">
-                  <History size={18} className="text-blue-500" />
+                  <History size={18} className="text-[var(--fg-accent)]" />
                   <span>{isRtl ? 'سجل التدقيق المالي والامتثال' : 'Financial Audit & Compliance Trail'}</span>
                 </h3>
                 <p className="text-[10px] text-[var(--text-muted)] mt-1 font-bold">
@@ -1886,19 +1919,19 @@ export const AdsManagementView: React.FC<{
               <button 
                 onClick={fetchAuditLogs}
                 disabled={isAuditLoading}
-                className="p-2 rounded-lg bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-muted)] hover:text-blue-500 transition-theme shadow-sm disabled:opacity-50"
+                className="p-2 rounded-[var(--radius-sm)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--fg-accent)] transition-theme shadow-sm disabled:opacity-50"
               >
                 <RefreshCw size={15} className={isAuditLoading ? 'animate-spin' : ''} />
               </button>
             </div>
 
             {isAuditLoading && auditLogs.length === 0 ? (
-              <div className="p-12 text-center text-xs text-gray-400 bg-[var(--surface-page)]/50 rounded-xl border border-dashed border-[var(--border-default)]">
-                <RefreshCw size={24} className="animate-spin text-blue-500 mx-auto mb-2" />
+              <div className="p-12 text-center text-xs text-[var(--text-muted)] bg-[var(--surface-page)]/50 rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)]">
+                <RefreshCw size={24} className="animate-spin text-[var(--fg-accent)] mx-auto mb-2" />
                 <span>{isRtl ? 'جاري تحميل سجل التدقيق...' : 'Loading audit history...'}</span>
               </div>
             ) : auditLogs.length === 0 ? (
-              <div className="p-12 text-center text-xs text-gray-400 bg-[var(--surface-page)]/50 rounded-xl border border-dashed border-[var(--border-default)]">
+              <div className="p-12 text-center text-xs text-[var(--text-muted)] bg-[var(--surface-page)]/50 rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)]">
                 {isRtl ? 'لا توجد سجلات تدقيق متاحة حالياً.' : 'No audit records available yet.'}
               </div>
             ) : (
@@ -1936,21 +1969,21 @@ export const AdsManagementView: React.FC<{
                           </span>
                         </td>
                         <td className="p-3 text-center">
-                          <span className="text-red-500/80 font-mono">${Number(log.old_value).toFixed(log.field_name.includes('impression') ? 4 : 2)}</span>
+                          <span className="text-[var(--fg-danger)]/80 font-mono">${Number(log.old_value).toFixed(log.field_name.includes('impression') ? 4 : 2)}</span>
                         </td>
                         <td className="p-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
-                            <TrendingUp size={10} className={Number(log.new_value) > Number(log.old_value) ? 'text-accent' : 'text-red-500 rotate-180'} />
-                            <span className="text-accent font-black font-mono">
+                            <TrendingUp size={10} className={Number(log.new_value) > Number(log.old_value) ? 'text-[var(--fg-accent)]' : 'text-[var(--fg-danger)] rotate-180'} />
+                            <span className="text-[var(--fg-accent)] font-black font-mono">
                               ${Number(log.new_value).toFixed(log.field_name.includes('impression') ? 4 : 2)}
                             </span>
                           </div>
                         </td>
                         <td className="p-3 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter ${
-                            log.change_type === 'batch' ? 'bg-purple-500/10 text-purple-500' :
-                            log.change_type === 'bulk_approval' ? 'bg-amber-500/10 text-amber-500' :
-                            'bg-blue-500/10 text-blue-500'
+                          <span className={`px-2 py-0.5 rounded-[var(--radius-full)] text-[8px] font-black uppercase tracking-tighter ${
+                            log.change_type === 'batch' ? 'bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)]' :
+                            log.change_type === 'bulk_approval' ? 'bg-[var(--status-warning-subtle)] text-[var(--fg-warning)]' :
+                            'bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)]'
                           }`}>
                             {log.change_type.replace(/_/g, ' ')}
                           </span>
@@ -1972,15 +2005,15 @@ export const AdsManagementView: React.FC<{
       ) : activeTab === 'economy' ? (
         <div className="space-y-6">
           {/* Batch Pricing Adjustment Control */}
-          <div className="bg-accent/5 border border-accent/20 rounded-2xl p-6 shadow-sm overflow-hidden relative group">
+          <div className="bg-[var(--bg-accent-muted)]/30 border border-[var(--border-accent)]/30 rounded-[var(--radius-lg)] p-6 shadow-sm overflow-hidden relative group">
             <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none group-hover:scale-110 transition-transform duration-700">
-              <TrendingUp size={120} className="text-accent" />
+              <TrendingUp size={120} className="text-[var(--fg-accent)]" />
             </div>
             
             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="flex-1">
                 <h3 className="font-black text-sm text-[var(--text-primary)] flex items-center gap-2">
-                  <Zap size={18} className="text-accent animate-pulse" />
+                  <Zap size={18} className="text-[var(--fg-accent)] animate-pulse" />
                   <span>{isRtl ? 'التحكم الجماعي في الأسعار' : 'Batch Pricing Adjustment'}</span>
                 </h3>
                 <p className="text-[11px] text-[var(--text-muted)] mt-1 max-w-lg">
@@ -1990,11 +2023,11 @@ export const AdsManagementView: React.FC<{
                 </p>
               </div>
 
-              <div className="flex items-center gap-4 bg-[var(--surface-subtle)] p-2 rounded-xl border border-[var(--border-default)] min-w-[300px]">
+              <div className="flex items-center gap-4 bg-[var(--surface-subtle)] p-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] min-w-[300px]">
                 <div className="flex-1 space-y-1 px-2">
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-[10px] font-black text-[var(--text-muted)] uppercase">{isRtl ? 'النسبة' : 'Percentage'}</span>
-                    <span className={`text-xs font-black ${batchAdjustmentPercent > 0 ? 'text-accent' : batchAdjustmentPercent < 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                    <span className={`text-xs font-black ${batchAdjustmentPercent > 0 ? 'text-[var(--fg-accent)]' : batchAdjustmentPercent < 0 ? 'text-[var(--fg-danger)]' : 'text-[var(--text-muted)]'}`}>
                       {batchAdjustmentPercent > 0 ? '+' : ''}{batchAdjustmentPercent}%
                     </span>
                   </div>
@@ -2005,7 +2038,7 @@ export const AdsManagementView: React.FC<{
                     step="5"
                     value={batchAdjustmentPercent}
                     onChange={(e) => setBatchAdjustmentPercent(parseInt(e.target.value))}
-                    className="w-full h-1.5 bg-[var(--surface-inset)] rounded-lg appearance-none cursor-pointer accent-accent"
+                    className="w-full h-1.5 bg-[var(--surface-inset)] rounded-[var(--radius-sm)] appearance-none cursor-pointer accent-[var(--accent)]"
                   />
                 </div>
                 <button
@@ -2057,7 +2090,7 @@ export const AdsManagementView: React.FC<{
                     setBatchAdjustmentPercent(0);
                   }}
                   disabled={batchAdjustmentPercent === 0}
-                  className="px-5 py-2.5 rounded-lg bg-accent text-white font-black text-xs hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-theme shadow-lg shadow-none active:scale-95"
+                  className="px-5 py-2.5 rounded-[var(--radius-sm)] bg-[var(--accent)] text-white font-black text-xs hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-theme shadow-sm active:scale-95 cursor-pointer"
                 >
                   {isRtl ? 'تطبيق التعديل' : 'Apply Adjustment'}
                 </button>
@@ -2068,11 +2101,11 @@ export const AdsManagementView: React.FC<{
 
 
           {/* System Economy Pricing */}
-          <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-2xl p-6 shadow-sm space-y-6">
+          <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-lg)] p-6 shadow-sm space-y-6">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-4">
               <div>
                 <h3 className="font-black text-sm text-[var(--text-primary)] flex items-center gap-2">
-                  <Coins size={18} className="text-accent" />
+                  <Coins size={18} className="text-[var(--fg-accent)]" />
                   <span>{isRtl ? 'إعدادات تسعير المنصة والعمولات' : 'Platform Pricing & Commission Settings'}</span>
                 </h3>
                 <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
@@ -2082,10 +2115,10 @@ export const AdsManagementView: React.FC<{
               <button
                 onClick={handleUpdateEconomy}
                 disabled={isEconomyLoading}
-                className="px-4 py-2 rounded-md bg-accent text-white font-bold text-xs flex items-center gap-2 hover:bg-accent disabled:opacity-50"
+                className="px-4 py-2 rounded-[var(--radius-sm)] bg-[var(--accent)] text-white font-bold text-xs flex items-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity cursor-pointer"
               >
                 {isEconomyLoading ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-                <span>{isRtl ? 'حفظ التغييرات المالية' : 'Save Economy Settings'}</span>
+                <span>{isRtl ? 'حفظ البيانات' : 'Save Economy'}</span>
               </button>
             </div>
 
@@ -2095,13 +2128,13 @@ export const AdsManagementView: React.FC<{
                   {isRtl ? 'سعر إعلان لوحة المجتمع (يومي)' : 'Bulletin Ad Price (Daily)'}
                 </label>
                 <div className="relative">
-                  <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-accent" />
+                  <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-accent)]" />
                   <input
                     type="number"
                     step="0.1"
                     value={economySettings.bulletin_ad_daily_price}
                     onChange={(e) => setEconomySettings({ ...economySettings, bulletin_ad_daily_price: parseFloat(e.target.value) })}
-                    className="w-full bg-[var(--surface-page)] border border-[var(--border-default)] rounded-md py-2.5 pl-9 pr-4 text-xs font-bold text-[var(--text-primary)] focus:border-accent outline-none"
+                    className="w-full bg-[var(--surface-page)] border border-[var(--border-default)] rounded-[var(--radius-sm)] py-2.5 pl-9 pr-4 text-xs font-bold text-[var(--text-primary)] focus:border-[var(--border-accent)] outline-none"
                   />
                 </div>
               </div>
@@ -2111,12 +2144,12 @@ export const AdsManagementView: React.FC<{
                   {isRtl ? 'عمولة المنصة من الهدايا (%)' : 'Gift Commission Percent (%)'}
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-amber-500">%</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-[var(--fg-warning)]">%</span>
                   <input
                     type="number"
                     value={economySettings.live_gift_commission_percent}
                     onChange={(e) => setEconomySettings({ ...economySettings, live_gift_commission_percent: parseInt(e.target.value) })}
-                    className="w-full bg-[var(--surface-page)] border border-[var(--border-default)] rounded-md py-2.5 pl-9 pr-4 text-xs font-bold text-[var(--text-primary)] focus:border-accent outline-none"
+                    className="w-full bg-[var(--surface-page)] border border-[var(--border-default)] rounded-[var(--radius-sm)] py-2.5 pl-9 pr-4 text-xs font-bold text-[var(--text-primary)] focus:border-[var(--border-accent)] outline-none"
                   />
                 </div>
               </div>
@@ -2126,13 +2159,13 @@ export const AdsManagementView: React.FC<{
                   {isRtl ? 'سعر ظهور الإعلان الجانبي' : 'Sidebar Ad Impression Price'}
                 </label>
                 <div className="relative">
-                  <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500" />
+                  <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-accent)]" />
                   <input
                     type="number"
                     step="0.001"
                     value={economySettings.sidebar_ad_impression_price}
                     onChange={(e) => setEconomySettings({ ...economySettings, sidebar_ad_impression_price: parseFloat(e.target.value) })}
-                    className="w-full bg-[var(--surface-page)] border border-[var(--border-default)] rounded-md py-2.5 pl-9 pr-4 text-xs font-bold text-[var(--text-primary)] focus:border-accent outline-none"
+                    className="w-full bg-[var(--surface-page)] border border-[var(--border-default)] rounded-[var(--radius-sm)] py-2.5 pl-9 pr-4 text-xs font-bold text-[var(--text-primary)] focus:border-[var(--border-accent)] outline-none"
                   />
                 </div>
               </div>
@@ -2142,13 +2175,13 @@ export const AdsManagementView: React.FC<{
                   {isRtl ? 'سعر النقرة على الإعلان الجانبي' : 'Sidebar Ad Click Price'}
                 </label>
                 <div className="relative">
-                  <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-500" />
+                  <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--fg-accent)]" />
                   <input
                     type="number"
                     step="0.01"
                     value={economySettings.sidebar_ad_click_price}
                     onChange={(e) => setEconomySettings({ ...economySettings, sidebar_ad_click_price: parseFloat(e.target.value) })}
-                    className="w-full bg-[var(--surface-page)] border border-[var(--border-default)] rounded-md py-2.5 pl-9 pr-4 text-xs font-bold text-[var(--text-primary)] focus:border-accent outline-none"
+                    className="w-full bg-[var(--surface-page)] border border-[var(--border-default)] rounded-[var(--radius-sm)] py-2.5 pl-9 pr-4 text-xs font-bold text-[var(--text-primary)] focus:border-[var(--border-accent)] outline-none"
                   />
                 </div>
               </div>
@@ -2157,7 +2190,7 @@ export const AdsManagementView: React.FC<{
             {/* Sidebar Master Control */}
             <div className="pt-6 border-t border-[var(--border-default)] flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-blue-500/10 text-blue-500">
+                <div className="p-3 rounded-[var(--radius-md)] bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)]">
                   <Monitor size={24} />
                 </div>
                 <div>
@@ -2185,7 +2218,7 @@ export const AdsManagementView: React.FC<{
             {/* 2FA Security Control */}
             <div className="pt-6 border-t border-[var(--border-default)] flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-xl bg-amber-500/10 text-amber-500">
+                <div className="p-3 rounded-[var(--radius-md)] bg-[var(--status-warning-subtle)] text-[var(--fg-warning)]">
                   <ShieldCheck size={24} />
                 </div>
                 <div>
@@ -2202,7 +2235,7 @@ export const AdsManagementView: React.FC<{
               <button
                 onClick={() => setEconomySettings(prev => ({ ...prev, require_2fa_for_economy: !prev.require_2fa_for_economy }))}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                  economySettings.require_2fa_for_economy ? 'bg-amber-500' : 'bg-gray-700'
+                  economySettings.require_2fa_for_economy ? 'bg-[var(--fg-warning)]' : 'bg-[var(--surface-subtle)] border border-[var(--border-default)]'
                 }`}
               >
                 <span
@@ -2215,7 +2248,7 @@ export const AdsManagementView: React.FC<{
           </div>
 
           {/* Gift Catalog Management */}
-          <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-2xl p-6 shadow-sm space-y-6">
+          <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-lg)] p-6 shadow-sm space-y-6">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-4">
               <div>
                 <h3 className="font-black text-sm text-[var(--text-primary)] flex items-center gap-2">
@@ -2232,7 +2265,7 @@ export const AdsManagementView: React.FC<{
                   setGiftFormData({ name_en: '', name_ar: '', icon: '🌹', points: 10, is_active: true });
                   setIsGiftModalOpen(true);
                 }}
-                className="px-4 py-2 rounded-md bg-accent text-white font-bold text-xs flex items-center gap-2 hover:bg-accent shadow-md"
+                className="px-4 py-2 rounded-[var(--radius-sm)] bg-[var(--accent)] text-white font-bold text-xs flex items-center gap-2 hover:opacity-90 transition-opacity shadow-sm cursor-pointer"
               >
                 <Plus size={14} />
                 <span>{isRtl ? 'إضافة هدية جديدة' : 'Add New Gift'}</span>
@@ -2240,21 +2273,21 @@ export const AdsManagementView: React.FC<{
             </div>
 
             {isGiftsLoading ? (
-              <div className="p-12 text-center text-xs text-gray-400">
-                <RefreshCw size={24} className="animate-spin text-accent mx-auto mb-2" />
+              <div className="p-12 text-center text-xs text-[var(--text-muted)]">
+                <RefreshCw size={24} className="animate-spin text-[var(--fg-accent)] mx-auto mb-2" />
                 <span>{isRtl ? 'جاري تحميل كتالوج الهدايا...' : 'Loading gift catalog...'}</span>
               </div>
             ) : giftCatalog.length === 0 ? (
-              <div className="p-12 text-center text-xs text-gray-400 bg-[var(--surface-page)]/50 rounded-xl border border-dashed border-[var(--border-default)]">
+              <div className="p-12 text-center text-xs text-[var(--text-muted)] bg-[var(--surface-page)]/50 rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)]">
                 {isRtl ? 'لا توجد هدايا مسجلة حالياً' : 'No gifts registered yet.'}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {giftCatalog.map((gift, gIdx) => (
-                  <div key={`ad-gift-${gift.id || gIdx}-${gIdx}`} className="p-4 bg-[var(--surface-page)] border border-[var(--border-default)] rounded-xl flex flex-col gap-3 group relative overflow-hidden transition-theme hover:border-accent/30">
+                  <div key={`ad-gift-${gift.id || gIdx}-${gIdx}`} className="p-4 bg-[var(--surface-page)] border border-[var(--border-default)] rounded-[var(--radius-md)] flex flex-col gap-3 group relative overflow-hidden transition-theme hover:border-[var(--border-accent)]/50">
                     <div className="flex items-center justify-between">
                       <span className="text-3xl">{gift.icon}</span>
-                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${gift.is_active ? 'bg-accent/10 text-accent' : 'bg-red-500/10 text-red-500'}`}>
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-[var(--radius-full)] ${gift.is_active ? 'bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border border-[var(--border-accent)]/30' : 'bg-[var(--status-danger-subtle)] text-[var(--fg-danger)] border border-[var(--fg-danger)]/20'}`}>
                         {gift.is_active ? (isRtl ? 'نشط' : 'Active') : (isRtl ? 'معطل' : 'Disabled')}
                       </span>
                     </div>
@@ -2277,13 +2310,13 @@ export const AdsManagementView: React.FC<{
                           });
                           setIsGiftModalOpen(true);
                         }}
-                        className="flex-1 py-1 rounded bg-blue-500/10 text-blue-500 text-[10px] font-bold hover:bg-blue-500 hover:text-white transition-theme"
+                        className="flex-1 py-1 rounded-[var(--radius-xs)] bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] text-[10px] font-bold hover:bg-[var(--border-accent)] hover:text-[var(--fg-on-accent)] transition-theme cursor-pointer"
                       >
                         {isRtl ? 'تعديل' : 'Edit'}
                       </button>
                       <button
                         onClick={() => handleDeleteGift(gift.id)}
-                        className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                        className="p-1 rounded-[var(--radius-xs)] text-[var(--text-muted)] hover:text-[var(--status-danger)] hover:bg-[var(--status-danger-subtle)] transition-colors cursor-pointer"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -2297,13 +2330,13 @@ export const AdsManagementView: React.FC<{
           {/* Gift Edit Modal */}
           {isGiftModalOpen && (
             <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-              <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-6">
+              <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-lg)] w-full max-w-md p-6 shadow-2xl space-y-6">
                 <div className="flex items-center justify-between pb-4 border-b border-[var(--border-default)]">
-                  <h4 className="font-extrabold text-sm flex items-center gap-2">
-                    <Gift size={18} className="text-accent" />
+                  <h4 className="font-extrabold text-sm flex items-center gap-2 text-[var(--text-primary)]">
+                    <Gift size={18} className="text-[var(--fg-accent)]" />
                     <span>{editingGift ? (isRtl ? 'تعديل بيانات الهدية' : 'Edit Gift') : (isRtl ? 'إضافة هدية جديدة للمنصة' : 'Add New Gift')}</span>
                   </h4>
-                  <button onClick={() => setIsGiftModalOpen(false)} className="text-gray-400 hover:text-white">
+                  <button onClick={() => setIsGiftModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">
                     <X size={20} />
                   </button>
                 </div>
@@ -2311,46 +2344,46 @@ export const AdsManagementView: React.FC<{
                 <form onSubmit={handleSaveGift} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">{isRtl ? 'الاسم (English)' : 'Name (English)'}</label>
+                      <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase">{isRtl ? 'الاسم (English)' : 'Name (English)'}</label>
                       <input
                         required
                         type="text"
                         value={giftFormData.name_en}
                         onChange={(e) => setGiftFormData({ ...giftFormData, name_en: e.target.value })}
-                        className="w-full bg-[var(--surface-page)] border border-[var(--border-default)] rounded-md px-3 py-2 text-xs font-bold text-[var(--text-primary)] focus:border-accent outline-none"
+                        className="w-full bg-[var(--surface-page)] border border-[var(--border-default)] rounded-[var(--radius-sm)] px-3 py-2 text-xs font-bold text-[var(--text-primary)] focus:border-[var(--border-accent)] outline-none"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">{isRtl ? 'الاسم (العربية)' : 'Name (Arabic)'}</label>
+                      <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase">{isRtl ? 'الاسم (العربية)' : 'Name (Arabic)'}</label>
                       <input
                         required
                         type="text"
                         value={giftFormData.name_ar}
                         onChange={(e) => setGiftFormData({ ...giftFormData, name_ar: e.target.value })}
-                        className="w-full bg-[var(--surface-page)] border border-[var(--border-default)] rounded-md px-3 py-2 text-xs font-bold text-[var(--text-primary)] focus:border-accent outline-none text-end"
+                        className="w-full bg-[var(--surface-page)] border border-[var(--border-default)] rounded-[var(--radius-sm)] px-3 py-2 text-xs font-bold text-[var(--text-primary)] focus:border-[var(--border-accent)] outline-none text-end"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">{isRtl ? 'الأيقونة (Emoji)' : 'Icon (Emoji)'}</label>
+                      <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase">{isRtl ? 'الأيقونة (Emoji)' : 'Icon (Emoji)'}</label>
                       <input
                         required
                         type="text"
                         value={giftFormData.icon}
                         onChange={(e) => setGiftFormData({ ...giftFormData, icon: e.target.value })}
-                        className="w-full bg-[var(--surface-page)] border border-[var(--border-default)] rounded-md px-3 py-2 text-lg text-center focus:border-accent outline-none"
+                        className="w-full bg-[var(--surface-page)] border border-[var(--border-default)] rounded-[var(--radius-sm)] px-3 py-2 text-lg text-center focus:border-[var(--border-accent)] outline-none"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">{isRtl ? 'السعر (بالنقاط)' : 'Price (Points)'}</label>
+                      <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase">{isRtl ? 'السعر (بالنقاط)' : 'Price (Points)'}</label>
                       <input
                         required
                         type="number"
                         value={giftFormData.points}
                         onChange={(e) => setGiftFormData({ ...giftFormData, points: parseInt(e.target.value) })}
-                        className="w-full bg-[var(--surface-page)] border border-[var(--border-default)] rounded-md px-3 py-2 text-xs font-bold text-yellow-500 focus:border-accent outline-none"
+                        className="w-full bg-[var(--surface-page)] border border-[var(--border-default)] rounded-[var(--radius-sm)] px-3 py-2 text-xs font-bold text-yellow-500 focus:border-[var(--border-accent)] outline-none"
                       />
                     </div>
                   </div>
@@ -2360,7 +2393,7 @@ export const AdsManagementView: React.FC<{
                       type="checkbox"
                       checked={giftFormData.is_active}
                       onChange={(e) => setGiftFormData({ ...giftFormData, is_active: e.target.checked })}
-                      className="w-4 h-4 rounded text-accent focus:ring-accent-500 accent-accent"
+                      className="w-4 h-4 rounded-[var(--radius-xs)] text-[var(--fg-accent)] accent-[var(--accent)] cursor-pointer"
                     />
                     <span className="text-xs font-bold text-[var(--text-primary)]">
                       {isRtl ? 'هذه الهدية نشطة ومتاحة للاستخدام الآن' : 'Gift is active and available for use'}
@@ -2371,13 +2404,13 @@ export const AdsManagementView: React.FC<{
                     <button
                       type="button"
                       onClick={() => setIsGiftModalOpen(false)}
-                      className="flex-1 px-4 py-2 rounded-md border border-[var(--border-default)] text-xs font-bold text-gray-400 hover:bg-gray-800"
+                      className="flex-1 px-4 py-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] text-xs font-bold text-[var(--text-muted)] hover:bg-[var(--surface-card)] cursor-pointer"
                     >
                       {isRtl ? 'إلغاء' : 'Cancel'}
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 px-4 py-2 rounded-md bg-accent text-white font-black text-xs hover:bg-accent shadow-lg shadow-none"
+                      className="flex-1 px-4 py-2 rounded-[var(--radius-sm)] bg-[var(--accent)] text-white font-black text-xs hover:opacity-90 shadow-sm cursor-pointer"
                     >
                       {isRtl ? 'حفظ البيانات' : 'Save Gift'}
                     </button>
@@ -2388,12 +2421,12 @@ export const AdsManagementView: React.FC<{
           )}
         </div>
       ) : activeTab === 'bulletin' ? (
-        <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-lg p-5 space-y-4">
+        <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-md)] p-5 space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-default)]">
             <div>
               <h3 className="font-black text-sm text-[var(--text-primary)] flex items-center gap-2">
-                <Sparkles size={16} className="text-accent" />
-                <span>{isRtl ? 'طلبات إعلانات فايرال بوك (ViralBook Ads)' : 'ViralBook Community Ad Submissions'}</span>
+                <Sparkles size={16} className="text-[var(--fg-accent)]" />
+                <span>{isRtl ? 'طلبات إعلانات فيرال بوك (ViralBook Ads)' : 'ViralBook Community Ad Submissions'}</span>
               </h3>
               <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
                 {isRtl ? 'مراجعة واعتماد أو رفض الإعلانات الممولة التي نشرها المستخدمون ودفعوا ثمنها من محفظتهم.' : 'Review, approve or reject paid community ads submitted by users.'}
@@ -2402,14 +2435,14 @@ export const AdsManagementView: React.FC<{
             <div className="flex items-center gap-2">
               <button
                 onClick={handleExportSchedule}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-page)] text-[var(--text-primary)] text-[10px] font-black hover:border-accent hover:text-accent transition-theme shadow-sm"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-page)] text-[var(--text-primary)] text-[10px] font-black hover:border-[var(--border-accent)] hover:text-[var(--fg-accent)] transition-theme shadow-sm cursor-pointer"
               >
                 <Download size={13} />
                 <span>{isRtl ? 'تصدير الجدول' : 'Export Schedule'}</span>
               </button>
               <button
                 onClick={fetchBulletinAds}
-                className="p-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-page)] text-gray-400 hover:text-accent transition-colors"
+                className="p-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-page)] text-[var(--text-muted)] hover:text-[var(--fg-accent)] transition-colors cursor-pointer"
               >
                 <RefreshCw size={15} className={isBulletinLoading ? 'animate-spin' : ''} />
               </button>
@@ -2418,7 +2451,7 @@ export const AdsManagementView: React.FC<{
 
           {/* Bulk Action Toolbar */}
           {!isBulletinLoading && bulletinAds.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-2 bg-[var(--surface-page)] p-3 rounded-lg border border-[var(--border-default)]">
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-[var(--surface-page)] p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)]">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-[var(--text-primary)]">
                   {isRtl ? `تم تحديد ${selectedBulletinIds.length} من ${bulletinAds.length}` : `${selectedBulletinIds.length} of ${bulletinAds.length} selected`}
@@ -2426,7 +2459,7 @@ export const AdsManagementView: React.FC<{
                 {selectedBulletinIds.length > 0 && (
                   <button
                     onClick={() => handleBulkDeleteBulletinAds()}
-                    className="px-3 py-1 rounded bg-red-500 text-white font-bold text-[10px] hover:bg-red-600 transition-theme flex items-center gap-1 shadow"
+                    className="px-3 py-1 rounded-[var(--radius-xs)] bg-[var(--status-danger)] text-white font-bold text-[10px] hover:opacity-90 transition-theme flex items-center gap-1 shadow cursor-pointer"
                   >
                     <Trash2 size={12} />
                     <span>{isRtl ? 'حذف المحدد' : 'Delete Selected'}</span>
@@ -2435,7 +2468,7 @@ export const AdsManagementView: React.FC<{
               </div>
               <button
                 onClick={handleDeleteAllExpiredOrRejected}
-                className="px-3 py-1 rounded border border-red-500/30 text-red-500 hover:bg-red-500/10 font-bold text-[10px] transition-theme flex items-center gap-1"
+                className="px-3 py-1 rounded-[var(--radius-xs)] border border-[var(--status-danger)]/30 text-[var(--status-danger)] hover:bg-[var(--status-danger-subtle)] font-bold text-[10px] transition-theme flex items-center gap-1 cursor-pointer"
               >
                 <Trash2 size={12} />
                 <span>{isRtl ? 'حذف جميع المنتهية والمرفوضة' : 'Delete All Expired & Rejected'}</span>
@@ -2444,12 +2477,12 @@ export const AdsManagementView: React.FC<{
           )}
 
           {isBulletinLoading ? (
-            <div className="p-12 text-center text-xs text-gray-400 flex flex-col items-center gap-2">
-              <RefreshCw size={24} className="animate-spin text-accent" />
-              <span>{isRtl ? 'جاري تحميل طلبات فايرال بوك...' : 'Loading ViralBook ads...'}</span>
+            <div className="p-12 text-center text-xs text-[var(--text-muted)] flex flex-col items-center gap-2">
+              <RefreshCw size={24} className="animate-spin text-[var(--fg-accent)]" />
+              <span>{isRtl ? 'جاري تحميل طلبات فيرال بوك...' : 'Loading ViralBook ads...'}</span>
             </div>
           ) : bulletinAds.length === 0 ? (
-            <div className="p-12 text-center text-xs text-gray-400 flex flex-col items-center gap-2">
+            <div className="p-12 text-center text-xs text-[var(--text-muted)] flex flex-col items-center gap-2">
               <Sparkles size={32} className="opacity-40" />
               <span>{isRtl ? 'لا توجد طلبات إعلانات مجتمعية حتى الآن' : 'No community ads submitted yet.'}</span>
             </div>
@@ -2469,7 +2502,7 @@ export const AdsManagementView: React.FC<{
                             setSelectedBulletinIds([]);
                           }
                         }}
-                        className="w-4 h-4 rounded text-accent focus:ring-accent-500 accent-accent cursor-pointer"
+                        className="w-4 h-4 rounded-[var(--radius-xs)] text-[var(--fg-accent)] accent-[var(--accent)] cursor-pointer"
                       />
                     </th>
                     <th className="p-3 text-start">{isRtl ? 'المستخدم & الإعلان' : 'User & Ad'}</th>
@@ -2493,7 +2526,7 @@ export const AdsManagementView: React.FC<{
                               setSelectedBulletinIds(prev => prev.filter(id => id !== ad.id));
                             }
                           }}
-                          className="w-4 h-4 rounded text-accent focus:ring-accent-500 accent-accent cursor-pointer"
+                          className="w-4 h-4 rounded-[var(--radius-xs)] text-[var(--fg-accent)] accent-[var(--accent)] cursor-pointer"
                         />
                       </td>
                       <td className="p-3">
@@ -2501,12 +2534,12 @@ export const AdsManagementView: React.FC<{
                           <img
                             src={getMediaUrl(ad.image_url)}
                             alt={ad.title}
-                            className="w-14 h-14 rounded-md object-cover border border-[var(--border-default)] shrink-0"
+                            className="w-14 h-14 rounded-[var(--radius-sm)] object-cover border border-[var(--border-default)] shrink-0"
                           />
                           <div>
                             <div className="font-extrabold text-[var(--text-primary)] text-xs">{ad.title}</div>
                             <div className="text-[11px] text-[var(--text-muted)] line-clamp-1">{ad.description}</div>
-                            <div className="text-[10px] text-accent font-mono mt-1">
+                            <div className="text-[10px] text-[var(--fg-accent)] font-mono mt-1">
                               👤 @{ad.username || 'مستخدم'} • ID: #{ad.id}
                             </div>
                           </div>
@@ -2515,7 +2548,7 @@ export const AdsManagementView: React.FC<{
 
                       <td className="p-3 text-center">
                         <div className="font-extrabold text-[var(--text-primary)]">{ad.duration_days} {isRtl ? 'أيام' : 'days'}</div>
-                        <div className="text-[11px] text-accent font-black mt-0.5">${ad.amount_paid}</div>
+                        <div className="text-[11px] text-[var(--fg-accent)] font-black mt-0.5">${ad.amount_paid}</div>
                       </td>
 
                       <td className="p-3 text-center">
@@ -2525,14 +2558,14 @@ export const AdsManagementView: React.FC<{
                       </td>
 
                       <td className="p-3 text-center">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
+                        <span className={`px-2.5 py-1 rounded-[var(--radius-full)] text-[10px] font-black ${
                           ad.status === 'approved'
-                            ? 'bg-accent/10 text-accent border border-accent/20'
+                            ? 'bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border border-[var(--border-accent)]/30'
                             : ad.status === 'pending'
-                            ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse'
+                            ? 'bg-[var(--status-warning-subtle)] text-[var(--fg-warning)] border border-[var(--fg-warning)]/20 animate-pulse'
                             : ad.status === 'rejected'
-                            ? 'bg-red-500/10 text-red-500 border border-red-500/20'
-                            : 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
+                            ? 'bg-[var(--status-danger-subtle)] text-[var(--fg-danger)] border border-[var(--fg-danger)]/20'
+                            : 'bg-[var(--surface-subtle)] text-[var(--text-muted)] border border-[var(--border-default)]'
                         }`}>
                           {ad.status === 'approved' && (isRtl ? 'مقبول / نشط' : 'Approved')}
                           {ad.status === 'pending' && (isRtl ? 'قيد المراجعة' : 'Pending')}
@@ -2547,7 +2580,7 @@ export const AdsManagementView: React.FC<{
                             <>
                               <button
                                 onClick={() => handleApproveBulletinAd(ad.id)}
-                                className="px-2.5 py-1 rounded bg-accent text-white font-bold text-[10px] hover:bg-accent transition-theme flex items-center gap-1 shadow"
+                                className="px-2.5 py-1 rounded-[var(--radius-xs)] bg-[var(--accent)] text-white font-bold text-[10px] hover:opacity-90 transition-theme flex items-center gap-1 shadow-sm cursor-pointer"
                               >
                                 <CheckCircle2 size={12} />
                                 <span>{isRtl ? 'اعتماد' : 'Approve'}</span>
@@ -2558,7 +2591,7 @@ export const AdsManagementView: React.FC<{
                                   setRejectingAdId(ad.id);
                                   setRejectionReason('');
                                 }}
-                                className="px-2.5 py-1 rounded bg-red-500/10 text-red-500 font-bold text-[10px] hover:bg-red-500 hover:text-white transition-theme flex items-center gap-1"
+                                className="px-2.5 py-1 rounded-[var(--radius-xs)] bg-[var(--status-danger-subtle)] text-[var(--status-danger)] font-bold text-[10px] hover:bg-[var(--status-danger)] hover:text-white transition-theme flex items-center gap-1 cursor-pointer"
                               >
                                 <XCircle size={12} />
                                 <span>{isRtl ? 'رفض' : 'Reject'}</span>
@@ -2572,7 +2605,7 @@ export const AdsManagementView: React.FC<{
                                 setStoppingAdId(ad.id);
                                 setStopReason('');
                               }}
-                              className="px-2.5 py-1 rounded bg-amber-500/10 text-amber-500 font-bold text-[10px] hover:bg-amber-500 hover:text-white transition-theme flex items-center gap-1"
+                              className="px-2.5 py-1 rounded-[var(--radius-xs)] bg-[var(--status-warning-subtle)] text-[var(--fg-warning)] font-bold text-[10px] hover:bg-[var(--fg-warning)] hover:text-white transition-theme flex items-center gap-1 cursor-pointer"
                               title={isRtl ? 'إيقاف الإعلان فوراً وإشعار المستخدم' : 'Stop Ad & Notify User'}
                             >
                               <XCircle size={12} />
@@ -2582,7 +2615,7 @@ export const AdsManagementView: React.FC<{
 
                           <button
                             onClick={() => handleDeleteBulletinAd(ad.id)}
-                            className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                            className="p-1 rounded-[var(--radius-xs)] text-[var(--text-muted)] hover:text-[var(--status-danger)] hover:bg-[var(--status-danger-subtle)] transition-colors cursor-pointer"
                             title={isRtl ? 'حذف نهائي' : 'Delete'}
                           >
                             <Trash2 size={14} />
@@ -2599,19 +2632,19 @@ export const AdsManagementView: React.FC<{
           {/* Stop Ad Modal */}
           {stoppingAdId && (
             <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-              <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-xl w-full max-w-md p-5 shadow-2xl space-y-4">
+              <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-lg)] w-full max-w-md p-5 shadow-2xl space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-[var(--border-default)]">
-                  <h4 className="font-extrabold text-sm text-amber-500 flex items-center gap-1.5">
+                  <h4 className="font-extrabold text-sm text-[var(--fg-warning)] flex items-center gap-1.5">
                     <XCircle size={16} />
                     <span>{isRtl ? 'إيقاف الإعلان وإرسال إشعار' : 'Stop Advertisement & Notify'}</span>
                   </h4>
-                  <button onClick={() => setStoppingAdId(null)} className="text-gray-400 hover:text-white">
+                  <button onClick={() => setStoppingAdId(null)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">
                     <X size={16} />
                   </button>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-400 mb-1">
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
                     {isRtl ? 'سبب الإيقاف (سيصل للمستخدم عبر الإشعارات والبريد الإلكتروني):' : 'Stoppage Reason (Sent via notification & email):'}
                   </label>
                   <textarea
@@ -2619,20 +2652,20 @@ export const AdsManagementView: React.FC<{
                     value={stopReason}
                     onChange={(e) => setStopReason(e.target.value)}
                     placeholder={isRtl ? 'مثال: مخالفة شروط النشر أو انتهاء ترخيص النشاط...' : 'e.g. Violation of guidelines...'}
-                    className="w-full p-2.5 text-xs rounded bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-amber-500 focus:outline-none"
+                    className="w-full p-2.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--fg-warning)]/40 focus:outline-none"
                   />
                 </div>
 
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-default)]">
                   <button
                     onClick={() => setStoppingAdId(null)}
-                    className="px-3 py-1.5 rounded text-xs text-gray-400 hover:bg-gray-800"
+                    className="px-3 py-1.5 rounded-[var(--radius-xs)] text-xs text-[var(--text-muted)] hover:bg-[var(--surface-card)] transition-colors cursor-pointer"
                   >
                     {isRtl ? 'إلغاء' : 'Cancel'}
                   </button>
                   <button
                     onClick={() => handleStopBulletinAd(stoppingAdId)}
-                    className="px-4 py-1.5 rounded text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 shadow"
+                    className="px-4 py-1.5 rounded-[var(--radius-xs)] text-xs font-bold bg-[var(--fg-warning)] text-white hover:bg-[var(--fg-warning)] shadow-sm cursor-pointer"
                   >
                     {isRtl ? 'تأكيد الإيقاف وإشعار المستخدم' : 'Confirm Stoppage & Notify'}
                   </button>
@@ -2644,19 +2677,19 @@ export const AdsManagementView: React.FC<{
           {/* Rejection Modal */}
           {rejectingAdId && (
             <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-              <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-xl w-full max-w-md p-5 shadow-2xl space-y-4">
+              <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-lg)] w-full max-w-md p-5 shadow-2xl space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-[var(--border-default)]">
-                  <h4 className="font-extrabold text-sm text-red-500 flex items-center gap-1.5">
+                  <h4 className="font-extrabold text-sm text-[var(--fg-danger)] flex items-center gap-1.5">
                     <XCircle size={16} />
                     <span>{isRtl ? 'سبب رفض الإعلان' : 'Reject Ad Submission'}</span>
                   </h4>
-                  <button onClick={() => setRejectingAdId(null)} className="text-gray-400 hover:text-white">
+                  <button onClick={() => setRejectingAdId(null)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">
                     <X size={16} />
                   </button>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-400 mb-1">
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
                     {isRtl ? 'أدخل سبب الرفض (سيصل للمستخدم):' : 'Rejection Reason:'}
                   </label>
                   <textarea
@@ -2664,7 +2697,7 @@ export const AdsManagementView: React.FC<{
                     value={rejectionReason}
                     onChange={(e) => setRejectionReason(e.target.value)}
                     placeholder={isRtl ? 'مثال: الصورة غير واضحة أو الرابط لا يعمل...' : 'e.g. Inappropriate content...'}
-                    className="w-full p-2.5 text-xs rounded bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-red-500 focus:outline-none"
+                    className="w-full p-2.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--fg-danger)]/40 focus:outline-none"
                   />
                 </div>
 
@@ -2673,7 +2706,7 @@ export const AdsManagementView: React.FC<{
                     type="checkbox"
                     checked={refundOnReject}
                     onChange={(e) => setRefundOnReject(e.target.checked)}
-                    className="w-4 h-4 rounded text-accent focus:ring-accent-500 accent-accent"
+                    className="w-4 h-4 rounded-[var(--radius-xs)] text-[var(--fg-accent)] accent-[var(--accent)] cursor-pointer"
                   />
                   <span className="text-xs font-bold text-[var(--text-primary)]">
                     {isRtl ? 'إعادة المبلغ ($) لحساب/محفظة المستخدم فوراً' : 'Refund payment ($) back to user wallet'}
@@ -2683,13 +2716,13 @@ export const AdsManagementView: React.FC<{
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-default)]">
                   <button
                     onClick={() => setRejectingAdId(null)}
-                    className="px-3 py-1.5 rounded text-xs text-gray-400 hover:bg-gray-800"
+                    className="px-3 py-1.5 rounded-[var(--radius-xs)] text-xs text-[var(--text-muted)] hover:bg-[var(--surface-card)] transition-colors cursor-pointer"
                   >
                     {isRtl ? 'إلغاء' : 'Cancel'}
                   </button>
                   <button
                     onClick={() => handleRejectBulletinAd(rejectingAdId)}
-                    className="px-4 py-1.5 rounded text-xs font-bold bg-red-500 text-white hover:bg-red-600 shadow"
+                    className="px-4 py-1.5 rounded-[var(--radius-xs)] text-xs font-bold bg-[var(--status-danger)] text-white hover:opacity-90 shadow-sm cursor-pointer"
                   >
                     {isRtl ? 'تأكيد الرفض' : 'Confirm Rejection'}
                   </button>
@@ -2701,37 +2734,37 @@ export const AdsManagementView: React.FC<{
       ) : (
         <>
           {/* Search & Actions Bar */}
-          <div className="flex items-center justify-between gap-4 bg-[var(--surface-subtle)] border border-[var(--border-default)] p-3 rounded-lg">
+          <div className="flex items-center justify-between gap-4 bg-[var(--surface-subtle)] border border-[var(--border-default)] p-3 rounded-[var(--radius-md)]">
             <div className="relative flex-1 max-w-md">
-              <Search size={16} className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={16} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={isRtl ? 'بحث حسب العنوان أو الراع...' : 'Search by title or sponsor...'}
-                className="w-full ps-9 pe-4 py-1.5 text-xs rounded-md bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-accent"
+                className="w-full ps-9 pe-4 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)]"
               />
             </div>
 
             <button
               onClick={fetchAds}
               title={isRtl ? 'تحديث' : 'Refresh'}
-              className="p-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-page)] text-gray-400 hover:text-accent transition-colors"
+              className="p-2 rounded-[var(--radius-xs)] border border-[var(--border-default)] bg-[var(--surface-page)] text-[var(--text-muted)] hover:text-[var(--fg-accent)] hover:border-[var(--border-accent)] transition-colors cursor-pointer"
             >
               <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
             </button>
           </div>
 
           {/* Ads List Table / Cards */}
-          <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-lg overflow-hidden shadow-sm">
+          <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-md)] overflow-hidden shadow-sm">
             {selectedAdIds.length > 0 && (
-              <div className="p-3 bg-red-500/10 border-b border-red-500/20 flex items-center justify-between text-xs">
-                <span className="font-bold text-red-500">
+              <div className="p-3 bg-[var(--status-danger-subtle)] border-b border-[var(--status-danger)]/20 flex items-center justify-between text-xs">
+                <span className="font-bold text-[var(--status-danger)]">
                   {isRtl ? `تم تحديد ${selectedAdIds.length} إعلان` : `${selectedAdIds.length} ads selected`}
                 </span>
                 <button
                   onClick={() => setIsBulkDeleteModalOpen(true)}
-                  className="px-3 py-1 rounded bg-red-600 text-white font-bold hover:bg-red-700 transition-colors flex items-center gap-1.5"
+                  className="px-3 py-1 rounded-[var(--radius-xs)] bg-[var(--status-danger)] text-white font-bold hover:opacity-90 transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <Trash2 size={14} />
                   <span>{isRtl ? 'حذف الإعلانات المحددة جماعياً' : 'Delete Selected Ads'}</span>
@@ -2739,12 +2772,12 @@ export const AdsManagementView: React.FC<{
               </div>
             )}
             {isLoading ? (
-              <div className="p-12 text-center text-xs text-gray-400 flex flex-col items-center gap-2">
-                <RefreshCw size={24} className="animate-spin text-accent" />
+              <div className="p-12 text-center text-xs text-[var(--text-muted)] flex flex-col items-center gap-2">
+                <RefreshCw size={24} className="animate-spin text-[var(--fg-accent)]" />
                 <span>{isRtl ? 'جاري تحميل قائمة الإعلانات...' : 'Loading advertisements...'}</span>
               </div>
             ) : filteredAds.length === 0 ? (
-              <div className="p-12 text-center text-xs text-gray-400 flex flex-col items-center gap-2">
+              <div className="p-12 text-center text-xs text-[var(--text-muted)] flex flex-col items-center gap-2">
                 <Megaphone size={32} className="opacity-40" />
                 <span>{isRtl ? 'لا توجد إعلانات مطابقة' : 'No matching advertisements found'}</span>
               </div>
@@ -2758,7 +2791,7 @@ export const AdsManagementView: React.FC<{
                           type="checkbox"
                           checked={filteredAds.length > 0 && selectedAdIds.length === filteredAds.length}
                           onChange={handleToggleSelectAll}
-                          className="rounded accent-accent cursor-pointer"
+                          className="rounded-[var(--radius-xs)] accent-[var(--accent)] cursor-pointer"
                         />
                       </th>
                       <th className="p-3 text-start">{isRtl ? 'الإعلان' : 'Advertisement'}</th>
@@ -2777,7 +2810,7 @@ export const AdsManagementView: React.FC<{
                             type="checkbox"
                             checked={selectedAdIds.includes(ad.id)}
                             onChange={() => handleToggleSelectAd(ad.id)}
-                            className="rounded accent-accent cursor-pointer"
+                            className="rounded-[var(--radius-xs)] accent-[var(--accent)] cursor-pointer"
                           />
                         </td>
                         <td className="p-3">
@@ -2785,25 +2818,25 @@ export const AdsManagementView: React.FC<{
                             <img
                               src={getMediaUrl(ad.image_url)}
                               alt={ad.title_ar}
-                              className="w-14 h-10 object-cover rounded border border-[var(--border-default)] shrink-0"
+                              className="w-14 h-10 object-cover rounded-[var(--radius-sm)] border border-[var(--border-default)] shrink-0"
                             />
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 mb-0.5">
                                 <div className="font-bold text-[var(--text-primary)] truncate max-w-[180px]">
                                   {isRtl ? ad.title_ar : ad.title_en}
                                 </div>
-                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter border ${
-                                  ad.format === 'story' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' :
+                                <span className={`px-1.5 py-0.5 rounded-[var(--radius-xs)] text-[8px] font-black uppercase tracking-tighter border ${
+                                  ad.format === 'story' ? 'bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)] border-[var(--border-accent)]/20' :
                                   ad.format === 'reel' ? 'bg-pink-500/10 text-pink-500 border-pink-500/20' :
-                                  ad.format === 'feed' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
-                                  ad.format === 'video' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                                  'bg-accent/10 text-accent border-accent/20'
+                                  ad.format === 'feed' ? 'bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)] border-[var(--border-accent)]/20' :
+                                  ad.format === 'video' ? 'bg-[var(--status-warning-subtle)] text-[var(--fg-warning)] border-[var(--fg-warning)]/20' :
+                                  'bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border-[var(--border-accent)]/30'
                                 }`}>
                                   {ad.format || 'sidebar'}
                                 </span>
                               </div>
-                              <div className="text-[10px] text-accent font-medium">
-                                {ad.sponsor_name || 'Sponsor'} • <span className="text-gray-400">{ad.badge_text_ar || 'مُموَّل'}</span>
+                              <div className="text-[10px] text-[var(--fg-accent)] font-medium">
+                                {ad.sponsor_name || 'Sponsor'} • <span className="text-[var(--text-muted)]">{ad.badge_text_ar || 'مُموَّل'}</span>
                               </div>
                             </div>
                           </div>
@@ -2814,28 +2847,28 @@ export const AdsManagementView: React.FC<{
                             href={ad.target_url}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-gray-400 hover:text-accent font-mono text-[11px] flex items-center gap-1 truncate max-w-[180px]"
+                            className="text-[var(--text-muted)] hover:text-[var(--fg-accent)] font-mono text-[11px] flex items-center gap-1 truncate max-w-[180px]"
                           >
                             <span className="truncate">{ad.target_url}</span>
                             <ExternalLink size={10} className="shrink-0" />
                           </a>
                         </td>
 
-                        <td className="p-3 text-center font-bold text-blue-500">
+                        <td className="p-3 text-center font-bold text-[var(--fg-accent)]">
                           {ad.impression_count.toLocaleString()}
                         </td>
 
-                        <td className="p-3 text-center font-bold text-purple-500">
+                        <td className="p-3 text-center font-bold text-[var(--fg-accent)]">
                           {ad.click_count.toLocaleString()}
                         </td>
 
                         <td className="p-3 text-center">
                           <button
                             onClick={() => handleToggleActive(ad.id)}
-                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-theme ${
+                            className={`px-2.5 py-1 rounded-[var(--radius-full)] text-[10px] font-bold border transition-theme cursor-pointer ${
                               ad.is_active
-                                ? 'bg-accent/10 text-accent border-accent/20 hover:bg-accent/20'
-                                : 'bg-gray-500/10 text-gray-400 border-gray-500/20 hover:bg-gray-500/20'
+                                ? 'bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border-[var(--border-accent)]/30 hover:opacity-90'
+                                : 'bg-[var(--surface-subtle)]0/10 text-[var(--text-muted)] border-gray-500/20 hover:bg-[var(--surface-subtle)]0/20'
                             }`}
                           >
                             {ad.is_active ? (isRtl ? 'نشط' : 'Active') : (isRtl ? 'معطل' : 'Disabled')}
@@ -2847,14 +2880,14 @@ export const AdsManagementView: React.FC<{
                             <button
                               onClick={() => handleOpenEditModal(ad)}
                               title={isRtl ? 'تعديل' : 'Edit'}
-                              className="p-1.5 rounded bg-gray-500/10 hover:bg-accent/20 text-gray-400 hover:text-accent transition-colors"
+                              className="p-1.5 rounded-[var(--radius-xs)] bg-[var(--surface-page)] hover:bg-[var(--bg-accent-muted)] text-[var(--text-muted)] hover:text-[var(--fg-accent)] transition-colors cursor-pointer"
                             >
                               <Edit size={14} />
                             </button>
                             <button
                               onClick={() => handleDelete(ad.id)}
                               title={isRtl ? 'حذف' : 'Delete'}
-                              className="p-1.5 rounded bg-red-500/10 hover:bg-red-500/20 text-gray-400 hover:text-red-500 transition-colors"
+                              className="p-1.5 rounded-[var(--radius-xs)] bg-[var(--status-danger-subtle)] hover:bg-[var(--fg-danger)]/20 text-[var(--text-muted)] hover:text-[var(--fg-danger)] transition-colors cursor-pointer"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -2873,10 +2906,10 @@ export const AdsManagementView: React.FC<{
       {/* Modal for Creating / Editing Ads */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+          <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-lg)] w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-[var(--border-default)]">
-              <div className="flex items-center gap-2 text-accent">
+              <div className="flex items-center gap-2 text-[var(--fg-accent)]">
                 <Megaphone size={18} />
                 <h3 className="font-bold text-sm text-[var(--text-primary)]">
                   {editingAd
@@ -2886,7 +2919,7 @@ export const AdsManagementView: React.FC<{
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                className="p-1 rounded-[var(--radius-xs)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)] transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -2897,7 +2930,7 @@ export const AdsManagementView: React.FC<{
               {/* Titles AR / EN */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-400 mb-1">
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
                     {isRtl ? 'العنوان بالعربية *' : 'Title (Arabic) *'}
                   </label>
                   <input
@@ -2905,12 +2938,12 @@ export const AdsManagementView: React.FC<{
                     required
                     value={formData.title_ar}
                     onChange={(e) => setFormData({ ...formData, title_ar: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs rounded bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="w-full px-3 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--border-accent)] focus:outline-none"
                     placeholder="مثال: حزمة الذكاء الاصطناعي"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-400 mb-1">
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
                     {isRtl ? 'العنوان بالإنجليزية *' : 'Title (English) *'}
                   </label>
                   <input
@@ -2918,7 +2951,7 @@ export const AdsManagementView: React.FC<{
                     required
                     value={formData.title_en}
                     onChange={(e) => setFormData({ ...formData, title_en: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs rounded bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="w-full px-3 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--border-accent)] focus:outline-none"
                     placeholder="e.g. Sovereign AI Suite"
                   />
                 </div>
@@ -2927,26 +2960,26 @@ export const AdsManagementView: React.FC<{
               {/* Sponsor & Badge */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-400 mb-1">
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
                     {isRtl ? 'اسم الراعي/المُعلن' : 'Sponsor Name'}
                   </label>
                   <input
                     type="text"
                     value={formData.sponsor_name}
                     onChange={(e) => setFormData({ ...formData, sponsor_name: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs rounded bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="w-full px-3 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--border-accent)] focus:outline-none"
                     placeholder="Hercules App / Perplexta"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-400 mb-1">
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
                     {isRtl ? 'نص الشارة (Badge)' : 'Badge Label'}
                   </label>
                   <input
                     type="text"
                     value={formData.badge_text_ar}
                     onChange={(e) => setFormData({ ...formData, badge_text_ar: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs rounded bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="w-full px-3 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--border-accent)] focus:outline-none"
                     placeholder="مُموَّل / Sponsored"
                   />
                 </div>
@@ -2955,95 +2988,95 @@ export const AdsManagementView: React.FC<{
               {/* Descriptions AR / EN */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-400 mb-1">
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
                     {isRtl ? 'الوصف بالعربية' : 'Description (Arabic)'}
                   </label>
                   <textarea
                     rows={2}
                     value={formData.description_ar}
                     onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs rounded bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="w-full px-3 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--border-accent)] focus:outline-none"
                     placeholder="وصف مختصر للإعلان..."
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-400 mb-1">
+                  <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
                     {isRtl ? 'الوصف بالإنجليزية' : 'Description (English)'}
                   </label>
                   <textarea
                     rows={2}
                     value={formData.description_en}
                     onChange={(e) => setFormData({ ...formData, description_en: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs rounded bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="w-full px-3 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--border-accent)] focus:outline-none"
                     placeholder="Short description..."
                   />
                 </div>
               </div>
 
               {/* SEO Meta Fields */}
-              <div className="bg-[var(--surface-page)] p-3 rounded-lg border border-[var(--border-default)] space-y-3">
-                <h4 className="text-xs font-bold text-accent">{isRtl ? 'إعدادات SEO' : 'SEO Settings'}</h4>
+              <div className="bg-[var(--surface-page)] p-3 rounded-[var(--radius-md)] border border-[var(--border-default)] space-y-3">
+                <h4 className="text-xs font-bold text-[var(--fg-accent)]">{isRtl ? 'إعدادات SEO' : 'SEO Settings'}</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-400 mb-1">
+                    <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
                       {isRtl ? 'Meta Title (AR)' : 'Meta Title (AR)'}
                     </label>
                     <input
                       type="text"
                       value={formData.meta_title_ar}
                       onChange={(e) => setFormData({ ...formData, meta_title_ar: e.target.value })}
-                      className="w-full px-3 py-1.5 text-xs rounded bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                      className="w-full px-3 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--border-accent)] focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-400 mb-1">
+                    <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
                       {isRtl ? 'Meta Title (EN)' : 'Meta Title (EN)'}
                     </label>
                     <input
                       type="text"
                       value={formData.meta_title_en}
                       onChange={(e) => setFormData({ ...formData, meta_title_en: e.target.value })}
-                      className="w-full px-3 py-1.5 text-xs rounded bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                      className="w-full px-3 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--border-accent)] focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-400 mb-1">
+                    <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
                       {isRtl ? 'Meta Description (AR)' : 'Meta Description (AR)'}
                     </label>
                     <input
                       type="text"
                       value={formData.meta_description_ar}
                       onChange={(e) => setFormData({ ...formData, meta_description_ar: e.target.value })}
-                      className="w-full px-3 py-1.5 text-xs rounded bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                      className="w-full px-3 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--border-accent)] focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-400 mb-1">
+                    <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
                       {isRtl ? 'Meta Description (EN)' : 'Meta Description (EN)'}
                     </label>
                     <input
                       type="text"
                       value={formData.meta_description_en}
                       onChange={(e) => setFormData({ ...formData, meta_description_en: e.target.value })}
-                      className="w-full px-3 py-1.5 text-xs rounded bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                      className="w-full px-3 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--border-accent)] focus:outline-none"
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-[11px] font-bold text-gray-400 mb-1">
+                    <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
                       {isRtl ? 'الكلمات المفتاحية (Keywords - comma separated)' : 'Keywords (Comma separated)'}
                     </label>
                     <input
                       type="text"
                       value={formData.keywords_ar}
                       onChange={(e) => setFormData({ ...formData, keywords_ar: e.target.value })}
-                      className="w-full px-3 py-1.5 text-xs rounded bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none mb-1"
+                      className="w-full px-3 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--border-accent)] focus:outline-none mb-1"
                       placeholder="AR Keywords..."
                     />
                     <input
                       type="text"
                       value={formData.keywords_en}
                       onChange={(e) => setFormData({ ...formData, keywords_en: e.target.value })}
-                      className="w-full px-3 py-1.5 text-xs rounded bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                      className="w-full px-3 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--border-accent)] focus:outline-none"
                       placeholder="EN Keywords..."
                     />
                   </div>
@@ -3052,7 +3085,7 @@ export const AdsManagementView: React.FC<{
 
               {/* Image URL & File Upload */}
               <div>
-                <label className="block text-[11px] font-bold text-gray-400 mb-1">
+                <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
                   {isRtl ? 'صورة الإعلان / صورة الغلاف *' : 'Ad Image / Cover URL *'}
                 </label>
                 <div className="flex gap-2">
@@ -3060,22 +3093,22 @@ export const AdsManagementView: React.FC<{
                     type="text"
                     value={formData.image_url}
                     onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                    className="flex-1 px-3 py-1.5 text-xs rounded bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="flex-1 px-3 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--border-accent)] focus:outline-none"
                     placeholder="https://images.unsplash.com/... or /uploads/..."
                   />
-                  <label className="px-3 py-1.5 rounded bg-accent/10 border border-accent/30 text-accent text-xs font-bold cursor-pointer hover:bg-accent/20 transition-colors flex items-center gap-1 shrink-0">
+                  <label className="px-3 py-1.5 rounded-[var(--radius-xs)] bg-[var(--bg-accent-muted)] border border-[var(--border-accent)]/30 text-[var(--fg-accent)] text-xs font-bold cursor-pointer hover:bg-[var(--accent)] hover:text-white transition-colors flex items-center gap-1 shrink-0">
                     <Upload size={14} />
                     <span>{isUploading ? (isRtl ? 'جاري الرفع...' : 'Uploading...') : (isRtl ? 'رفع صورة من الجهاز' : 'Upload File')}</span>
                     <input type="file" accept="image/*,.png,.jpg,.jpeg,.gif,.webp,.heic,.heif,.svg,.bmp" onChange={handleFileUpload} className="hidden" />
                   </label>
                 </div>
                 <div className="flex items-center justify-between mt-1">
-                  <span className="text-[10px] text-accent font-medium">
+                  <span className="text-[10px] text-[var(--fg-accent)] font-medium">
                     ✨ {getRecommendedDimensions(formData.format, isRtl)}
                   </span>
                 </div>
                 {formData.image_url && (
-                  <div className="flex items-center gap-1 mt-1 text-[10px] text-accent font-medium">
+                  <div className="flex items-center gap-1 mt-1 text-[10px] text-[var(--fg-accent)] font-medium">
                     <CheckCircle2 size={12} className="shrink-0" />
                     <span>
                       {formData.image_url.startsWith('/uploads/')
@@ -3088,26 +3121,26 @@ export const AdsManagementView: React.FC<{
 
               {/* Video URL & Video File Upload */}
               <div>
-                <label className="block text-[11px] font-bold text-accent mb-1 flex items-center justify-between">
+                <label className="block text-[11px] font-bold text-[var(--fg-accent)] mb-1 flex items-center justify-between">
                   <span>{isRtl ? 'رابط مقطع الفيديو / ريلز (اختياري - MP4, YouTube, Vimeo, TikTok)' : 'Video / Reels URL (Optional - MP4, YouTube, Vimeo, TikTok)'}</span>
-                  <span className="text-[9px] text-gray-500">{isRtl ? 'يدعم القص والتكيف تلقائياً' : 'Supports auto crop & fit'}</span>
+                  <span className="text-[9px] text-[var(--text-muted)]">{isRtl ? 'يدعم القص والتكيف تلقائياً' : 'Supports auto crop & fit'}</span>
                 </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={formData.video_url || ''}
                     onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
-                    className="flex-1 px-3 py-1.5 text-xs rounded bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="flex-1 px-3 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--border-accent)] focus:outline-none"
                     placeholder="https://example.com/video.mp4 or YouTube / TikTok link"
                   />
-                  <label className="px-3 py-1.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-bold cursor-pointer hover:bg-blue-500/20 transition-colors flex items-center gap-1 shrink-0">
+                  <label className="px-3 py-1.5 rounded-[var(--radius-xs)] bg-[var(--bg-accent-subtle)] border border-[var(--border-accent)]/30 text-[var(--fg-accent)] text-xs font-bold cursor-pointer hover:bg-[var(--fg-accent)]/20 transition-colors flex items-center gap-1 shrink-0">
                     <Upload size={14} />
                     <span>{isUploading ? (isRtl ? 'جاري الرفع...' : 'Uploading...') : (isRtl ? 'رفع فيديو' : 'Upload Video')}</span>
                     <input type="file" accept="video/*,.mp4,.mov,.webm,.mkv,.avi,.3gp,.m4v" onChange={handleVideoFileUpload} className="hidden" />
                   </label>
                 </div>
                 {formData.video_url && (
-                  <div className="flex items-center gap-1 mt-1 text-[10px] text-blue-400 font-medium">
+                  <div className="flex items-center gap-1 mt-1 text-[10px] text-[var(--fg-accent)] font-medium">
                     <CheckCircle2 size={12} className="shrink-0" />
                     <span>
                       {formData.video_url.startsWith('/uploads/')
@@ -3120,7 +3153,7 @@ export const AdsManagementView: React.FC<{
 
               {/* Poster Image URL & Upload */}
               <div>
-                <label className="block text-[11px] font-bold text-gray-400 mb-1">
+                <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
                   {isRtl ? 'صورة الغلاف المصغرة للفيديو / البوستر (اختياري - Poster URL)' : 'Video Poster / Thumbnail URL (Optional)'}
                 </label>
                 <div className="flex gap-2">
@@ -3128,17 +3161,17 @@ export const AdsManagementView: React.FC<{
                     type="text"
                     value={formData.poster_url || ''}
                     onChange={(e) => setFormData({ ...formData, poster_url: e.target.value })}
-                    className="flex-1 px-3 py-1.5 text-xs rounded bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                    className="flex-1 px-3 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--border-accent)] focus:outline-none"
                     placeholder="https://... or /uploads/poster.jpg"
                   />
-                  <label className="px-3 py-1.5 rounded bg-accent/10 border border-accent/30 text-accent text-xs font-bold cursor-pointer hover:bg-accent/20 transition-colors flex items-center gap-1 shrink-0">
+                  <label className="px-3 py-1.5 rounded-[var(--radius-xs)] bg-[var(--bg-accent-muted)] border border-[var(--border-accent)]/30 text-[var(--fg-accent)] text-xs font-bold cursor-pointer hover:bg-[var(--accent)] hover:text-white transition-colors flex items-center gap-1 shrink-0">
                     <Upload size={14} />
                     <span>{isUploading ? (isRtl ? 'جاري الرفع...' : 'Uploading...') : (isRtl ? 'رفع بوستر' : 'Upload Poster')}</span>
                     <input type="file" accept="image/*" onChange={handlePosterUpload} className="hidden" />
                   </label>
                 </div>
                 {formData.poster_url && (
-                  <div className="flex items-center gap-1 mt-1 text-[10px] text-accent font-medium">
+                  <div className="flex items-center gap-1 mt-1 text-[10px] text-[var(--fg-accent)] font-medium">
                     <CheckCircle2 size={12} className="shrink-0" />
                     <span>{isRtl ? 'تم تحديد صورة الغلاف المصغرة بنجاح' : 'Poster thumbnail attached'}</span>
                   </div>
@@ -3147,8 +3180,8 @@ export const AdsManagementView: React.FC<{
 
               {/* Media Live Player Preview inside Modal */}
               {(formData.video_url || formData.image_url) && (
-                <div className="p-3 bg-black/40 rounded-xl border border-gray-800 space-y-2">
-                  <span className="text-[10px] font-black text-accent uppercase tracking-widest block">
+                <div className="p-3 bg-black/40 rounded-[var(--radius-md)] border border-[var(--border-default)] space-y-2">
+                  <span className="text-[10px] font-black text-[var(--fg-accent)] uppercase tracking-widest block">
                     {isRtl ? 'معاينة الوسائط والتكيف مع الأبعاد المعتمده' : 'Live Media Aspect Ratio Preview'}
                   </span>
                   
@@ -3161,7 +3194,7 @@ export const AdsManagementView: React.FC<{
                       className={formData.format === 'story' || formData.format === 'reel' ? 'max-h-[320px] mx-auto' : 'h-48'}
                     />
                   ) : (
-                    <div className="relative w-full h-32 rounded-lg border border-gray-700 overflow-hidden bg-black">
+                    <div className="relative w-full h-32 rounded-[var(--radius-sm)] border border-[var(--border-default)] overflow-hidden bg-black">
                       <img src={getMediaUrl(formData.image_url)} alt="Preview" className="w-full h-full object-cover" />
                     </div>
                   )}
@@ -3170,7 +3203,7 @@ export const AdsManagementView: React.FC<{
 
               {/* Target URL */}
               <div>
-                <label className="block text-[11px] font-bold text-gray-400 mb-1">
+                <label className="block text-[11px] font-bold text-[var(--text-muted)] mb-1">
                   {isRtl ? 'الرابط المستهدف عند النقر *' : 'Target URL on Click *'}
                 </label>
                 <input
@@ -3178,79 +3211,79 @@ export const AdsManagementView: React.FC<{
                   required
                   value={formData.target_url}
                   onChange={(e) => setFormData({ ...formData, target_url: e.target.value })}
-                  className="w-full px-3 py-1.5 text-xs rounded bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none"
+                  className="w-full px-3 py-1.5 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-[var(--border-accent)] focus:outline-none"
                   placeholder="/subscription or https://example.com"
                 />
               </div>
 
               {/* Format & Position Selection */}
-              <div className="space-y-3 p-3 bg-black/20 rounded-lg border border-[var(--border-default)]">
+              <div className="space-y-3 p-3 bg-black/20 rounded-[var(--radius-md)] border border-[var(--border-default)]">
                 <div className="flex items-center gap-2 mb-1">
-                  <div className="w-1 h-3 bg-accent rounded-full" />
-                  <span className="text-[10px] font-black text-accent uppercase tracking-widest">
+                  <div className="w-1 h-3 bg-[var(--accent)] rounded-[var(--radius-full)]" />
+                  <span className="text-[10px] font-black text-[var(--fg-accent)] uppercase tracking-widest">
                     {isRtl ? 'إعدادات الظهور والقياسات' : 'Display & Aspect Ratio Config'}
                   </span>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-400 mb-1">
-                      {isRtl ? 'تنسيق الإعلان (Format)' : 'Ad Format'}
-                    </label>
-                    <select
+                    <SelectDropdown
+                      size="sm"
+                      label={isRtl ? 'تنسيق الإعلان (Format)' : 'Ad Format'}
                       value={formData.format}
-                      onChange={(e) => setFormData({ ...formData, format: e.target.value as any })}
-                      className="w-full px-3 py-1.5 text-xs rounded bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none font-bold"
-                    >
-                      <option value="sidebar">{isRtl ? 'إعلان جانبي (Sidebar)' : 'Sidebar Ad'}</option>
-                      <option value="feed">{isRtl ? 'منشور (Feed Post)' : 'Feed Post'}</option>
-                      <option value="story">{isRtl ? 'قصة (Story)' : 'Story Ad'}</option>
-                      <option value="reel">{isRtl ? 'ريلز (Reel)' : 'Reel Video'}</option>
-                      <option value="video">{isRtl ? 'فيديو (In-stream Video)' : 'In-stream Video'}</option>
-                    </select>
+                      onChange={(val) => setFormData({ ...formData, format: val as any })}
+                      dir={isRtl ? 'rtl' : 'ltr'}
+                      options={[
+                        { value: 'sidebar', label: isRtl ? 'إعلان جانبي (Sidebar)' : 'Sidebar Ad' },
+                        { value: 'feed', label: isRtl ? 'منشور (Feed Post)' : 'Feed Post' },
+                        { value: 'story', label: isRtl ? 'قصة (Story)' : 'Story Ad' },
+                        { value: 'reel', label: isRtl ? 'ريلز (Reel)' : 'Reel Video' },
+                        { value: 'video', label: isRtl ? 'فيديو (In-stream Video)' : 'In-stream Video' }
+                      ]}
+                    />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-400 mb-1">
-                      {isRtl ? 'موقع العرض (Position)' : 'Display Position'}
-                    </label>
-                    <select
+                    <SelectDropdown
+                      size="sm"
+                      label={isRtl ? 'موقع العرض (Position)' : 'Display Position'}
                       value={formData.position}
-                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                      className="w-full px-3 py-1.5 text-xs rounded bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)] focus:border-accent focus:outline-none"
-                    >
-                      <option value="sidebar">{isRtl ? 'الشريط الجانبي' : 'Sidebar'}</option>
-                      <option value="feed">{isRtl ? 'الرئيسية (Newsfeed)' : 'Newsfeed'}</option>
-                      <option value="header_banner">{isRtl ? 'أعلى الصفحة' : 'Header Banner'}</option>
-                      <option value="footer_banner">{isRtl ? 'أسفل الصفحة' : 'Footer Banner'}</option>
-                      <option value="popup">{isRtl ? 'نافذة منبثقة' : 'Popup'}</option>
-                    </select>
+                      onChange={(val) => setFormData({ ...formData, position: val })}
+                      dir={isRtl ? 'rtl' : 'ltr'}
+                      options={[
+                        { value: 'sidebar', label: isRtl ? 'الشريط الجانبي' : 'Sidebar' },
+                        { value: 'feed', label: isRtl ? 'الرئيسية (Newsfeed)' : 'Newsfeed' },
+                        { value: 'header_banner', label: isRtl ? 'أعلى الصفحة' : 'Header Banner' },
+                        { value: 'footer_banner', label: isRtl ? 'أسفل الصفحة' : 'Footer Banner' },
+                        { value: 'popup', label: isRtl ? 'نافذة منبثقة' : 'Popup' }
+                      ]}
+                    />
                   </div>
                 </div>
 
                 {/* Technical Specs Guidance */}
-                <div className="bg-accent/5 border border-accent/10 rounded p-2.5 flex items-start gap-2">
-                  <Info size={14} className="text-accent mt-0.5 shrink-0" />
+                <div className="bg-[var(--bg-accent-muted)]/30 border border-[var(--border-accent)]/20 rounded-[var(--radius-xs)] p-2.5 flex items-start gap-2">
+                  <Info size={14} className="text-[var(--fg-accent)] mt-0.5 shrink-0" />
                   <div className="text-[10px] leading-relaxed text-[var(--text-muted)] font-medium">
                     {formData.format === 'story' || formData.format === 'reel' ? (
-                      <span className="text-accent">
+                      <span className="text-[var(--fg-accent)]">
                         {isRtl 
                           ? 'القياس الموصى به: 1080x1920 بكسل (9:16). مثالي للهواتف الذكية.'
                           : 'Recommended: 1080x1920 px (9:16 aspect ratio). Optimized for full-screen mobile.'}
                       </span>
                     ) : formData.format === 'feed' ? (
-                      <span className="text-accent">
+                      <span className="text-[var(--fg-accent)]">
                         {isRtl 
                           ? 'القياس الموصى به: 1080x1080 بكسل (1:1) أو 1080x1350 (4:5).'
                           : 'Recommended: 1080x1080 px (1:1) or 1080x1350 (4:5 ratio).'}
                       </span>
                     ) : formData.format === 'sidebar' ? (
-                      <span className="text-accent">
+                      <span className="text-[var(--fg-accent)]">
                         {isRtl 
                           ? 'القياس الموصى به: 600x600 بكسل. يظهر في الشريط الجانبي للحواسيب.'
                           : 'Recommended: 600x600 px. Displayed in the desktop sidebar area.'}
                       </span>
                     ) : (
-                      <span className="text-accent">
+                      <span className="text-[var(--fg-accent)]">
                         {isRtl 
                           ? 'القياس الموصى به: 1920x1080 بكسل (16:9). للفيديوهات العريضة.'
                           : 'Recommended: 1920x1080 px (16:9 ratio). Optimized for widescreen video.'}
@@ -3263,12 +3296,12 @@ export const AdsManagementView: React.FC<{
               {/* Options: Order & Active Status */}
               <div className="flex items-center justify-between pt-2 border-t border-[var(--border-default)]">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-bold text-gray-400">{isRtl ? 'الترتيب:' : 'Order:'}</label>
+                  <label className="text-xs font-bold text-[var(--text-muted)]">{isRtl ? 'الترتيب:' : 'Order:'}</label>
                   <input
                     type="number"
                     value={formData.display_order}
                     onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}
-                    className="w-16 px-2 py-1 text-xs rounded bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)]"
+                    className="w-16 px-2 py-1 text-xs rounded-[var(--radius-xs)] bg-[var(--surface-page)] border border-[var(--border-default)] text-[var(--text-primary)]"
                   />
                 </div>
 
@@ -3277,7 +3310,7 @@ export const AdsManagementView: React.FC<{
                     type="checkbox"
                     checked={formData.is_active}
                     onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                    className="w-4 h-4 rounded text-accent focus:ring-accent-500 accent-accent"
+                    className="w-4 h-4 rounded-[var(--radius-xs)] text-[var(--fg-accent)] accent-[var(--accent)] cursor-pointer"
                   />
                   <span className="text-xs font-bold text-[var(--text-primary)]">
                     {isRtl ? 'إعلان نشط' : 'Active Ad'}
@@ -3290,14 +3323,14 @@ export const AdsManagementView: React.FC<{
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded text-xs font-bold bg-gray-500/10 hover:bg-gray-500/20 text-gray-400 transition-colors"
+                  className="px-4 py-2 rounded-[var(--radius-sm)] text-xs font-bold border border-[var(--border-default)] text-[var(--text-muted)] hover:bg-[var(--surface-card)] transition-colors cursor-pointer"
                 >
                   {isRtl ? 'إلغاء' : 'Cancel'}
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded text-xs font-bold bg-accent hover:bg-accent text-white shadow-lg shadow-none transition-theme flex items-center gap-1.5"
+                  className="px-5 py-2 rounded-[var(--radius-sm)] text-xs font-bold bg-[var(--accent)] hover:opacity-90 text-white shadow-sm transition-theme flex items-center gap-1.5 cursor-pointer"
                 >
                   {isSubmitting && <RefreshCw size={14} className="animate-spin" />}
                   <span>{editingAd ? (isRtl ? 'تحديث الإعلان' : 'Save Changes') : (isRtl ? 'نشر الإعلان' : 'Publish Ad')}</span>
@@ -3311,11 +3344,11 @@ export const AdsManagementView: React.FC<{
       {/* Bulk Delete Confirmation Modal */}
       {isBulkDeleteModalOpen && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+          <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-lg)] w-full max-w-md p-5 space-y-4 shadow-2xl">
             <h3 className="font-bold text-base text-[var(--text-primary)]">
               {isRtl ? 'تأكيد الحذف الجماعي للإعلانات' : 'Confirm Bulk Ad Deletion'}
             </h3>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-[var(--text-muted)]">
               {isRtl
                 ? `هل أنت متأكد من حذف ${selectedAdIds.length} إعلان نهائياً من قاعدة البيانات وخوادم التخزين؟ لا يمكن التراجع عن هذا الإجراء.`
                 : `Are you sure you want to permanently delete ${selectedAdIds.length} ads from the database and storage server? This action cannot be undone.`}
@@ -3323,14 +3356,14 @@ export const AdsManagementView: React.FC<{
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 onClick={() => setIsBulkDeleteModalOpen(false)}
-                className="px-4 py-2 rounded text-xs font-bold bg-gray-500/10 hover:bg-gray-500/20 text-gray-300 transition-colors"
+                className="px-4 py-2 rounded-[var(--radius-sm)] text-xs font-bold border border-[var(--border-default)] text-[var(--text-muted)] hover:bg-[var(--surface-card)] transition-colors cursor-pointer"
               >
                 {isRtl ? 'إلغاء' : 'Cancel'}
               </button>
               <button
                 onClick={handleBulkDeleteAds}
                 disabled={isSubmitting}
-                className="px-4 py-2 rounded text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 rounded-[var(--radius-sm)] text-xs font-bold bg-[var(--status-danger)] hover:opacity-90 text-white transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 size={14} />
                 <span>{isSubmitting ? (isRtl ? 'جاري الحذف...' : 'Deleting...') : (isRtl ? 'تأكيد الحذف النهائي' : 'Confirm Delete')}</span>
@@ -3343,9 +3376,9 @@ export const AdsManagementView: React.FC<{
       {/* 2FA Verification Modal */}
       {verificationModal.isOpen && (
         <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-          <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-6">
+          <div className="bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-lg)] w-full max-w-sm p-6 shadow-2xl space-y-6">
             <div className="text-center space-y-2">
-              <div className="w-16 h-16 bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-[var(--status-warning-subtle)] text-[var(--fg-warning)] rounded-[var(--radius-full)] flex items-center justify-center mx-auto mb-4">
                 <CheckCircle2 size={32} />
               </div>
               <h3 className="text-lg font-black text-[var(--text-primary)]">
@@ -3365,20 +3398,20 @@ export const AdsManagementView: React.FC<{
                 value={verificationModal.code}
                 onChange={(e) => setVerificationModal({ ...verificationModal, code: e.target.value })}
                 placeholder="000000"
-                className="w-full bg-[var(--surface-page)] border-2 border-[var(--border-default)] rounded-xl py-4 text-center text-2xl font-black tracking-[1em] focus:border-accent outline-none text-accent"
+                className="w-full bg-[var(--surface-page)] border-2 border-[var(--border-default)] rounded-[var(--radius-sm)] py-4 text-center text-2xl font-black tracking-[1em] focus:border-[var(--border-accent)] outline-none text-[var(--fg-accent)]"
               />
               
               <div className="flex gap-3">
                 <button
                   onClick={() => setVerificationModal({ ...verificationModal, isOpen: false })}
-                  className="flex-1 px-4 py-3 rounded-xl border border-[var(--border-default)] text-xs font-bold text-gray-400 hover:bg-gray-800"
+                  className="flex-1 px-4 py-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] text-xs font-bold text-[var(--text-muted)] hover:bg-[var(--surface-card)] cursor-pointer"
                 >
                   {isRtl ? 'إلغاء' : 'Cancel'}
                 </button>
                 <button
                   onClick={handleVerifyApproval}
                   disabled={isApproving || verificationModal.code.length < 4}
-                  className="flex-1 px-4 py-3 rounded-xl bg-accent text-white font-black text-xs hover:bg-accent shadow-lg shadow-none disabled:opacity-50"
+                  className="flex-1 px-4 py-3 rounded-[var(--radius-sm)] bg-[var(--accent)] text-white font-black text-xs hover:opacity-90 shadow-sm disabled:opacity-50 cursor-pointer"
                 >
                   {isApproving ? <RefreshCw size={18} className="animate-spin mx-auto" /> : (isRtl ? 'تأكيد الرمز' : 'Verify & Execute')}
                 </button>

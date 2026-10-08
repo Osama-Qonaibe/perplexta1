@@ -1,65 +1,173 @@
 
-const header = (lang: string) => `
-  <div style="text-align: center; padding: 50px 0; background-color: #ffffff; border-bottom: 1px solid #f1f5f9;">
-    <h1 style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 32px; font-weight: 300; letter-spacing: 8px; color: #0f172a; text-transform: uppercase;">PERPLEXTA</h1>
-    <p style="margin: 10px 0 0 0; font-size: 10px; color: #94a3b8; letter-spacing: 3px; text-transform: uppercase;">Advanced Analytics Terminal</p>
-  </div>
-`;
+const header = (lang: string) => {
+  const isAr = lang === 'ar';
+  return `
+    <tr dir="${isAr ? 'rtl' : 'ltr'}">
+      <td class="header" align="center" style="background: linear-gradient(135deg, #0d1117 0%, #161b22 100%); padding: 42px 24px; text-align: center; border-bottom: 2px solid #1a7f37;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 800; font-family: ${isAr ? "'Tajawal', 'Cairo', sans-serif" : "'Tajawal', 'Helvetica Neue', Helvetica, Arial, sans-serif"};">
+          ${isAr ? 'منظومة بيربليكستا الذكية' : 'PERPLEXTA PLATFORM'}
+        </h1>
+        <p style="color: #58a6ff; margin: 8px 0 0 0; font-size: 13px; font-weight: 600;">
+          ${isAr ? 'التحليل التقني والذكاء الاصطناعي السيادي' : 'Sovereign AI & Technical Analysis'}
+        </p>
+        <div style="display: inline-block; background-color: rgba(26, 127, 55, 0.15); color: #58a6ff; padding: 5px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-top: 14px; border: 1px solid rgba(88, 166, 255, 0.3);">
+          ${isAr ? 'بوابة الهوية والخدمات الرسمية' : 'Official Identity & Services Gateway'}
+        </div>
+      </td>
+    </tr>
+  `;
+};
 
 const footer = (lang: string) => {
   const isAr = lang === 'ar';
   return `
-    <div style="margin-top: 50px; padding-top: 30px; border-top: 1px solid #f1f5f9; text-align: ${isAr ? 'right' : 'left'};">
-      <p style="margin: 0; color: #0f172a; font-family: ${isAr ? 'Tajawal, Arial' : 'Arial'}; font-weight: 700; font-size: 15px;">
-        ${isAr ? 'فريق عمل بيربليكستا' : 'Perplexta Operations Team'}
-      </p>
-      
-      <div style="margin-top: 15px; font-family: ${isAr ? 'Tajawal, Arial' : 'Arial'}; font-size: 13px; color: #64748b; line-height: 1.8;">
-        <div style="margin-bottom: 4px;"><strong>${isAr ? 'الدعم الفني:' : 'Support:'}</strong> <a href="mailto:support@perplexta.com" style="color: #334155; text-decoration: none;">support@perplexta.com</a></div>
-        <div style="margin-bottom: 4px;"><strong>${isAr ? 'المنصة الرئيسية:' : 'Primary Domain:'}</strong> <a href="https://perplexta.com" style="color: #334155; text-decoration: none;">perplexta.com</a></div>
-        <div style="margin-bottom: 4px;"><strong>${isAr ? 'بوابة الشركة:' : 'Corporate Gateway:'}</strong> <a href="https://perplexta.uk" style="color: #334155; text-decoration: none;">perplexta.uk</a></div>
-      </div>
-      
-      <div style="margin-top: 40px; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 20px;">
-        <div style="display: table; margin: 0 auto; border-collapse: separate; border-spacing: 12px 0;">
-          <div style="display: table-cell;">
-            <a href="{{baseUrl}}/terms" style="color: #94a3b8; text-decoration: none; font-size: 11px; font-weight: 600; text-transform: uppercase;">
-              ${isAr ? 'شروط الاستخدام' : 'Terms of Use'}
-            </a>
-          </div>
-          <div style="display: table-cell; border-left: 1px solid #e2e8f0; height: 12px;"></div>
-          <div style="display: table-cell;">
-            <a href="{{baseUrl}}/privacy" style="color: #94a3b8; text-decoration: none; font-size: 11px; font-weight: 600; text-transform: uppercase;">
-              ${isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}
-            </a>
-          </div>
-          <div style="display: table-cell; border-left: 1px solid #e2e8f0; height: 12px;"></div>
-          <div style="display: table-cell;">
-            <a href="{{baseUrl}}/about" style="color: #94a3b8; text-decoration: none; font-size: 11px; font-weight: 600; text-transform: uppercase;">
-              ${isAr ? 'عن المنصة' : 'About Platform'}
-            </a>
-          </div>
+    <tr dir="${isAr ? 'rtl' : 'ltr'}">
+      <td class="footer" align="center" style="background-color: #0d1117; padding: 30px 25px; text-align: center; color: #8b949e; font-size: 13px; border-top: 1px solid #3d444d; line-height: 1.8;">
+        <div style="margin-bottom: 12px;">
+          <a href="https://perplexta.com/about" target="_blank" style="margin: 0 8px; color: #58a6ff; text-decoration: none; font-size: 12px; font-weight: 600;">
+            ${isAr ? 'عن المنصة' : 'About Platform'}
+          </a> •
+          <a href="https://perplexta.com/terms" target="_blank" style="margin: 0 8px; color: #58a6ff; text-decoration: none; font-size: 12px; font-weight: 600;">
+            ${isAr ? 'شروط الاستخدام' : 'Terms of Use'}
+          </a> •
+          <a href="https://perplexta.com/privacy" target="_blank" style="margin: 0 8px; color: #58a6ff; text-decoration: none; font-size: 12px; font-weight: 600;">
+            ${isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}
+          </a>
         </div>
-      </div>
-      
-      <p style="margin-top: 30px; text-align: center; color: #cbd5e1; font-family: Arial; font-size: 9px; letter-spacing: 2px; text-transform: uppercase;">
-        Confidential System Notification | © 2026 PERPLEXTA
-      </p>
-    </div>
+        ${isAr ? 'جميع الحقوق محفوظة © 2026 <strong>منصة بيربليكستا (PERPLEXTA)</strong>' : 'All Rights Reserved © 2026 <strong>PERPLEXTA PLATFORM</strong>'}<br>
+        <span style="direction: ltr; display: block; margin-top: 6px; font-size: 11px; color: #8b949e; font-family: Arial;">PERPLEXTA PLATFORM — Sovereign Technical Intelligence</span>
+        <span style="font-size: 11px; color: #8b949e; display: inline-block; margin-top: 10px;">
+          ${isAr ? 'تصلك هذه الرسالة بناءً على إشعار رسمي من منصة بيربليكستا. إذا لم تقم بهذا الإجراء، يمكنك إبلاغ فريق الأمان.' : 'You received this email from Perplexta Platform. If you did not initiate this action, please contact security compliance.'}
+        </span>
+      </td>
+    </tr>
   `;
 };
 
-const wrapper = (content: string, lang: string) => `
-  <div dir="${lang === 'ar' ? 'rtl' : 'ltr'}" style="background-color: #fcfcfc; padding: 40px 20px; font-family: ${lang === 'ar' ? "'Tajawal', Arial, sans-serif" : "'Helvetica Neue', Helvetica, Arial, sans-serif"};">
-    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-      ${header(lang)}
-      <div style="padding: 50px 60px;">
-        ${content}
-        ${footer(lang)}
-      </div>
+const wrapper = (content: string, lang: string) => {
+  const isAr = lang === 'ar';
+  return `<!DOCTYPE html>
+<html lang="${lang}" dir="${isAr ? 'rtl' : 'ltr'}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${isAr ? 'إشعار منصة بيربليكستا' : 'Perplexta Notification'}</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f8fafc;
+            font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: #1e293b;
+            direction: ${isAr ? 'rtl' : 'ltr'};
+            text-align: ${isAr ? 'right' : 'left'};
+            -webkit-font-smoothing: antialiased;
+        }
+        .wrapper {
+            width: 100%;
+            table-layout: fixed;
+            background-color: #f8fafc;
+            padding: 40px 0;
+        }
+        .main-table {
+            background-color: #ffffff;
+            margin: 0 auto;
+            width: 600px;
+            max-width: 92%;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+            border: 1px solid #e2e8f0;
+        }
+        .content {
+            padding: 40px 32px;
+            text-align: ${isAr ? 'right' : 'left'};
+            background-color: #ffffff;
+        }
+        .content h2, .content h3 {
+            color: #0f172a !important;
+            font-size: 22px;
+            margin-top: 0;
+            margin-bottom: 18px;
+            font-weight: 800;
+            line-height: 1.4;
+            font-family: 'Tajawal', sans-serif;
+        }
+        .content p {
+            font-size: 15px;
+            line-height: 1.85;
+            color: #475569 !important;
+            margin-bottom: 22px;
+            font-family: 'Tajawal', sans-serif;
+        }
+        .info-card {
+            background-color: #f8fafc;
+            border-${isAr ? 'right' : 'left'}: 4px solid #0284c7;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 28px;
+            border-top: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            border-${isAr ? 'left' : 'right'}: 1px solid #e2e8f0;
+        }
+        .info-card table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .info-card td {
+            padding: 6px 0;
+            font-size: 14px;
+            color: #1e293b;
+            font-family: 'Tajawal', sans-serif;
+        }
+        .info-label {
+            color: #64748b;
+            width: 35%;
+            font-weight: 600;
+        }
+        .btn-container {
+            margin: 35px 0 25px 0;
+            text-align: center;
+        }
+        .btn {
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 14px 36px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 700;
+            display: inline-block;
+            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.3);
+            font-family: 'Tajawal', sans-serif;
+        }
+        @media (prefers-color-scheme: dark) {
+            body, .wrapper { background-color: #0b0f17 !important; }
+            .main-table { background-color: #111827 !important; border-color: #1f2937 !important; }
+            .content { background-color: #111827 !important; }
+            .content h2, .content h3 { color: #f9fafb !important; }
+            .content p { color: #9ca3af !important; }
+            .info-card { background-color: #1e293b !important; border-color: #334155 !important; }
+            .info-card td { color: #e2e8f0 !important; }
+            .info-label { color: #94a3b8 !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <table border="0" cellpadding="0" cellspacing="0" class="main-table" width="600">
+            ${header(lang)}
+            <tr>
+                <td class="content">
+                    ${content}
+                </td>
+            </tr>
+            ${footer(lang)}
+        </table>
     </div>
-  </div>
-`;
+</body>
+</html>`;
+};
 
 export const systemTemplates = [
   { 
@@ -67,23 +175,91 @@ export const systemTemplates = [
     subject_en: 'Perplexta System: Official Identity Provisioning', 
     subject_ar: 'نظام بيربليكستا: تفعيل الهوية الرسمية', 
     body_en: wrapper(`
-      <h2 style="color: #0f172a; font-size: 22px; font-weight: 600; margin-bottom: 25px; letter-spacing: -0.5px;">Identity Authentication Required</h2>
-      <p style="color: #475569; font-size: 15px; line-height: 1.7; margin-bottom: 20px;">Verification sequence initiated for: <strong>{{userName}}</strong></p>
-      <p style="color: #475569; font-size: 15px; line-height: 1.7; margin-bottom: 35px;">Your registration on the Perplexta Advanced Analytics Terminal has been recorded. To authorize your access and enable system features, please proceed with the mandatory email confirmation protocol.</p>
-      <div style="text-align: center; margin: 40px 0;">
-        <a href="{{actionUrl}}" style="background-color: #0f172a; color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 2px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; display: inline-block;">Confirm Identity</a>
-      </div>
-      <p style="color: #94a3b8; font-size: 12px; line-height: 1.6;">Note: This link will expire after 24 hours of generation.</p>
+      <h2>Welcome, {{userName}}! 👋</h2>
+      <p>
+        We are pleased to welcome you to the Perplexta Terminal. Your account has been successfully created and provisioned with full analytics and AI capabilities.
+      </p>
+      
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" class="info-card">
+        <tr>
+          <td>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td class="info-label">Username:</td>
+                <td><strong>{{userName}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">Email:</td>
+                <td><strong>{{userEmail}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">Account Status:</td>
+                <td><span style="color: #4ade80; font-weight: 700;">Active & Ready</span></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+
+      <p>
+        Click the button below to authorize your session and access your dashboard:
+      </p>
+
+      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td align="center" class="btn-container">
+            <a href="{{actionUrl}}" target="_blank" class="btn">Access Dashboard Now</a>
+          </td>
+        </tr>
+      </table>
+
+      <p style="font-size: 14px; margin-top: 32px; margin-bottom: 0; color: #94a3b8; line-height: 1.7;">
+        If you have any questions or require support, contact operations directly at <a href="mailto:support@perplexta.com" style="color: #38bdf8; text-decoration: none;">support@perplexta.com</a>.
+      </p>
     `, 'en'), 
     body_ar: wrapper(`
-      <h2 style="color: #0f172a; font-size: 24px; font-weight: 700; margin-bottom: 25px;">مطلوب توثيق الهوية</h2>
-      <p style="color: #475569; font-size: 16px; line-height: 1.8; margin-bottom: 20px;">تم بدء سلسلة التحقق للمعرّف: <strong>{{userName}}</strong></p>
-      <p style="color: #475569; font-size: 16px; line-height: 1.8; margin-bottom: 35px;">لقد تم تسجيل بياناتكم في نظام بيربليكستا للتحليلات المتقدمة. لتفعيل حق الوصول وتمكين ميزات النظام، يرجى المتابعة لإتمام بروتوكول تأكيد البريد الإلكتروني الإلزامي.</p>
-      <div style="text-align: center; margin: 40px 0;">
-        <a href="{{actionUrl}}" style="background-color: #0f172a; color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 2px; font-weight: 700; font-size: 15px; display: inline-block;">تأكيد الهوية الرقمية</a>
-      </div>
-      <p style="color: #94a3b8; font-size: 13px; line-height: 1.6;">تنبيه: تنتهي صلاحية هذا الرابط بعد مرور 24 ساعة من صدوره.</p>
-    `, 'ar') 
+      <h2>أهلاً بك يا {{userName}}! 👋</h2>
+      <p>
+        يسعدنا انضمامك إلى بيربليكستا. تم إنشاء حسابك بنجاح وجاهز للاستخدام للاستفادة من كافة أدوات الذكاء الاصطناعي والتحليل الأكاديمي.
+      </p>
+      
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" class="info-card">
+        <tr>
+          <td>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td class="info-label">اسم المستخدم:</td>
+                <td><strong>{{userName}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">البريد الإلكتروني:</td>
+                <td><strong>{{userEmail}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">حالة الحساب:</td>
+                <td><span style="color: #4ade80; font-weight: 700;">مفعّل وجاهز</span></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+
+      <p>
+        اضغط على الزر أدناه لتأكيد دخولك والانتقال مباشرة إلى لوحة التحكم الخاصة بك:
+      </p>
+
+      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td align="center" class="btn-container">
+            <a href="{{actionUrl}}" target="_blank" class="btn">الانتقال إلى لوحة التحكم</a>
+          </td>
+        </tr>
+      </table>
+
+      <p style="font-size: 14px; margin-top: 32px; margin-bottom: 0; color: #94a3b8; line-height: 1.7;">
+        إذا كان لديك أي استفسار أو احتجت للمساعدة، يمكنك التواصل مباشرة مع فريق الدعم الفني عبر البريد الإلكتروني <a href="mailto:support@perplexta.com" style="color: #38bdf8; text-decoration: none;">support@perplexta.com</a>.
+      </p>
+    `, 'ar')
   },
   { 
     name: 'password_reset', 
@@ -519,7 +695,7 @@ export const systemTemplates = [
   {
     name: 'bulletin_ad_approved',
     subject_en: 'Logistics: ViralBook Advertisement Approved & Published - Perplexta',
-    subject_ar: 'تحديث لوجستي: تم اعتماد ونشر إعلانك بنجاح في فايرال بوك - بيربليكستا',
+    subject_ar: 'تحديث لوجستي: تم اعتماد ونشر إعلانك بنجاح في فيرال بوك - بيربليكستا',
     body_en: wrapper(`
       <h2 style="color: #334155; font-size: 22px; font-weight: 600; margin-bottom: 25px; letter-spacing: -0.5px;">Advertisement Published</h2>
       <p style="color: #475569; font-size: 15px; line-height: 1.7; margin-bottom: 20px;">Identity profile verified. Your advertisement <strong>"{{adTitle}}"</strong> has been successfully approved and published on Perplexta ViralBook.</p>
@@ -534,7 +710,7 @@ export const systemTemplates = [
     `, 'en'),
     body_ar: wrapper(`
       <h2 style="color: #334155; font-size: 24px; font-weight: 700; margin-bottom: 25px;">تم اعتماد ونشر الإعلان</h2>
-      <p style="color: #475569; font-size: 16px; line-height: 1.8; margin-bottom: 20px;">تم التحقق من الامتثال. تمت الموافقة على نشر إعلانك الموسوم بـ <strong>"{{adTitle}}"</strong> ونشره بنجاح في فايرال بوك - بيربليكستا.</p>
+      <p style="color: #475569; font-size: 16px; line-height: 1.8; margin-bottom: 20px;">تم التحقق من الامتثال. تمت الموافقة على نشر إعلانك الموسوم بـ <strong>"{{adTitle}}"</strong> ونشره بنجاح في فيرال بوك - بيربليكستا.</p>
       <div style="background-color: #f8fafc; padding: 25px; border-right: 3px solid #334155; border-radius: 2px; margin: 25px 0;">
         <div style="font-size: 14px; color: #64748b; margin-bottom: 8px;"><strong>مدة العرض النشط:</strong> <span style="color: #0f172a;">{{durationDays}} يوم</span></div>
         <div style="font-size: 14px; color: #64748b;"><strong>تاريخ انتهاء الصلاحية:</strong> <span style="color: #0f172a;">{{expiresAt}}</span></div>
@@ -548,7 +724,7 @@ export const systemTemplates = [
   {
     name: 'bulletin_ad_rejected',
     subject_en: 'Compliance Alert: ViralBook Advertisement Rejected - Perplexta',
-    subject_ar: 'تنبيه الامتثال: تم رفض نشر إعلانك في فايرال بوك - بيربليكستا',
+    subject_ar: 'تنبيه الامتثال: تم رفض نشر إعلانك في فيرال بوك - بيربليكستا',
     body_en: wrapper(`
       <h2 style="color: #ef4444; font-size: 22px; font-weight: 600; margin-bottom: 25px; letter-spacing: -0.5px;">Ad Submission Rejection</h2>
       <p style="color: #475569; font-size: 15px; line-height: 1.7; margin-bottom: 20px;">Your submission <strong>"{{adTitle}}"</strong> did not meet our editorial and safety guidelines.</p>
@@ -562,8 +738,8 @@ export const systemTemplates = [
       </div>
     `, 'en'),
     body_ar: wrapper(`
-      <h2 style="color: #ef4444; font-size: 24px; font-weight: 700; margin-bottom: 25px;">رفض نشر الإعلان في فايرال بوك</h2>
-      <p style="color: #475569; font-size: 16px; line-height: 1.8; margin-bottom: 20px;">لم يستوفِ طلب النشر الخاص بكم لإعلان <strong>"{{adTitle}}"</strong> معايير النشر والأمان الخاصة بمنصة فايرال بوك.</p>
+      <h2 style="color: #ef4444; font-size: 24px; font-weight: 700; margin-bottom: 25px;">رفض نشر الإعلان في فيرال بوك</h2>
+      <p style="color: #475569; font-size: 16px; line-height: 1.8; margin-bottom: 20px;">لم يستوفِ طلب النشر الخاص بكم لإعلان <strong>"{{adTitle}}"</strong> معايير النشر والأمان الخاصة بمنصة فيرال بوك.</p>
       <div style="background-color: #fef2f2; padding: 25px; border: 1px solid #fee2e2; border-radius: 2px; margin: 25px 0; color: #991b1b;">
         <div style="font-size: 14px; font-weight: 700; margin-bottom: 8px;">سبب رفض طلب النشر:</div>
         <div style="font-size: 15px; font-family: sans-serif; line-height: 1.6;">{{rejectionReason}}</div>
@@ -648,5 +824,527 @@ export const systemTemplates = [
       </div>
       <p style="color: #475569; font-size: 16px; line-height: 1.8;">سيستمتع إعلانك المروج بظهور ذي أولوية متقدمة في واجهة التغذية الإخبارية وإطارات ملونة لزيادة التفاعل.</p>
     `, 'ar')
+  },
+  {
+    name: 'two_factor_auth_code',
+    subject_en: 'Security Verification Code - Perplexta 2FA',
+    subject_ar: 'رمز التحقق الأمني - المصادقة الثنائية بيربليكستا',
+    body_en: wrapper(`
+      <h2 style="color: #0f172a; font-size: 22px; font-weight: 600; margin-bottom: 25px;">Two-Factor Authentication Code</h2>
+      <p style="color: #475569; font-size: 15px; line-height: 1.7;">A security verification attempt was initiated for account <strong>{{userName}}</strong>.</p>
+      <div style="background-color: #f8fafc; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; margin: 25px 0; text-align: center;">
+        <div style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 8px;">Your One-Time Code:</div>
+        <div style="font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0284c7; font-family: monospace;">{{code}}</div>
+      </div>
+      <p style="color: #94a3b8; font-size: 12px;">This code expires in 10 minutes. Do not share this code with anyone.</p>
+    `, 'en'),
+    body_ar: wrapper(`
+      <h2 style="color: #0f172a; font-size: 24px; font-weight: 700; margin-bottom: 25px;">رمز المصادقة الثنائية</h2>
+      <p style="color: #475569; font-size: 16px; line-height: 1.8;">تم إجراء محاولة دخول أمنية تتطلب رمز التحقق للمعرف <strong>{{userName}}</strong>.</p>
+      <div style="background-color: #f8fafc; padding: 25px; border: 1px solid #e2e8f0; border-radius: 10px; margin: 25px 0; text-align: center;">
+        <div style="font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 8px;">رمز التحقق الخاص بك:</div>
+        <div style="font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0284c7; font-family: monospace;">{{code}}</div>
+      </div>
+      <p style="color: #94a3b8; font-size: 13px;">ينتهي استخدام هذا الرمز خلال 10 دقائق. لا تشارك هذا الرمز مع أي شخص إطلاقاً.</p>
+    `, 'ar')
+  },
+  {
+    name: 'security_suspicious_attempt',
+    subject_en: 'Critical Alert: Suspicious Activity Blocked - Perplexta Security',
+    subject_ar: 'تنبيه حرج: حظر نشاط مشبوه - أمن بيربليكستا',
+    body_en: wrapper(`
+      <h2 style="color: #ef4444; font-size: 22px; font-weight: 600; margin-bottom: 25px;">Suspicious Security Attempt Detected</h2>
+      <p style="color: #475569; font-size: 15px; line-height: 1.7;">Our security system intercepted and blocked an unauthorized login attempt for profile <strong>{{userName}}</strong>.</p>
+      <div style="background-color: #fef2f2; border: 1px solid #fee2e2; padding: 20px; border-radius: 8px; margin: 25px 0; color: #991b1b;">
+        <div style="font-size: 13px; margin-bottom: 6px;"><strong>Origin IP:</strong> {{ipAddress}}</div>
+        <div style="font-size: 13px; margin-bottom: 6px;"><strong>Location / Device:</strong> {{deviceInfo}}</div>
+        <div style="font-size: 13px;"><strong>Timestamp:</strong> {{time}}</div>
+      </div>
+      <p style="color: #475569; font-size: 15px; line-height: 1.7;">If this was not you, we recommend updating your password immediately.</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="{{actionUrl}}" style="background-color: #ef4444; color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; display: inline-block;">Secure Account Now</a>
+      </div>
+    `, 'en'),
+    body_ar: wrapper(`
+      <h2 style="color: #ef4444; font-size: 24px; font-weight: 700; margin-bottom: 25px;">رصد حظر نشاط مشبوه</h2>
+      <p style="color: #475569; font-size: 16px; line-height: 1.8;">اعترض نظام الأمان وحظر محاولة دخول غير مصرح بها للحساب <strong>{{userName}}</strong>.</p>
+      <div style="background-color: #fef2f2; border: 1px solid #fee2e2; padding: 20px; border-radius: 8px; margin: 25px 0; color: #991b1b;">
+        <div style="font-size: 14px; margin-bottom: 6px;"><strong>عنوان IP المصدر:</strong> {{ipAddress}}</div>
+        <div style="font-size: 14px; margin-bottom: 6px;"><strong>الجهاز / الموقع:</strong> {{deviceInfo}}</div>
+        <div style="font-size: 14px;"><strong>التوقيت:</strong> {{time}}</div>
+      </div>
+      <p style="color: #475569; font-size: 16px; line-height: 1.8;">إذا لم تكن صاحب هذه المحاولة، نوصي بتغيير كلمة المرور الخاصة بك فوراً.</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="{{actionUrl}}" style="background-color: #ef4444; color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; display: inline-block;">تأمين الحساب فوراً</a>
+      </div>
+    `, 'ar')
+  },
+  {
+    name: 'bulletin_page_verified',
+    subject_en: 'Official Update: Commercial Business Page Verified - Perplexta',
+    subject_ar: 'تحديث رسمي: تم توثيق صفحتك التجارية بنجاح - بيربليكستا',
+    body_en: wrapper(`
+      <h2 style="color: #0284c7; font-size: 22px; font-weight: 600; margin-bottom: 25px;">Business Verification Granted</h2>
+      <p style="color: #475569; font-size: 15px; line-height: 1.7;">Congratulations! Your corporate entity page <strong>"{{pageName}}"</strong> has been granted official verification badge status on ViralBook.</p>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" class="info-card">
+        <tr>
+          <td>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td class="info-label">Page Name:</td>
+                <td><strong>{{pageName}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">Verification Badge:</td>
+                <td><span style="color: #38bdf8; font-weight: 700;">✓ Verified Official Page</span></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+      <p style="color: #475569; font-size: 15px; line-height: 1.7;">You now have access to verified broadcasting tools, custom vanity URLs, and enhanced client inquiry metrics.</p>
+    `, 'en'),
+    body_ar: wrapper(`
+      <h2 style="color: #0284c7; font-size: 24px; font-weight: 700; margin-bottom: 25px;">مبارك! تم توثيق صفحتك التجارية</h2>
+      <p style="color: #475569; font-size: 16px; line-height: 1.8;">تهانينا! تم منح صفحتكم التجارية <strong>"{{pageName}}"</strong> شارة التوثيق الرسمية والموثوقة في منصة فيرال بوك.</p>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" class="info-card">
+        <tr>
+          <td>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td class="info-label">اسم الصفحة:</td>
+                <td><strong>{{pageName}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">حالة الشارة:</td>
+                <td><span style="color: #38bdf8; font-weight: 700;">✓ صفحة تجارية موثوقة</span></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+      <p style="color: #475569; font-size: 16px; line-height: 1.8;">يمكنكم الآن الاستفادة من أدوات النشر الموثق، الروابط المخصصة، واستقبال استفسارات التجارة مباشرة.</p>
+    `, 'ar')
+  },
+  {
+    name: 'bulletin_page_inquiry',
+    subject_en: 'Business Inquiry Received for Page "{{pageName}}" - Perplexta',
+    subject_ar: 'استفسار تجاري جديد لصفحة "{{pageName}}" - بيربليكستا',
+    body_en: wrapper(`
+      <h2 style="color: #0f172a; font-size: 22px; font-weight: 600; margin-bottom: 25px;">New Commercial Prospect Inquiry</h2>
+      <p style="color: #475569; font-size: 15px; line-height: 1.7;">A client <strong>{{senderName}}</strong> sent a commercial inquiry to your verified page <strong>"{{pageName}}"</strong>.</p>
+      <div style="background-color: #f8fafc; border-left: 3px solid #0284c7; padding: 20px; margin: 25px 0; color: #334155; font-size: 14px;">
+        "{{messageSnippet}}"
+      </div>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="{{actionUrl}}" style="background-color: #0284c7; color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; display: inline-block;">Reply to Client</a>
+      </div>
+    `, 'en'),
+    body_ar: wrapper(`
+      <h2 style="color: #0f172a; font-size: 24px; font-weight: 700; margin-bottom: 25px;">استفسار تجاري جديد لصفحتكم</h2>
+      <p style="color: #475569; font-size: 16px; line-height: 1.8;">أرسل العميل <strong>{{senderName}}</strong> استفساراً تجارياً لصفحتكم الموثقة <strong>"{{pageName}}"</strong>.</p>
+      <div style="background-color: #f8fafc; border-right: 3px solid #0284c7; padding: 20px; margin: 25px 0; color: #334155; font-size: 15px;">
+        "{{messageSnippet}}"
+      </div>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="{{actionUrl}}" style="background-color: #0284c7; color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; display: inline-block;">الرد على العميل</a>
+      </div>
+    `, 'ar')
+  },
+  {
+    name: 'gpu_provider_down_alert',
+    subject_en: 'Infrastructure Alert: GPU Node Offline Notice',
+    subject_ar: 'تنبيه البنية التحتية: انقطاع خادم الـ GPU',
+    body_en: wrapper(`
+      <h2 style="color: #ef4444; font-size: 22px; font-weight: 600; margin-bottom: 25px;">GPU Infrastructure Node Offline</h2>
+      <p style="color: #475569; font-size: 15px; line-height: 1.7;">Health monitor detected an outage on compute node: <strong>{{providerName}}</strong>.</p>
+      <div style="background-color: #fef2f2; padding: 20px; border: 1px solid #fee2e2; border-radius: 8px; margin: 20px 0; color: #991b1b; font-size: 13px;">
+        <div><strong>Node Model:</strong> {{modelName}}</div>
+        <div><strong>Endpoint:</strong> {{endpointUrl}}</div>
+        <div><strong>Error Status:</strong> {{errorMessage}}</div>
+      </div>
+      <p style="color: #475569; font-size: 15px; line-height: 1.7;">Automated failover has rerouted multimodal tasks to backup compute nodes.</p>
+    `, 'en'),
+    body_ar: wrapper(`
+      <h2 style="color: #ef4444; font-size: 24px; font-weight: 700; margin-bottom: 25px;">انقطاع اتصال خادم معالجة الـ GPU</h2>
+      <p style="color: #475569; font-size: 16px; line-height: 1.8;">رصد مراقب الصحة انقطاع الاتصال بالعقدة الحسابية: <strong>{{providerName}}</strong>.</p>
+      <div style="background-color: #fef2f2; padding: 20px; border: 1px solid #fee2e2; border-radius: 8px; margin: 20px 0; color: #991b1b; font-size: 14px;">
+        <div><strong>نموذج العقدة:</strong> {{modelName}}</div>
+        <div><strong>رابط الواجهة:</strong> {{endpointUrl}}</div>
+        <div><strong>حالة الخطأ:</strong> {{errorMessage}}</div>
+      </div>
+      <p style="color: #475569; font-size: 16px; line-height: 1.8;">قام محرك التوجيه التلقائي بتحويل مهام الوسائط المتعددة لمزودي الاحتياط.</p>
+    `, 'ar')
+  },
+  {
+    name: 'ai_research_report_ready',
+    subject_en: 'AI Terminal: Deep Academic Research Report Generated',
+    subject_ar: 'المنظومة الذكية: جاهزية تقرير البحث الأكاديمي المتقدم',
+    body_en: wrapper(`
+      <h2 style="color: #0284c7; font-size: 22px; font-weight: 600; margin-bottom: 25px;">Research Analysis Completed</h2>
+      <p style="color: #475569; font-size: 15px; line-height: 1.7;">Your deep academic study <strong>"{{topicTitle}}"</strong> has finished processing and is ready for export.</p>
+      <div style="background-color: #f8fafc; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; margin: 25px 0;">
+        <div style="font-size: 13px; color: #64748b;"><strong>Sources Cited:</strong> {{sourcesCount}} Literature Citations</div>
+        <div style="font-size: 13px; color: #64748b; margin-top: 6px;"><strong>Execution Model:</strong> {{modelUsed}}</div>
+      </div>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="{{actionUrl}}" style="background-color: #0284c7; color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; display: inline-block;">Download Report (PDF/Word)</a>
+      </div>
+    `, 'en'),
+    body_ar: wrapper(`
+      <h2 style="color: #0284c7; font-size: 24px; font-weight: 700; margin-bottom: 25px;">جاهزية التقرير والتحليل الأكاديمي</h2>
+      <p style="color: #475569; font-size: 16px; line-height: 1.8;">اكتملت معالجة دراستكم الأكاديمية العملاقة <strong>"{{topicTitle}}"</strong> وهي جاهزة للتصدير والتحميل.</p>
+      <div style="background-color: #f8fafc; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; margin: 25px 0;">
+        <div style="font-size: 14px; color: #64748b;"><strong>عدد المراجع والتوثيقات:</strong> {{sourcesCount}} مرجع أكاديمي</div>
+        <div style="font-size: 14px; color: #64748b; margin-top: 6px;"><strong>نموذج المعالجة:</strong> {{modelUsed}}</div>
+      </div>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="{{actionUrl}}" style="background-color: #0284c7; color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; display: inline-block;">تحميل التقرير (PDF/Word)</a>
+      </div>
+    `, 'ar')
+  },
+  {
+    name: 'wallet_low_balance',
+    subject_en: 'Ledger Warning: Wallet Balance Low - Perplexta',
+    subject_ar: 'تنبيه السجل: رصيد المحفظة منخفض جداً - بيربليكستا',
+    body_en: wrapper(`
+      <h2 style="color: #b45309; font-size: 22px; font-weight: 600; margin-bottom: 25px;">Low Ledger Balance Alert</h2>
+      <p style="color: #475569; font-size: 15px; line-height: 1.7;">Your wallet balance has dropped below the operational threshold: <strong>{{currentBalance}} PTS</strong>.</p>
+      <p style="color: #475569; font-size: 15px; line-height: 1.7;">Please top up your wallet to avoid interruption of automated background tasks, image processing, and API queries.</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="{{actionUrl}}" style="background-color: #0284c7; color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; display: inline-block;">Top Up Wallet Now</a>
+      </div>
+    `, 'en'),
+    body_ar: wrapper(`
+      <h2 style="color: #b45309; font-size: 24px; font-weight: 700; margin-bottom: 25px;">تنبيه: انخفاض رصيد المحفظة</h2>
+      <p style="color: #475569; font-size: 16px; line-height: 1.8;">انخفض رصيد محفظتكم الرقمية عن العتبة التشغيلية الموصى بها: <strong>{{currentBalance}} نقطة</strong>.</p>
+      <p style="color: #475569; font-size: 16px; line-height: 1.8;">يرجى إعادة تغذية المحفظة لتجنب توقف المهام المؤتمتة ومعالجات الوسائط والذكاء الاصطناعي.</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="{{actionUrl}}" style="background-color: #0284c7; color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; display: inline-block;">تغذية المحفظة الآن</a>
+      </div>
+    `, 'ar')
+  },
+  {
+    name: 'invoice_receipt_issued',
+    subject_en: 'Official Receipt: Payment Confirmed - Perplexta',
+    subject_ar: 'إيصال رسمي: تم تأكيد استلام الدفعة - بيربليكستا',
+    body_en: wrapper(`
+      <h2 style="color: #0f172a; font-size: 22px; font-weight: 600; margin-bottom: 25px;">Official Invoice & Receipt</h2>
+      <p style="color: #475569; font-size: 15px; line-height: 1.7;">Payment of <strong>{{amount}}</strong> has been confirmed and officially recorded.</p>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" class="info-card">
+        <tr>
+          <td>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td class="info-label">Invoice Number:</td>
+                <td><strong>{{invoiceNumber}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">Service Item:</td>
+                <td><strong>{{itemDescription}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">Payment Method:</td>
+                <td><strong>{{paymentMethod}}</strong></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="{{actionUrl}}" style="background-color: #0f172a; color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; display: inline-block;">Download Official PDF Invoice</a>
+      </div>
+    `, 'en'),
+    body_ar: wrapper(`
+      <h2 style="color: #0f172a; font-size: 24px; font-weight: 700; margin-bottom: 25px;">إيصال واستمارة سداد رسمية</h2>
+      <p style="color: #475569; font-size: 16px; line-height: 1.8;">تم استلام وتأكيد سداد مبلغ <strong>{{amount}}</strong> وتسجيله رسمياً في السجل المالي.</p>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" class="info-card">
+        <tr>
+          <td>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td class="info-label">رقم الفاتورة:</td>
+                <td><strong>{{invoiceNumber}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">الخدمة / المادة:</td>
+                <td><strong>{{itemDescription}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">وسيلة السداد:</td>
+                <td><strong>{{paymentMethod}}</strong></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="{{actionUrl}}" style="background-color: #0f172a; color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; display: inline-block;">تحميل فاتورة PDF الرسمية</a>
+      </div>
+    `, 'ar')
+  },
+  {
+    name: 'admin_broadcast_announcement',
+    subject_en: 'Official Announcement from Perplexta Leadership',
+    subject_ar: 'إعلان رسمي مهم من إدارة منصة بيربليكستا',
+    body_en: wrapper(`
+      <h2 style="color: #0f172a; font-size: 22px; font-weight: 600; margin-bottom: 25px;">{{announcementTitle}}</h2>
+      <div style="font-size: 15px; line-height: 1.85; color: #334155; margin-bottom: 25px;">
+        {{announcementBody}}
+      </div>
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="{{actionUrl}}" style="background-color: #0f172a; color: #ffffff; padding: 15px 35px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; display: inline-block;">Learn More on Platform</a>
+      </div>
+    `, 'en'),
+    body_ar: wrapper(`
+      <h2 style="color: #0f172a; font-size: 24px; font-weight: 700; margin-bottom: 25px;">{{announcementTitle}}</h2>
+      <div style="font-size: 16px; line-height: 1.85; color: #334155; margin-bottom: 25px;">
+        {{announcementBody}}
+      </div>
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="{{actionUrl}}" style="background-color: #0f172a; color: #ffffff; padding: 15px 35px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 14px; display: inline-block;">متابعة التفاصيل عبر المنصة</a>
+      </div>
+    `, 'ar')
+  },
+  {
+    name: 'admin_alert_new_user',
+    subject_en: '[Admin Alert] New User Registration Recorded - {{newUserName}}',
+    subject_ar: '[إشعار إداري] تسجيل مستخدم جديد - {{newUserName}}',
+    body_en: wrapper(`
+      <h2 style="color: #0f172a; font-size: 20px; font-weight: 700; margin-bottom: 20px;">👤 New User Account Provisioned</h2>
+      <p style="color: #475569; font-size: 14px; line-height: 1.7;">A new member has completed identity registration on Perplexta Terminal.</p>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" class="info-card">
+        <tr>
+          <td>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td class="info-label">User Name:</td>
+                <td><strong>{{newUserName}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">User Email:</td>
+                <td><strong>{{newUserEmail}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">Registration IP:</td>
+                <td><strong>{{registrationIp}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">Referred By:</td>
+                <td><strong>{{referrerName}}</strong></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+      <div style="text-align: center; margin: 25px 0;">
+        <a href="{{actionUrl}}" style="background-color: #0f172a; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 13px; display: inline-block;">Review User in Admin ERP</a>
+      </div>
+    `, 'en'),
+    body_ar: wrapper(`
+      <h2 style="color: #0f172a; font-size: 20px; font-weight: 700; margin-bottom: 20px;">👤 تسجيل مستخدم جديد في المنظومة</h2>
+      <p style="color: #475569; font-size: 14px; line-height: 1.8;">سجل عضو جديد حسابه المعتمد في لوحة تحكم المنصة.</p>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" class="info-card">
+        <tr>
+          <td>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td class="info-label">اسم المستخدم:</td>
+                <td><strong>{{newUserName}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">البريد الإلكتروني:</td>
+                <td><strong>{{newUserEmail}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">عنوان IP:</td>
+                <td><strong>{{registrationIp}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">مسجل عبر إحالة:</td>
+                <td><strong>{{referrerName}}</strong></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+      <div style="text-align: center; margin: 25px 0;">
+        <a href="{{actionUrl}}" style="background-color: #0f172a; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 13px; display: inline-block;">مراجعة الحساب في لوحة التحكم</a>
+      </div>
+    `, 'ar')
+  },
+  {
+    name: 'admin_alert_plan_purchased',
+    subject_en: '[Admin Alert] Subscription Plan Purchased - {{planName}}',
+    subject_ar: '[إشعار إداري] ترقية وشراء خطة اشتراك - {{planName}}',
+    body_en: wrapper(`
+      <h2 style="color: #0284c7; font-size: 20px; font-weight: 700; margin-bottom: 20px;">💳 New Plan Subscription Purchased</h2>
+      <p style="color: #475569; font-size: 14px; line-height: 1.7;">A subscription purchase was confirmed for user <strong>{{purchaserName}}</strong>.</p>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" class="info-card">
+        <tr>
+          <td>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td class="info-label">Purchaser:</td>
+                <td><strong>{{purchaserName}} ({{purchaserEmail}})</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">Plan Name:</td>
+                <td><strong>{{planName}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">Amount Paid:</td>
+                <td><strong style="color: #4ade80;">{{paidAmount}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">Billing Cycle:</td>
+                <td><strong>{{billingCycle}}</strong></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+      <div style="text-align: center; margin: 25px 0;">
+        <a href="{{actionUrl}}" style="background-color: #0284c7; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 13px; display: inline-block;">View Financial Ledger</a>
+      </div>
+    `, 'en'),
+    body_ar: wrapper(`
+      <h2 style="color: #0284c7; font-size: 20px; font-weight: 700; margin-bottom: 20px;">💳 تم شراء وترقية خطة جديدة</h2>
+      <p style="color: #475569; font-size: 14px; line-height: 1.8;">تم تأكيد عملية شراء اشتراك جديد للمستخدم <strong>{{purchaserName}}</strong>.</p>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" class="info-card">
+        <tr>
+          <td>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td class="info-label">المشتري:</td>
+                <td><strong>{{purchaserName}} ({{purchaserEmail}})</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">اسم الباقة:</td>
+                <td><strong>{{planName}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">المبلغ المدفوع:</td>
+                <td><strong style="color: #4ade80;">{{paidAmount}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">دورة الفوترة:</td>
+                <td><strong>{{billingCycle}}</strong></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+      <div style="text-align: center; margin: 25px 0;">
+        <a href="{{actionUrl}}" style="background-color: #0284c7; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 13px; display: inline-block;">عرض السجل المالي للإدارة</a>
+      </div>
+    `, 'ar')
+  },
+  {
+    name: 'admin_alert_user_deleted',
+    subject_en: '[Admin Security Alert] Account Deactivation / Removal - {{targetUserName}}',
+    subject_ar: '[تنبيه إداري أمني] تعطيل / حذف حساب - {{targetUserName}}',
+    body_en: wrapper(`
+      <h2 style="color: #ef4444; font-size: 20px; font-weight: 700; margin-bottom: 20px;">⚠️ Account Deletion / Deactivation Logged</h2>
+      <p style="color: #475569; font-size: 14px; line-height: 1.7;">A user account deactivation or deletion action was executed.</p>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" class="info-card">
+        <tr>
+          <td>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td class="info-label">Target Account:</td>
+                <td><strong>{{targetUserName}} ({{targetUserEmail}})</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">Executed By:</td>
+                <td><strong>{{operatorName}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">Reason Code:</td>
+                <td><strong>{{reasonNote}}</strong></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    `, 'en'),
+    body_ar: wrapper(`
+      <h2 style="color: #ef4444; font-size: 20px; font-weight: 700; margin-bottom: 20px;">⚠️ تم تنفيذ حذف / تعطيل حساب</h2>
+      <p style="color: #475569; font-size: 14px; line-height: 1.8;">تم تسجيل عملية حذف أو تعطيل حساب مستخدم في المنظومة.</p>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" class="info-card">
+        <tr>
+          <td>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td class="info-label">الحساب المستهدف:</td>
+                <td><strong>{{targetUserName}} ({{targetUserEmail}})</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">المنفّذ:</td>
+                <td><strong>{{operatorName}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">سبب الإجراء:</td>
+                <td><strong>{{reasonNote}}</strong></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    `, 'ar')
+  },
+  {
+    name: 'admin_alert_high_deposit',
+    subject_en: '[Admin Alert] High-Value Wallet Deposit Logged - {{depositAmount}}',
+    subject_ar: '[إشعار إداري] إيداع مالي كبير في المحفظة - {{depositAmount}}',
+    body_en: wrapper(`
+      <h2 style="color: #b45309; font-size: 20px; font-weight: 700; margin-bottom: 20px;">💎 High-Value Wallet Deposit</h2>
+      <p style="color: #475569; font-size: 14px; line-height: 1.7;">A high-value wallet deposit was logged and requires auditing.</p>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" class="info-card">
+        <tr>
+          <td>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td class="info-label">Account Name:</td>
+                <td><strong>{{accountName}} ({{accountEmail}})</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">Deposit Amount:</td>
+                <td><strong style="color: #4ade80;">{{depositAmount}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">Gateway Method:</td>
+                <td><strong>{{paymentGateway}}</strong></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    `, 'en'),
+    body_ar: wrapper(`
+      <h2 style="color: #b45309; font-size: 20px; font-weight: 700; margin-bottom: 20px;">💎 إيداع مالي كبير في المحفظة</h2>
+      <p style="color: #475569; font-size: 14px; line-height: 1.8;">تم تسجيل إيداع مالي بقيمة مرتفعة ويتطلب تدقيق السجل.</p>
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" class="info-card">
+        <tr>
+          <td>
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td class="info-label">اسم الحساب:</td>
+                <td><strong>{{accountName}} ({{accountEmail}})</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">مبلغ الإيداع:</td>
+                <td><strong style="color: #4ade80;">{{depositAmount}}</strong></td>
+              </tr>
+              <tr>
+                <td class="info-label">وسيلة السداد:</td>
+                <td><strong>{{paymentGateway}}</strong></td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    `, 'ar')
   }
 ];
+

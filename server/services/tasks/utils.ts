@@ -1,5 +1,6 @@
 import { decrementUserUsage } from '../quota.js';
 import { getEconomySettings } from '../wallet.js';
+import { pool } from '../../db/index.js';
 
 export const AI_CALL_TIMEOUT_MS = 45000;
 export const TTS_TIMEOUT_MS = 30000;
@@ -25,7 +26,7 @@ export async function validateProviderCapacity(
     };
   }
 
-  const { is_active, daily_budget, used_today } = vaultConfig;
+  const { is_active, daily_budget, used_today, last_reset_date } = vaultConfig;
 
   if (!is_active) {
     return { 
@@ -35,16 +36,22 @@ export async function validateProviderCapacity(
   }
 
   const budget = parseFloat(daily_budget || '0');
-  const used = parseFloat(used_today || '0');
+  let used = parseFloat(used_today || '0');
+  const todayStr = new Date().toISOString().split('T')[0];
+  const resetDateStr = last_reset_date ? new Date(last_reset_date).toISOString().split('T')[0] : '';
+
+  if (resetDateStr && resetDateStr !== todayStr) {
+    used = 0;
+  }
   
   const settings = await getEconomySettings();
   const pointsPerDollar = parseFloat(settings.points_per_dollar || '1000');
   const estimatedCost = (costPerUsage || 0) / pointsPerDollar;
 
-  if (budget > 0 && (used + estimatedCost) > budget) {
+  if (budget > 0 && (used >= budget || (used + estimatedCost) > budget)) {
     return { 
       valid: false, 
-      warning: `Provider check: '${providerId}' daily budget of $${budget} exceeded (spent $${used.toFixed(4)}, next run expects $${estimatedCost.toFixed(4)}).` 
+      warning: `Provider check: '${providerId}' daily budget of $${budget} reached/exceeded (spent $${used.toFixed(4)}, next run expects $${estimatedCost.toFixed(4)}). Request BLOCKED before server call.` 
     };
   }
 
@@ -144,6 +151,17 @@ export async function safeDecrementOnFailure(
   walletCharged: boolean | { charged: 'points' | 'balance'; amount: number }
 ) {
   try {
+    // Preserve usage count for heavy generation tasks (image/video) to prevent infinite retry leaks on failure
+    if (toolIdStr === 'image' || toolIdStr === 'video') {
+      console.info(`[Quota Protection] Preserving usage count for Heavy Task '${toolIdStr}' (User ${userId}) to prevent infinite retry leaks on failure.`);
+      if (pool && userId) {
+        pool.query(
+          `INSERT INTO user_activity_logs (user_id, event_type, event_details) VALUES ($1, $2, $3)`,
+          [userId, 'HEAVY_TASK_FAILED', JSON.stringify({ tool_id: toolIdStr, timestamp: new Date().toISOString() })]
+        ).catch(() => {});
+      }
+      return;
+    }
     if (quotaCheck && quotaCheck.allowed) {
       await decrementUserUsage(userId, toolIdStr);
     } else {

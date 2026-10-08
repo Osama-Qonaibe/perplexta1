@@ -150,7 +150,7 @@ export const MessageFeedbackModal: React.FC<MessageFeedbackModalProps> = ({
               <div 
                 className={`w-7 h-7 rounded-shape-sm flex items-center justify-center shrink-0 border ${
                   type === 'like' 
-                    ? 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30' 
+                    ? 'bg-[var(--status-success-subtle)] text-[var(--fg-success)] border-[var(--fg-success)]/30' 
                     : 'bg-rose-500/15 text-rose-500 border-rose-500/30'
                 }`}
               >
@@ -228,7 +228,7 @@ export const MessageFeedbackModal: React.FC<MessageFeedbackModalProps> = ({
                           onClick={() => toggleTag(tag)}
                           className={`px-2.5 h-8 rounded-shape-sm text-[11px] font-medium transition-theme cursor-pointer border ${
                             isSelected
-                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-semibold'
+                              ? 'bg-[var(--status-success-subtle)] text-[var(--fg-success)] dark:text-[var(--fg-success)] border-[var(--fg-success)]/30 font-semibold'
                               : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)] border-[var(--border-default)] hover:border-[var(--border-accent)]'
                           }`}
                         >
@@ -259,8 +259,8 @@ export const MessageFeedbackModal: React.FC<MessageFeedbackModalProps> = ({
                 </div>
 
                 {/* Model Reinforcement & Email Notice Banner */}
-                <div className="p-2.5 rounded-shape-sm bg-emerald-500/8 border border-emerald-500/20 space-y-1">
-                  <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">
+                <div className="p-2.5 rounded-shape-sm bg-[var(--status-success-subtle)] border border-[var(--fg-success)]/20 space-y-1">
+                  <div className="flex items-center gap-1.5 text-[var(--fg-success)] dark:text-[var(--fg-success)] font-bold text-[11px]">
                     <Sparkles size={13} className="shrink-0" />
                     <span>{dir === 'rtl' ? 'تثبيت القدرات وإشعار الإدارة' : 'Capability Reinforcement & Admin Notice'}</span>
                   </div>
@@ -358,7 +358,7 @@ export const MessageFeedbackModal: React.FC<MessageFeedbackModalProps> = ({
                 disabled={isSubmitting}
                 className={`px-4 h-8 rounded-shape-sm text-xs font-bold text-white flex items-center justify-center gap-1.5 shadow-2xs transition-theme cursor-pointer ${
                   type === 'like'
-                    ? 'bg-emerald-600 hover:bg-emerald-700 active:scale-98'
+                    ? 'bg-[var(--comp-button-primary-bg)] hover:opacity-90 active:scale-98'
                     : 'bg-rose-600 hover:bg-rose-700 active:scale-98'
                 } ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
               >

@@ -28,6 +28,7 @@ export interface SavedPostsTabProps {
   handleWhatsAppClick: (ad: BulletinAd, e: React.MouseEvent) => void;
   handleShareAd: (ad: BulletinAd) => void;
   handleOpenPageDetail: (pageId: number) => void;
+  handleOpenUserDetail?: (userId: number) => void;
   handleOpenLightbox: (...args: any[]) => void;
   openPostUploadModal: () => void;
   handleOpenBoostModal: (ad: BulletinAd) => void;
@@ -63,6 +64,7 @@ export const SavedPostsTab: React.FC<SavedPostsTabProps> = ({
   handleWhatsAppClick,
   handleShareAd,
   handleOpenPageDetail,
+  handleOpenUserDetail,
   handleOpenLightbox,
   openPostUploadModal,
   handleOpenBoostModal,
@@ -75,7 +77,7 @@ export const SavedPostsTab: React.FC<SavedPostsTabProps> = ({
   return (
     <div className="space-y-4 w-full max-w-2xl mx-auto">
       {/* Header card with Sovereign design tokens */}
-      <div className="rounded-xl bg-[var(--surface-card)] border border-[var(--border-default)] p-3 shadow-xs flex items-center justify-between transition-theme">
+      <div className="rounded-[var(--radius-md)] bg-[var(--surface-card)] border border-[var(--border-default)] p-3 shadow-xs flex items-center justify-between transition-theme">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-shape-sm bg-accent/10 text-accent flex items-center justify-center border border-accent/20">
             <Bookmark size={16} />
@@ -91,7 +93,7 @@ export const SavedPostsTab: React.FC<SavedPostsTabProps> = ({
         </div>
         <button
           onClick={() => setActiveTab('board')}
-          className="h-8 px-3 rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:border-accent/40 hover:bg-accent/10 text-xs font-bold text-[var(--text-primary)] hover:text-accent transition-all duration-150 active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+          className="h-8 px-3 rounded-shape-sm bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:border-accent/40 hover:bg-accent/10 text-xs font-bold text-[var(--text-primary)] hover:text-accent transition-all duration-fast active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-2xs"
         >
           <span>{isRtl ? 'استعراض المزيد' : 'Browse More'}</span>
           {isRtl ? <ArrowLeft size={13} /> : <ArrowRight size={13} />}
@@ -100,7 +102,7 @@ export const SavedPostsTab: React.FC<SavedPostsTabProps> = ({
 
       {/* Empty State */}
       {!loadingSaved && savedAds.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 px-4 rounded-xl bg-[var(--surface-card)] border border-[var(--border-default)] shadow-xs space-y-3 text-center transition-theme">
+        <div className="flex flex-col items-center justify-center py-16 px-4 rounded-[var(--radius-md)] bg-[var(--surface-card)] border border-[var(--border-default)] shadow-xs space-y-3 text-center transition-theme">
           <div className="w-12 h-12 rounded-shape-md bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-center justify-center text-[var(--text-muted)]">
             <Bookmark size={22} />
           </div>
@@ -116,7 +118,7 @@ export const SavedPostsTab: React.FC<SavedPostsTabProps> = ({
           </div>
           <button
             onClick={() => setActiveTab('board')}
-            className="mt-1 h-8 px-3.5 rounded-shape-sm bg-accent text-[var(--text-primary)] hover:opacity-90 font-bold text-xs transition-all duration-150 active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            className="mt-1 h-8 px-3.5 rounded-shape-sm bg-accent text-[var(--text-primary)] hover:opacity-90 font-bold text-xs transition-all duration-fast active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-2xs"
           >
             <Compass size={13} />
             <span>{isRtl ? 'استعراض الإعلانات' : 'Explore Ads'}</span>
@@ -151,6 +153,7 @@ export const SavedPostsTab: React.FC<SavedPostsTabProps> = ({
           onWhatsApp={handleWhatsAppClick}
           onShare={handleShareAd}
           onOpenPageDetail={handleOpenPageDetail}
+          onOpenUserDetail={handleOpenUserDetail}
           onOpenLightbox={handleOpenLightbox}
           onCreateAdClick={openPostUploadModal}
           onBoostAd={handleOpenBoostModal}

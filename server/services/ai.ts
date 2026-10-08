@@ -15,11 +15,11 @@ import fs from 'fs/promises';
 import path from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { pool } from '../db/index.js';
-import { decrypt } from '../utils/crypto.js';
+import { decrypt, encrypt } from '../utils/crypto.js';
 import { memoryCache } from '../utils/cache.js';
-import { invalidateApiKeysVaultCache } from '../db/queries.js';
+import { invalidateApiKeysVaultCache, invalidateOrchestratorConfigCache } from '../db/queries.js';
 
-const CUSTOM_PROVIDER_TIMEOUT_MS = 60000;
+const CUSTOM_PROVIDER_TIMEOUT_MS = 12000;
 
 function createTimeoutSignal(ms: number): { signal: AbortSignal; clear: () => void } {
   const controller = new AbortController();
@@ -134,12 +134,19 @@ export async function syncProviderModelsInternal(providerId: string, apiKey: str
       });
       await handleApiError(response, 'Google AI');
       const data: any = await response.json();
-      models = (data.models || []).map((m: any) => ({
-        ...m,
-        id: m.name,
-        name: m.displayName || m.name.replace('models/', ''),
-        supportedMethods: m.supportedGenerationMethods || []
-      }));
+      models = (data.models || [])
+        .map((m: any) => ({
+          ...m,
+          id: m.name,
+          name: m.displayName || m.name.replace('models/', ''),
+          supportedMethods: m.supportedGenerationMethods || []
+        }))
+        .sort((a: any, b: any) => {
+          const aSupports = (a.supportedMethods || []).includes('generateContent') ? 1 : 0;
+          const bSupports = (b.supportedMethods || []).includes('generateContent') ? 1 : 0;
+          if (bSupports !== aSupports) return bSupports - aSupports;
+          return (a.name || '').localeCompare(b.name || '');
+        });
     } else if (provider === 'together') {
       const response = await fetch('https://api.together.xyz/v1/models', {
         headers: { 'Authorization': `Bearer ${cleanApiKey}`, 'Accept': 'application/json' },
@@ -262,11 +269,48 @@ export async function syncProviderModelsInternal(providerId: string, apiKey: str
 
     if (count > 0) {
       await pool.query(
-        'UPDATE api_keys_vault SET models = $1, model_list = $1, is_active = true, updated_at = CURRENT_TIMESTAMP WHERE provider = $2',
-        [JSON.stringify(models), providerId]
+        `INSERT INTO api_keys_vault (provider, encrypted_key, is_active, models, model_list, updated_at)
+         VALUES ($1, $2, true, $3, $3, CURRENT_TIMESTAMP)
+         ON CONFLICT (provider) DO UPDATE
+         SET encrypted_key = CASE WHEN api_keys_vault.encrypted_key IS NULL OR api_keys_vault.encrypted_key = '' THEN EXCLUDED.encrypted_key ELSE api_keys_vault.encrypted_key END,
+             models = EXCLUDED.models,
+             model_list = EXCLUDED.model_list,
+             is_active = true,
+             updated_at = CURRENT_TIMESTAMP`,
+        [providerId, encrypt(cleanApiKey), JSON.stringify(models)]
       );
       invalidateVaultCache(providerId);
       invalidateApiKeysVaultCache();
+
+      // Auto-assign any unconfigured tools in tool_orchestrator dynamically from synced models
+      try {
+        const textModel = models.find((m: any) => {
+          const id = (m.id || m.name || '').toLowerCase();
+          const methods = m.supportedMethods || m.supportedGenerationMethods || [];
+          const supportsText = methods.length === 0 || methods.includes('generateContent');
+          return supportsText && (id.includes('3.6-flash') || id.includes('3.8-flash'));
+        }) || models.find((m: any) => {
+          const id = (m.id || m.name || '').toLowerCase();
+          const methods = m.supportedMethods || m.supportedGenerationMethods || [];
+          const supportsText = methods.length === 0 || methods.includes('generateContent');
+          return supportsText && !id.includes('tts') && !id.includes('image') && !id.includes('embedding') && !id.includes('transcribe') && !id.includes('robotics') && !id.includes('computer-use') && !id.includes('antigravity') && !id.includes('deep-research');
+        }) || models[0];
+
+        if (textModel) {
+          const modelId = textModel.id || textModel.name || (typeof textModel === 'string' ? textModel : '');
+          if (modelId) {
+            await pool.query(`
+              UPDATE tool_orchestrator
+              SET primary_provider = $1, primary_model = $2, updated_at = CURRENT_TIMESTAMP
+              WHERE (primary_provider IS NULL OR primary_provider = '' OR primary_model IS NULL OR primary_model = '')
+                AND tool_id IN ('chat_fast', 'chat_pro', 'chat_reasoning', 'perplexta_analysis', 'ads_copilot', 'code', 'sovereign_search', 'x402_api')
+            `, [providerId, modelId]);
+            invalidateOrchestratorConfigCache();
+          }
+        }
+      } catch (err: any) {
+        console.warn('[AI Service] Auto-route assignment notice:', err?.message || err);
+      }
     }
     return { models, count };
   } catch (error) {
@@ -296,21 +340,56 @@ export async function getProviderKey(provider: string): Promise<string | null> {
 
   let decryptedKey: string | null = null;
   try {
-    const result = await pool.query('SELECT encrypted_key, url_key FROM api_keys_vault WHERE provider = $1', [normProvider]);
+    const result = await pool.query('SELECT encrypted_key, url_key, is_active, daily_budget, used_today, last_reset_date FROM api_keys_vault WHERE provider = $1', [normProvider]);
     if (result.rows.length > 0) {
-      if (result.rows[0].encrypted_key) {
-        decryptedKey = decrypt(result.rows[0].encrypted_key);
+      const row = result.rows[0];
+      if (row.is_active === false) {
+        return null;
       }
-      if (result.rows[0].url_key) {
-        urlKeyCache.set(normProvider, { value: result.rows[0].url_key, expiresAt: now + CACHE_TTL_MS });
+
+      // Strict Daily Budget Limit Enforcement
+      const dailyBudget = parseFloat(String(row.daily_budget || '0'));
+      let usedToday = parseFloat(String(row.used_today || '0'));
+      const todayStr = new Date().toISOString().split('T')[0];
+      const resetDateStr = row.last_reset_date ? new Date(row.last_reset_date).toISOString().split('T')[0] : '';
+
+      if (resetDateStr && resetDateStr !== todayStr) {
+        usedToday = 0;
+        pool.query('UPDATE api_keys_vault SET used_today = 0, last_reset_date = CURRENT_DATE WHERE provider = $1', [normProvider]).catch(() => {});
+      }
+
+      if (dailyBudget > 0 && usedToday >= dailyBudget) {
+        console.warn(`[AI Service] Provider '${normProvider}' reached daily budget limit ($${usedToday.toFixed(4)} / $${dailyBudget}). Request BLOCKED before server dispatch.`);
+        return null;
+      }
+
+      if (row.encrypted_key) {
+        decryptedKey = decrypt(row.encrypted_key);
+      }
+      if (row.url_key) {
+        urlKeyCache.set(normProvider, { value: row.url_key, expiresAt: now + CACHE_TTL_MS });
+      }
+      if (decryptedKey && decryptedKey.trim().length > 0) {
+        vaultCache.set(normProvider, { value: decryptedKey, expiresAt: now + CACHE_TTL_MS });
+        return decryptedKey;
+      }
+      
+      // If DB has no key for google/gemini, fallback to environment GEMINI_API_KEY
+      if ((normProvider === 'google' || normProvider === 'gemini') && process.env.GEMINI_API_KEY) {
+        vaultCache.set(normProvider, { value: process.env.GEMINI_API_KEY, expiresAt: now + CACHE_TTL_MS });
+        return process.env.GEMINI_API_KEY;
+      }
+      return null;
+    } else {
+      // Check if vault has any records at all
+      const totalCountRes = await pool.query('SELECT COUNT(*) as cnt FROM api_keys_vault').catch(() => ({ rows: [{ cnt: '0' }] }));
+      const totalCnt = parseInt(totalCountRes.rows[0]?.cnt || '0', 10);
+      if (totalCnt > 0 && normProvider !== 'google' && normProvider !== 'gemini') {
+        // Vault has records, meaning keys are managed and this provider was explicitly deleted/not added
+        return null;
       }
     }
   } catch (_) {}
-
-  if (decryptedKey !== null) {
-    vaultCache.set(normProvider, { value: decryptedKey, expiresAt: now + CACHE_TTL_MS });
-    return decryptedKey;
-  }
 
   // Environment fallback for Google / Gemini
   if ((normProvider === 'google' || normProvider === 'gemini') && process.env.GEMINI_API_KEY) {
@@ -649,6 +728,12 @@ function transformMessagesForGemini(messages: any[]): any[] {
     }
   }
 
+  if (result.length === 0) {
+    result.push({ role: 'user', parts: [{ text: ' ' }] });
+  } else if (result[0].role === 'model') {
+    result.unshift({ role: 'user', parts: [{ text: ' ' }] });
+  }
+
   return result;
 }
 
@@ -842,6 +927,10 @@ export async function callAIProvider(
   let body: any = {};
   let fetchSignal: AbortSignal | undefined;
 
+  const effectiveTemperature = typeof options?.temperature === 'number' ? options.temperature : (options?.toolId === 'code' ? 0.15 : undefined);
+  const effectiveTopP = typeof options?.topP === 'number' ? options.topP : (options?.toolId === 'code' ? 0.95 : undefined);
+  const effectiveMaxTokens = typeof options?.maxOutputTokens === 'number' ? options.maxOutputTokens : (options?.toolId === 'code' ? 16384 : 8192);
+
   if (normProvider === 'openai' || normProvider === 'deepseek' || normProvider === 'together' || normProvider === 'openrouter' || normProvider === 'xai' || normProvider === 'grok' || normProvider === 'groq' || normProvider === 'mistral') {
     if (normProvider === 'openai') url = 'https://api.openai.com/v1/chat/completions';
     else if (normProvider === 'deepseek') url = 'https://api.deepseek.com/chat/completions';
@@ -858,7 +947,14 @@ export async function callAIProvider(
       // OpenRouter sometimes hangs on standard streaming parsing if provider doesn't support it well, but stream is true here
     }
     const mappedMessages = transformMessagesForOpenAI(messages);
-    body = { model: cleanModel, messages: mappedMessages, stream: isStreaming, max_tokens: 8192 };
+    body = { 
+      model: cleanModel, 
+      messages: mappedMessages, 
+      stream: isStreaming, 
+      max_tokens: effectiveMaxTokens,
+      ...(effectiveTemperature !== undefined ? { temperature: effectiveTemperature } : {}),
+      ...(effectiveTopP !== undefined ? { top_p: effectiveTopP } : {})
+    };
     
     // OpenRouter Optimization: Prevent aggressive upstream fallback chaining which causes 30s+ latency
     if (normProvider === 'openrouter') {
@@ -870,7 +966,14 @@ export async function callAIProvider(
     headers['anthropic-version'] = '2023-06-01';
     headers['anthropic-beta'] = 'pdfs-2024-09-25';
     const mappedMessages = transformMessagesForAnthropic(messages);
-    body = { model: cleanModel, max_tokens: 8192, stream: isStreaming, messages: mappedMessages.filter(m => m.role !== 'system') };
+    body = { 
+      model: cleanModel, 
+      max_tokens: effectiveMaxTokens, 
+      stream: isStreaming, 
+      messages: mappedMessages.filter(m => m.role !== 'system'),
+      ...(effectiveTemperature !== undefined ? { temperature: effectiveTemperature } : {}),
+      ...(effectiveTopP !== undefined ? { top_p: effectiveTopP } : {})
+    };
     if (systemPrompt) body.system = systemPrompt;
   } else if (normProvider.includes('google') || normProvider.includes('gemini')) {
     const method = isStreaming ? 'streamGenerateContent' : 'generateContent';
@@ -882,15 +985,20 @@ export async function callAIProvider(
     if (isStreaming) url += '?alt=sse';
     headers['x-goog-api-key'] = cleanApiKey;
     const isTtsModel = cleanModel.toLowerCase().includes('tts');
+    const isDeveloperInstructionUnsupported = isTtsModel || 
+      cleanModel.toLowerCase().includes('antigravity') || 
+      cleanModel.toLowerCase().includes('deep-research');
     const geminiContents = transformMessagesForGemini(messages);
     body = { 
       contents: geminiContents,
       generationConfig: {
-        maxOutputTokens: 8192
+        maxOutputTokens: effectiveMaxTokens,
+        ...(effectiveTemperature !== undefined ? { temperature: effectiveTemperature } : {}),
+        ...(effectiveTopP !== undefined ? { topP: effectiveTopP } : {})
       }
     };
     if (systemPrompt) {
-      if (isTtsModel) {
+      if (isDeveloperInstructionUnsupported) {
         if (geminiContents.length > 0 && geminiContents[0].parts && geminiContents[0].parts.length > 0) {
           const firstPart = geminiContents[0].parts[0];
           if (typeof firstPart.text === 'string') {
@@ -921,7 +1029,8 @@ export async function callAIProvider(
     }
     const mappedMessages = transformMessagesForOllama(messages);
     body = { model: cleanModel, messages: mappedMessages, stream: isStreaming };
-    const { signal, clear: clearOllamaTimer } = createTimeoutSignal(CUSTOM_PROVIDER_TIMEOUT_MS);
+    const OLLAMA_TIMEOUT_MS = 4000;
+    const { signal, clear: clearOllamaTimer } = createTimeoutSignal(OLLAMA_TIMEOUT_MS);
     fetchSignal = signal;
     try {
       let res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: fetchSignal });
@@ -930,14 +1039,14 @@ export async function callAIProvider(
         console.warn(`[AI Service] Ollama returned ${res.status} with Authorization header. Retrying without Authorization...`);
         const headersNoAuth = { ...headers };
         delete headersNoAuth['Authorization'];
-        const { signal: retrySignal, clear: clearRetryTimer } = createTimeoutSignal(CUSTOM_PROVIDER_TIMEOUT_MS);
+        const { signal: retrySignal, clear: clearRetryTimer } = createTimeoutSignal(OLLAMA_TIMEOUT_MS);
         res = await fetch(url, { method: 'POST', headers: headersNoAuth, body: JSON.stringify(body), signal: retrySignal });
         clearRetryTimer();
       }
       return handleResponse(res);
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        throw new Error(`Ollama provider timed out after ${CUSTOM_PROVIDER_TIMEOUT_MS / 1000}s. Check your Ollama server.`);
+        throw new Error(`Ollama provider unreachable/timed out after ${OLLAMA_TIMEOUT_MS / 1000}s. Check your Ollama server.`);
       }
       throw err;
     }
@@ -989,18 +1098,25 @@ export async function callAIProvider(
       const errJson = await clonedRes.json();
       const errorDetail = JSON.stringify(errJson);
       
-      const isQuotaOrOverloaded = res.status === 429 || res.status === 503 || errorDetail.includes('RESOURCE_EXHAUSTED') || errorDetail.includes('quota') || errorDetail.includes('overloaded');
+      const isQuotaOrOverloaded = res.status === 429 || res.status === 503 || errorDetail.includes('RESOURCE_EXHAUSTED') || errorDetail.includes('quota') || errorDetail.includes('overloaded') || errorDetail.includes('high demand') || errorDetail.includes('UNAVAILABLE');
       
       if (isQuotaOrOverloaded) {
-        console.warn(`[AI Service] Rate limit / Quota exhausted / Overloaded encountered for model ${cleanModel}. Attempting fallback to gemini-2.5-flash...`);
-        if (!cleanModel.includes('2.5-flash')) {
-          const fallbackUrl = url.replace(cleanModel, 'models/gemini-2.5-flash');
-          const fallbackRes = await fetch(fallbackUrl, { method: 'POST', headers, body: JSON.stringify(body) });
-          if (fallbackRes.ok) {
-            console.log('[AI Service] Successfully recovered using gemini-2.5-flash fallback.');
-            return handleResponse(fallbackRes);
+        console.warn(`[AI Service] Rate limit / High demand (${res.status}) encountered for model ${cleanModel}. Initiating fast retry for temporary demand spikes...`);
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          const delayMs = attempt * 850;
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          try {
+            const retryRes = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+            if (retryRes.ok) {
+              console.log(`[AI Service] Request recovered successfully from temporary spike on attempt ${attempt} for ${cleanModel}.`);
+              return handleResponse(retryRes);
+            }
+            res = retryRes;
+          } catch (retryErr) {
+            console.warn(`[AI Service] Fast retry attempt ${attempt} network error:`, retryErr);
           }
         }
+        console.warn(`[AI Service] Model ${cleanModel} still unavailable after retries. Deferring to Orchestrator dynamic database fallback chain.`);
       }
 
       const is404 = res.status === 404 || errorDetail.includes('NOT_FOUND') || errorDetail.includes('is not found') || errorDetail.includes('not found');
@@ -1055,6 +1171,39 @@ export async function callAIProvider(
         }
         
         res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+      }
+
+      const isDeveloperInstructionDisabled = errorDetail.includes('Developer instruction is not enabled') ||
+                                            (errJson.error?.message && errJson.error.message.includes('Developer instruction is not enabled'));
+      if (isDeveloperInstructionDisabled) {
+        console.warn(`[AI Service] Developer instruction not supported on ${cleanModel}. Self-healing by retrying with system prompt embedded in user message...`);
+        const fallbackContents = transformMessagesForGemini(messages);
+        if (systemPrompt) {
+          if (fallbackContents.length > 0 && fallbackContents[0].parts && fallbackContents[0].parts.length > 0) {
+            const firstPart = fallbackContents[0].parts[0];
+            if (typeof firstPart.text === 'string') {
+              firstPart.text = `[System Protocol:\n${systemPrompt}]\n\nUser Prompt:\n${firstPart.text}`;
+            } else {
+              fallbackContents[0].parts.unshift({ text: `[System Protocol:\n${systemPrompt}]` });
+            }
+          } else {
+            fallbackContents.unshift({ role: 'user', parts: [{ text: `[System Protocol:\n${systemPrompt}]` }] });
+          }
+        }
+        const retryBody: any = {
+          contents: fallbackContents,
+          generationConfig: {
+            maxOutputTokens: effectiveMaxTokens,
+            ...(effectiveTemperature !== undefined ? { temperature: effectiveTemperature } : {}),
+            ...(effectiveTopP !== undefined ? { topP: effectiveTopP } : {})
+          }
+        };
+        const retryRes = await fetch(url, { method: 'POST', headers, body: JSON.stringify(retryBody) });
+        if (retryRes.ok) {
+          console.log(`[AI Service] Self-healed successfully without Developer instruction for ${cleanModel}.`);
+          return handleResponse(retryRes);
+        }
+        res = retryRes;
       }
     } catch (e) {
       console.error('[AI Service] Error checking or recovering from Gemini multi-turn response:', e);

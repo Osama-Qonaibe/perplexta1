@@ -4,6 +4,7 @@ import { useAppContext } from "../../context/AppContext";
 import { motion, AnimatePresence } from "motion/react";
 import { getAuthHeaders, getTimeAgo } from "../../utils/adminUtils";
 import { AdminService } from "../../services/adminService";
+import { SelectDropdown } from "@/design-system";
 import {
   Settings2,
   FileText,
@@ -66,12 +67,12 @@ export
 const SmartEmailHubView = ({
   theme,
   t,
-  dir,
+  dir = 'rtl',
   showToast,
 }: {
   theme: string;
   t: (key: string, replacements?: any) => string;
-  dir: string;
+  dir?: 'rtl' | 'ltr';
   showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
 }) => {
   const [activeTab, setActiveTab] = useState<"settings" | "templates" | "feedback_logs">(
@@ -107,6 +108,7 @@ const SmartEmailHubView = ({
   });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [templates, setTemplates] = useState<any[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
@@ -439,7 +441,7 @@ const SmartEmailHubView = ({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      <div className="flex items-center gap-2 overflow-x-auto pb-2.5 pt-1 no-scrollbar scroll-smooth border-b border-[var(--border-default)]">
+      <div className="flex items-center gap-2 overflow-x-auto pb-2.5 pt-1 custom-scrollbar scroll-smooth border-b border-[var(--border-default)]">
         <button
           onClick={() => setActiveTab("settings")}
           className={`flex items-center gap-2 px-4 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-all whitespace-nowrap border shrink-0 cursor-pointer ${
@@ -539,19 +541,19 @@ const SmartEmailHubView = ({
 
               <form onSubmit={(e) => e.preventDefault()} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-bold text-[var(--text-primary)] mb-1.5">
-                    {t("mailerType")}
-                  </label>
-                  <select
+                  <SelectDropdown
+                    label={t("mailerType")}
                     value={settings.mailer_type || "smtp"}
-                    onChange={(e) =>
-                      setSettings({ ...settings, mailer_type: e.target.value })
+                    onChange={(val) =>
+                      setSettings({ ...settings, mailer_type: val })
                     }
-                    className="w-full px-4 py-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-theme"
-                  >
-                    <option value="smtp">{t("smtp")}</option>
-                    <option value="php">{t("phpMail")}</option>
-                  </select>
+                    dir={dir}
+                    options={[
+                      { value: "smtp", label: t("smtp") || "Standard SMTP" },
+                      { value: "sendgrid", label: "SendGrid (SMTP/API)" },
+                      { value: "resend", label: "Resend Mailer" }
+                    ]}
+                  />
                 </div>
 
                 {settings.mailer_type === "smtp" && (
@@ -597,23 +599,22 @@ const SmartEmailHubView = ({
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-bold text-[var(--text-primary)] mb-1.5">
-                          {t("encryption")}
-                        </label>
-                        <select
+                        <SelectDropdown
+                          label={t("encryption")}
                           value={settings.smtp_encryption || "tls"}
-                          onChange={(e) =>
+                          onChange={(val) =>
                             setSettings({
                                ...settings,
-                               smtp_encryption: e.target.value,
+                               smtp_encryption: val,
                             })
                           }
-                          className="w-full px-4 py-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-theme"
-                        >
-                          <option value="tls">{t("tls")}</option>
-                          <option value="ssl">{t("ssl") || "SSL"}</option>
-                          <option value="none">{t("none")}</option>
-                        </select>
+                          dir={dir}
+                          options={[
+                            { value: "tls", label: t("tls") },
+                            { value: "ssl", label: t("ssl") || "SSL" },
+                            { value: "none", label: t("none") }
+                          ]}
+                        />
                       </div>
                       <div>
                         <label className="block text-sm font-bold text-[var(--text-primary)] mb-1.5">
@@ -643,19 +644,30 @@ const SmartEmailHubView = ({
                         {t("smtpPassword") ||
                           (dir === "rtl" ? "كلمة سر SMTP" : "SMTP Password")}
                       </label>
-                      <input
-                        type="password"
-                        value={settings.smtp_password || ""}
-                        onChange={(e) =>
-                          setSettings({
-                            ...settings,
-                            smtp_password: e.target.value,
-                          })
-                        }
-                        placeholder="••••••••••••••••"
-                        className="w-full px-4 py-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-theme text-left placeholder:text-[var(--text-muted)]"
-                        dir="ltr"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={settings.smtp_password || ""}
+                          onChange={(e) =>
+                            setSettings({
+                              ...settings,
+                              smtp_password: e.target.value,
+                            })
+                          }
+                          placeholder="••••••••••••••••"
+                          className="w-full px-4 py-3 pe-12 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-theme text-left placeholder:text-[var(--text-muted)]"
+                          dir="ltr"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute inset-y-0 end-0 px-3 flex items-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+                          tabIndex={-1}
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
                     </div>
                   </>
                 )}
@@ -811,12 +823,12 @@ const SmartEmailHubView = ({
                     )}
                     <div className="flex justify-between items-start mb-4">
                       <div
-                        className={`p-3 rounded-[var(--radius-sm)] ${template.type === "system" ? "bg-sky-500/10 text-sky-600 dark:text-sky-400" : "bg-purple-500/10 text-purple-600 dark:text-purple-400"}`}
+                        className={`p-3 rounded-[var(--radius-sm)] ${template.type === "system" ? "bg-sky-500/10 text-sky-600 dark:text-sky-400" : "bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)]"}`}
                       >
                         <Mail size={22} />
                       </div>
                       <span
-                        className={`px-2.5 py-1 rounded-[var(--radius-xs)] text-xs font-bold border ${template.type === "system" ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/25" : "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25"}`}
+                        className={`px-2.5 py-1 rounded-[var(--radius-xs)] text-xs font-bold border ${template.type === "system" ? "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/25" : "bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)] border-[var(--border-accent)]/25"}`}
                       >
                         {template.type === "system"
                           ? t("systemTemplates")
@@ -1065,16 +1077,16 @@ const SmartEmailHubView = ({
                 </p>
               </div>
 
-              <div className="p-5 rounded-[var(--radius-md)] border border-emerald-500/20 bg-emerald-500/5 shadow-xs">
-                <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 mb-2">
+              <div className="p-5 rounded-[var(--radius-md)] border border-[var(--fg-success)]/20 bg-[var(--status-success-subtle)] shadow-xs">
+                <div className="flex items-center justify-between text-[var(--fg-success)] dark:text-[var(--fg-success)] mb-2">
                   <span className="text-xs font-bold">{dir === "rtl" ? "الإشادات والتقييمات الإيجابية" : "Positive Praises & Likes"}</span>
                   <ThumbsUp size={16} />
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                  <span className="text-2xl font-black text-[var(--fg-success)] dark:text-[var(--fg-success)] font-mono">
                     {feedbackStats.likes_count || 0}
                   </span>
-                  <span className="text-xs font-bold text-amber-500 flex items-center gap-0.5">
+                  <span className="text-xs font-bold text-[var(--fg-warning)] flex items-center gap-0.5">
                     <Star size={12} className="fill-amber-500" />
                     {Number(feedbackStats.avg_rating || 5).toFixed(1)}/5
                   </span>
@@ -1084,12 +1096,12 @@ const SmartEmailHubView = ({
                 </p>
               </div>
 
-              <div className="p-5 rounded-[var(--radius-md)] border border-rose-500/20 bg-rose-500/5 shadow-xs">
-                <div className="flex items-center justify-between text-rose-600 dark:text-rose-400 mb-2">
+              <div className="p-5 rounded-[var(--radius-md)] border border-[var(--fg-danger)]/20 bg-[var(--status-danger-subtle)] shadow-xs">
+                <div className="flex items-center justify-between text-[var(--fg-danger)] dark:text-[var(--fg-danger)] mb-2">
                   <span className="text-xs font-bold">{dir === "rtl" ? "بلاغات التصحيح وتعلّم الأخطاء" : "Dislikes & Model Corrections"}</span>
                   <ThumbsDown size={16} />
                 </div>
-                <div className="text-2xl font-black text-rose-600 dark:text-rose-400 font-mono">
+                <div className="text-2xl font-black text-[var(--fg-danger)] dark:text-[var(--fg-danger)] font-mono">
                   {feedbackStats.dislikes_count || 0}
                 </div>
                 <p className="text-[11px] text-[var(--text-muted)] mt-1">
@@ -1122,13 +1134,13 @@ const SmartEmailHubView = ({
                     onChange={(e) => setFeedbackSearch(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && fetchFeedbackLogs()}
                     placeholder={dir === "rtl" ? "بحث في التقييمات، البريد، أو الملاحظات..." : "Search feedback, email, or comments..."}
-                    className={`w-full py-2 text-xs rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-accent transition-theme ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'}`}
+                    className={`w-full py-2 text-xs rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-accent transition-theme ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'}`}
                   />
                 </div>
                 <button
                   type="button"
                   onClick={fetchFeedbackLogs}
-                  className="px-3 py-2 rounded-xl text-xs font-bold bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-default)] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                  className="px-3 py-2 rounded-[var(--radius-md)] text-xs font-bold bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-default)] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
                 >
                   <RefreshCw size={13} className={isLoadingFeedback ? "animate-spin" : ""} />
                   <span className="hidden sm:inline">{dir === "rtl" ? "تحديث" : "Refresh"}</span>
@@ -1145,7 +1157,7 @@ const SmartEmailHubView = ({
                     key={flt.key}
                     type="button"
                     onClick={() => setFeedbackFilter(flt.key as any)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-[var(--radius-md)] text-xs font-bold transition-all whitespace-nowrap border shrink-0 cursor-pointer flex items-center gap-1.5 ${
                       feedbackFilter === flt.key
                         ? "bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] border-[var(--border-accent)]"
                         : "bg-[var(--surface-subtle)] text-[var(--text-secondary)] border-[var(--border-default)] hover:text-[var(--text-primary)]"
@@ -1192,17 +1204,17 @@ const SmartEmailHubView = ({
                     <div
                       key={item.id}
                       className={`p-5 rounded-[var(--radius-md)] border bg-[var(--surface-card)] shadow-xs transition-theme space-y-3.5 ${
-                        isLike ? 'border-emerald-500/25 hover:border-emerald-500/40' : 'border-rose-500/25 hover:border-rose-500/40'
+                        isLike ? 'border-[var(--fg-success)]/25 hover:border-[var(--fg-success)]/40' : 'border-[var(--fg-danger)]/25 hover:border-[var(--fg-danger)]/40'
                       }`}
                     >
                       {/* Item Header */}
                       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-default)] pb-3">
                         <div className="flex items-center gap-3">
                           <div
-                            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                            className={`w-9 h-9 rounded-[var(--radius-md)] flex items-center justify-center shrink-0 border ${
                               isLike
-                                ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                                : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                                ? 'bg-[var(--status-success-subtle)] text-[var(--fg-success)] border-[var(--fg-success)]/20'
+                                : 'bg-[var(--status-danger-subtle)] text-[var(--fg-danger)] border-[var(--fg-danger)]/20'
                             }`}
                           >
                             {isLike ? <ThumbsUp size={17} /> : <ThumbsDown size={17} />}
@@ -1225,12 +1237,12 @@ const SmartEmailHubView = ({
 
                         <div className="flex items-center gap-2">
                           {isLike ? (
-                            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 text-xs font-bold font-mono">
-                              <Star size={13} className="fill-amber-400 text-amber-400" />
+                            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--status-success-subtle)] border border-[var(--fg-success)]/25 text-[var(--fg-success)] dark:text-[var(--fg-success)] text-xs font-bold font-mono">
+                              <Star size={13} className="fill-amber-400 text-[var(--fg-warning)]" />
                               <span>{item.rating || 5} / 5</span>
                             </div>
                           ) : (
-                            <span className="px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-400 text-xs font-bold">
+                            <span className="px-2.5 py-1 rounded-full bg-[var(--status-danger-subtle)] border border-[var(--fg-danger)]/25 text-[var(--fg-danger)] dark:text-[var(--fg-danger)] text-xs font-bold">
                               {item.reason || (dir === 'rtl' ? 'بلاغ عدم إعجاب' : 'Dislike Report')}
                             </span>
                           )}
@@ -1255,7 +1267,7 @@ const SmartEmailHubView = ({
                                 showToast('Error', 'error');
                               }
                             }}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                            className="w-7 h-7 rounded-[var(--radius-sm)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--fg-danger)] hover:bg-[var(--status-danger-subtle)] transition-colors cursor-pointer"
                             title={dir === 'rtl' ? 'حذف السجل' : 'Delete Log'}
                           >
                             <Trash2 size={14} />
@@ -1265,7 +1277,7 @@ const SmartEmailHubView = ({
 
                       {/* Content / Comment */}
                       {item.comment && (
-                        <div className="p-3.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs text-[var(--text-primary)] leading-relaxed">
+                        <div className="p-3.5 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs text-[var(--text-primary)] leading-relaxed">
                           <span className="font-bold text-[var(--text-secondary)] block mb-1">
                             {isLike ? (dir === 'rtl' ? '💬 ملاحظة وإشادة المستخدم:' : '💬 User praise / comment:') : (dir === 'rtl' ? '🎯 توجيه التصحيح والتعليم:' : '🎯 Correction & Guidance:')}
                           </span>
@@ -1279,7 +1291,7 @@ const SmartEmailHubView = ({
                           {tagsArr.map((tag: string, i: number) => (
                             <span
                               key={i}
-                              className="px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                              className="px-2.5 py-0.5 rounded-shape-sm text-[11px] font-medium bg-[var(--status-success-subtle)] text-[var(--fg-success)] dark:text-[var(--fg-success)] border border-[var(--fg-success)]/20"
                             >
                               ✓ {tag}
                             </span>
@@ -1291,7 +1303,7 @@ const SmartEmailHubView = ({
                       {(item.user_prompt || item.assistant_response) && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                           {item.user_prompt && (
-                            <div className="p-2.5 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[11px]">
+                            <div className="p-2.5 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[11px]">
                               <span className="font-bold text-[var(--text-muted)] block mb-0.5">
                                 {dir === 'rtl' ? 'سؤال المستخدم:' : 'User Query:'}
                               </span>
@@ -1301,7 +1313,7 @@ const SmartEmailHubView = ({
                             </div>
                           )}
                           {item.assistant_response && (
-                            <div className="p-2.5 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[11px]">
+                            <div className="p-2.5 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[11px]">
                               <span className="font-bold text-[var(--text-muted)] block mb-0.5">
                                 {dir === 'rtl' ? 'رد المساعد الذكي:' : 'Assistant Response:'}
                               </span>
@@ -1316,7 +1328,7 @@ const SmartEmailHubView = ({
                       {/* Footer Badges */}
                       <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-[11px] text-[var(--text-muted)]">
                         <div className="flex items-center gap-3">
-                          <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+                          <span className="flex items-center gap-1 text-[var(--fg-success)] dark:text-[var(--fg-success)] font-semibold">
                             <Brain size={12} />
                             {isLike ? (dir === 'rtl' ? 'تم تثبيت القدرات في الذاكرة' : 'Capabilities Reinforced') : (dir === 'rtl' ? 'تم تزويد المساعد بالتصحيح' : 'Model Learned Correction')}
                           </span>

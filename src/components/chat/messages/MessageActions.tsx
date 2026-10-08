@@ -70,10 +70,10 @@ const ActionButtonWithTooltip = ({
       onMouseLeave={() => setHoveredId(null)}
       onClick={onClick}
       disabled={disabled}
-      className={`w-8 h-8 rounded-shape-sm flex items-center justify-center transition-all duration-150 cursor-pointer border border-transparent bg-transparent relative before:absolute before:-inset-1.5 before:content-[''] active:scale-95 disabled:opacity-40 disabled:pointer-events-none shrink-0 box-border ${
+      className={`w-8 h-8 rounded-shape-sm flex items-center justify-center transition-colors duration-fast cursor-pointer border relative before:absolute before:-inset-1.5 before:content-[''] active:scale-95 disabled:opacity-40 disabled:pointer-events-none shrink-0 box-border ${
         active
-          ? activeClass || 'bg-[var(--bg-accent-muted)] text-[var(--fg-accent)]'
-          : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]/60'
+          ? activeClass || 'border-[var(--border-default)] bg-[var(--surface-card)] text-[var(--fg-accent)] shadow-2xs'
+          : 'border-transparent hover:border-[var(--border-accent)]/60 bg-transparent hover:bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
       } ${className}`}
     >
       {icon}
@@ -84,8 +84,8 @@ const ActionButtonWithTooltip = ({
           initial={{ opacity: 0, y: 3, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 2, scale: 0.96 }}
-          transition={{ duration: 0.12 }}
-          className="absolute bottom-full mb-1.5 px-2 py-0.5 rounded-shape-xs bg-[var(--surface-card)] text-[var(--text-primary)] border border-[var(--border-default)] text-[10px] font-semibold shadow-md pointer-events-none z-50 whitespace-nowrap"
+          transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
+          className="absolute bottom-full mb-1.5 px-2 py-0.5 rounded-shape-xs bg-[var(--surface-card)] text-[var(--text-primary)] border border-[var(--border-default)] text-[10px] font-semibold shadow-2xs pointer-events-none z-50 whitespace-nowrap"
         >
           {label}
         </motion.div>
@@ -223,7 +223,7 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
             label={dir === 'rtl' ? 'إعجاب وتقييم' : 'Like & Rate'}
             icon={<ThumbsUp size={14} />}
             active={msg.feedback === 1}
-            activeClass="text-emerald-500 bg-emerald-500/10 border-emerald-500/30"
+            activeClass="text-[var(--fg-success)] bg-[var(--status-success-subtle)] border-[var(--fg-success)]/30"
             onClick={() => {
               if (msg.feedback === 1) {
                 handleFeedback(msg.id!, 0);
@@ -239,7 +239,7 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
             hoveredId={hoveredId}
             setHoveredId={setHoveredId}
             label={dir === 'rtl' ? 'الإبلاغ عن سياسات الأمان والسلامة' : 'Report Content Safety Policy'}
-            icon={<ShieldAlert size={14} className="text-rose-500" />}
+            icon={<ShieldAlert size={14} />}
             active={isSafetyReportModalOpen}
             activeClass="text-rose-500 bg-rose-500/10 border-rose-500/30"
             onClick={() => {
@@ -258,7 +258,7 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
               label={dir === 'rtl' ? 'المزيد من الخيارات والإبلاغ' : 'More Options'}
               icon={<MoreHorizontal size={14} />}
               active={isMenuOpen}
-              activeClass="bg-[var(--bg-accent-muted)] border-[var(--border-accent)]/40 text-[var(--fg-accent)]"
+              activeClass="border-[var(--border-default)] bg-[var(--surface-card)] text-[var(--fg-accent)] shadow-2xs"
               onClick={() => {
                 const nextState = !isMenuOpen;
                 setLocalMenuOpen(nextState);
@@ -336,12 +336,13 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
                 return (
                   <motion.div
                     ref={menuRef}
-                    initial={{ opacity: 0, y: 6, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 6, scale: 0.96 }}
-                    transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-                    className={`absolute bottom-full mb-2 w-max min-w-[190px] p-1 font-sans bg-[var(--surface-card)] border border-[var(--border-default)] rounded-xl shadow-2xl z-50 backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/10 flex flex-col gap-0.5 ${
-                      dir === 'rtl' ? 'right-0' : 'left-0'
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.10, ease: [0.16, 1, 0.3, 1] }}
+                    style={{ transformOrigin: dir === 'rtl' ? 'bottom left' : 'bottom right' }}
+                    className={`absolute bottom-full mb-2 w-max min-w-[190px] p-1.5 font-sans bg-[var(--surface-card)] border border-[var(--border-default)] rounded-[var(--radius-md)] shadow-2xl z-50 backdrop-blur-2xl ring-1 ring-black/5 dark:ring-white/10 flex flex-col gap-0.5 ${
+                      dir === 'rtl' ? 'left-0' : 'right-0'
                     }`}
                     dir={dir}
                   >
@@ -353,10 +354,12 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
                         setLocalMenuOpen(false);
                         if (setOpenMenuId) setOpenMenuId(null);
                       }}
-                      className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-semibold text-rose-500 hover:bg-rose-500/10 rounded-shape-sm transition-all duration-150 cursor-pointer group select-none"
+                      className="group w-full h-[36px] min-h-[36px] flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-xs)] border border-transparent bg-transparent hover:bg-rose-500/10 text-rose-500 transition-all duration-fast cursor-pointer select-none text-start text-xs"
                     >
-                      <span className="truncate min-w-0">{dir === 'rtl' ? 'الإبلاغ عن المحتوى' : 'Report Content Safety'}</span>
-                      <ShieldAlert size={14} className="text-rose-500 shrink-0" />
+                      <ShieldAlert size={14} className="text-rose-500 group-hover:text-rose-400 shrink-0 transition-colors duration-fast" />
+                      <span className="truncate min-w-0 flex-1 text-xs font-semibold text-rose-500 group-hover:text-rose-400 transition-colors duration-fast">
+                        {dir === 'rtl' ? 'الإبلاغ عن المحتوى' : 'Report Content Safety'}
+                      </span>
                     </button>
 
                     <div className="my-0.5 h-px bg-[var(--border-default)]" />
@@ -369,10 +372,12 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
                           key={item.id}
                           type="button"
                           onClick={item.action}
-                          className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-semibold text-[var(--text-primary)] hover:bg-cyan-500/10 hover:text-cyan-400 rounded-shape-sm transition-all duration-150 cursor-pointer group select-none"
+                          className="group w-full h-[36px] min-h-[36px] flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-xs)] border border-transparent bg-transparent hover:bg-[var(--surface-subtle)] transition-all duration-fast cursor-pointer select-none text-start text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                         >
-                          <span className="truncate min-w-0 group-hover:text-cyan-400 transition-colors">{item.label}</span>
-                          <Icon size={14} className={`${item.iconColor} group-hover:text-cyan-400 transition-all duration-150 shrink-0`} />
+                          <Icon size={14} className={`${item.iconColor} group-hover:text-[var(--fg-accent)] shrink-0 transition-colors duration-fast`} />
+                          <span className="truncate min-w-0 flex-1 text-xs font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors duration-fast">
+                            {item.label}
+                          </span>
                         </button>
                       );
                     })}
@@ -387,10 +392,12 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
                         setLocalMenuOpen(false);
                         if (setOpenMenuId) setOpenMenuId(null);
                       }}
-                      className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-bold text-rose-500 hover:bg-rose-500/10 rounded-shape-sm transition-all duration-150 cursor-pointer group select-none"
+                      className="group w-full h-[34px] min-h-[34px] flex items-center gap-2 px-2.5 rounded-shape-sm border border-transparent bg-transparent hover:bg-rose-500/10 text-rose-500 transition-colors duration-fast cursor-pointer select-none text-start"
                     >
-                      <span className="truncate min-w-0">{dir === 'rtl' ? 'حذف الرد' : 'Delete Response'}</span>
-                      <Trash2 size={14} className="text-rose-500 shrink-0" />
+                      <Trash2 size={14} className="text-rose-500 group-hover:text-rose-400 shrink-0 transition-colors duration-fast" />
+                      <span className="truncate min-w-0 flex-1 text-xs font-bold text-rose-500 group-hover:text-rose-400 transition-colors duration-fast">
+                        {dir === 'rtl' ? 'حذف الرد' : 'Delete Response'}
+                      </span>
                     </button>
                   </motion.div>
                 );

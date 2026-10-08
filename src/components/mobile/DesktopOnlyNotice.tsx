@@ -19,8 +19,8 @@ export const DesktopOnlyNotice: React.FC<{ title?: string; message?: string }> =
 
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center select-none">
-      <div className="w-full max-w-sm p-6 rounded-2xl bg-[var(--surface-card)] border border-[var(--border-default)] shadow-sm flex flex-col items-center">
-        <div className="w-16 h-16 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-center justify-center text-[var(--text-accent)] mb-4">
+      <div className="w-full max-w-sm p-6 rounded-[var(--radius-lg)] bg-[var(--surface-card)] border border-[var(--border-default)] shadow-sm flex flex-col items-center">
+        <div className="w-16 h-16 rounded-[var(--radius-lg)] bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-center justify-center text-[var(--text-accent)] mb-4">
           <Monitor className="w-8 h-8 stroke-[1.5]" />
         </div>
 
@@ -36,7 +36,7 @@ export const DesktopOnlyNotice: React.FC<{ title?: string; message?: string }> =
 
         <button
           onClick={handleReturn}
-          className="w-full h-11 px-4 rounded-xl bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-bold text-xs flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer shadow-sm"
+          className="w-full h-11 px-4 rounded-[var(--radius-md)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-bold text-xs flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer shadow-sm"
         >
           {isRtl ? (
             <>

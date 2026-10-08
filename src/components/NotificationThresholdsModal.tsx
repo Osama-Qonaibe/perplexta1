@@ -80,14 +80,14 @@ export const NotificationThresholdsModal: React.FC<NotificationThresholdsModalPr
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-xl rounded-2xl border border-[var(--border-default)] bg-[var(--surface-card)] text-[var(--text-primary)] shadow-2xl overflow-hidden transition-all transform animate-scale-up font-sans"
+        className="relative w-full max-w-xl rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-card)] text-[var(--text-primary)] shadow-2xl overflow-hidden transition-all transform animate-scale-up font-sans"
         onClick={(e) => e.stopPropagation()}
         dir={isRtl ? "rtl" : "ltr"}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-[var(--border-default)] bg-accent/5">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-accent/15 text-accent border border-accent/20">
+            <div className="p-2.5 rounded-[var(--radius-md)] bg-accent/15 text-accent border border-accent/20">
               <Sliders size={20} />
             </div>
             <div>
@@ -110,7 +110,7 @@ export const NotificationThresholdsModal: React.FC<NotificationThresholdsModalPr
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] transition-theme cursor-pointer"
+            className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] transition-theme cursor-pointer"
           >
             <X size={18} />
           </button>
@@ -126,7 +126,7 @@ export const NotificationThresholdsModal: React.FC<NotificationThresholdsModalPr
               <button
                 type="button"
                 onClick={() => applyPreset("standard", 50, 80)}
-                className={`px-3 py-2 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                className={`px-3 py-2 rounded-[var(--radius-sm)] border text-xs font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
                   activePreset === "standard" || (lowThreshold === 50 && highThreshold === 80)
                     ? "bg-accent/15 border-accent text-accent shadow-sm"
                     : "bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-secondary)] hover:border-accent/40"
@@ -138,7 +138,7 @@ export const NotificationThresholdsModal: React.FC<NotificationThresholdsModalPr
               <button
                 type="button"
                 onClick={() => applyPreset("proactive", 40, 70)}
-                className={`px-3 py-2 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                className={`px-3 py-2 rounded-[var(--radius-sm)] border text-xs font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
                   activePreset === "proactive" || (lowThreshold === 40 && highThreshold === 70)
                     ? "bg-amber-500/15 border-amber-500 text-amber-500 shadow-sm"
                     : "bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-secondary)] hover:border-accent/40"
@@ -151,7 +151,7 @@ export const NotificationThresholdsModal: React.FC<NotificationThresholdsModalPr
               <button
                 type="button"
                 onClick={() => applyPreset("conservative", 60, 90)}
-                className={`px-3 py-2 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                className={`px-3 py-2 rounded-[var(--radius-sm)] border text-xs font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
                   activePreset === "conservative" || (lowThreshold === 60 && highThreshold === 90)
                     ? "bg-blue-500/15 border-blue-500 text-blue-500 shadow-sm"
                     : "bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-secondary)] hover:border-accent/40"
@@ -164,7 +164,7 @@ export const NotificationThresholdsModal: React.FC<NotificationThresholdsModalPr
           </div>
 
           {/* Interactive Sliders */}
-          <div className="space-y-4 p-4 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-default)]">
+          <div className="space-y-4 p-4 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)]">
             {/* Low Threshold Slider */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs font-bold">
@@ -185,7 +185,7 @@ export const NotificationThresholdsModal: React.FC<NotificationThresholdsModalPr
                 step={5}
                 value={lowThreshold}
                 onChange={(e) => handleLowChange(Number(e.target.value))}
-                className="w-full h-2 bg-[var(--surface-card)] border border-[var(--border-default)] rounded-lg appearance-none cursor-pointer accent-amber-500"
+                className="w-full h-2 bg-[var(--surface-card)] border border-[var(--border-default)] rounded-[var(--radius-sm)] appearance-none cursor-pointer accent-amber-500"
               />
               <p className="text-[11px] text-[var(--text-muted)] leading-normal">
                 {isRtl
@@ -216,7 +216,7 @@ export const NotificationThresholdsModal: React.FC<NotificationThresholdsModalPr
                 step={5}
                 value={highThreshold}
                 onChange={(e) => handleHighChange(Number(e.target.value))}
-                className="w-full h-2 bg-[var(--surface-card)] border border-[var(--border-default)] rounded-lg appearance-none cursor-pointer accent-red-500"
+                className="w-full h-2 bg-[var(--surface-card)] border border-[var(--border-default)] rounded-[var(--radius-sm)] appearance-none cursor-pointer accent-red-500"
               />
               <p className="text-[11px] text-[var(--text-muted)] leading-normal">
                 {isRtl
@@ -231,7 +231,7 @@ export const NotificationThresholdsModal: React.FC<NotificationThresholdsModalPr
             <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider block mb-2">
               {isRtl ? "معاينة نطاقات التنبيه المستهدفة" : "Target Alert Zones Visual Spectrum"}
             </span>
-            <div className="relative h-6 w-full rounded-lg overflow-hidden flex font-mono text-[10px] font-bold text-white shadow-inner border border-[var(--border-default)]">
+            <div className="relative h-6 w-full rounded-[var(--radius-sm)] overflow-hidden flex font-mono text-[10px] font-bold text-white shadow-inner border border-[var(--border-default)]">
               {/* Normal Zone */}
               <div
                 style={{ width: `${lowThreshold}%` }}
@@ -268,7 +268,7 @@ export const NotificationThresholdsModal: React.FC<NotificationThresholdsModalPr
                 setHighThreshold(80);
                 setActivePreset("standard");
               }}
-              className="px-3 py-2 rounded-lg text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center gap-1 transition-theme cursor-pointer"
+              className="px-3 py-2 rounded-[var(--radius-sm)] text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center gap-1 transition-theme cursor-pointer"
             >
               <RotateCcw size={14} />
               <span>{isRtl ? "إعادة ضبط" : "Reset Default"}</span>
@@ -278,17 +278,17 @@ export const NotificationThresholdsModal: React.FC<NotificationThresholdsModalPr
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-lg border border-[var(--border-default)] text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)] transition-theme cursor-pointer"
+                className="px-4 py-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)] transition-theme cursor-pointer"
               >
                 {isRtl ? "إلغاء" : "Cancel"}
               </button>
               <button
                 type="submit"
                 disabled={isSaving}
-                className="px-5 py-2 rounded-lg bg-accent hover:bg-accent/90 disabled:opacity-50 text-[var(--fg-on-emphasis)] text-xs font-bold flex items-center gap-2 transition-all shadow-md cursor-pointer"
+                className="px-5 py-2 rounded-[var(--radius-sm)] bg-accent hover:bg-accent/90 disabled:opacity-50 text-[var(--fg-on-emphasis)] text-xs font-bold flex items-center gap-2 transition-all shadow-md cursor-pointer"
               >
                 {isSaving ? (
-                  <div className="w-4 h-4 rounded-[4px] border-2 border-white/30 border-t-white animate-spin" />
+                  <div className="w-4 h-4 rounded-[var(--radius-xs)] border-2 border-white/30 border-t-white animate-spin" />
                 ) : (
                   <Save size={15} />
                 )}

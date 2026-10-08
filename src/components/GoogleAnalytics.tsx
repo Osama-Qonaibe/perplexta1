@@ -54,8 +54,15 @@ export const GoogleAnalytics = () => {
 
     // Initialize Google Tag Manager if a GA ID is configured or custom container is used
     if (gaId) {
+      // Validate GA ID format (only allow alphanumeric, underscores, and hyphens)
+      const sanitizedGaId = gaId.trim();
+      if (!/^[A-Za-z0-9_-]+$/.test(sanitizedGaId)) {
+        console.warn('[Analytics Manager] Invalid Google Analytics ID format:', sanitizedGaId);
+        return;
+      }
+
       // Load standard GTM Container via the safe config service
-      initializeGTM(gaId);
+      initializeGTM(sanitizedGaId);
 
       // Load GA4 config and inject standard gtag script safely using the nonce
       let script1 = document.getElementById('ga-gtag-script') as HTMLScriptElement;
@@ -63,7 +70,7 @@ export const GoogleAnalytics = () => {
         script1 = document.createElement('script');
         script1.id = 'ga-gtag-script';
         applyNonce(script1);
-        script1.src = `https://www.googletagmanager.com/gtag/js?id=${gaId}`;
+        script1.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(sanitizedGaId)}`;
         script1.async = true;
         document.head.appendChild(script1);
       }
@@ -73,12 +80,12 @@ export const GoogleAnalytics = () => {
         script2 = document.createElement('script');
         script2.id = 'ga-init-script';
         applyNonce(script2);
-        script2.innerHTML = `
+        script2.textContent = `
           window.dataLayer = window.dataLayer || [];
           function gtag(){window.dataLayer.push(arguments);}
           window.gtag = gtag;
           gtag('js', new Date());
-          gtag('config', '${gaId}', { 'send_page_view': false });
+          gtag('config', ${JSON.stringify(sanitizedGaId)}, { 'send_page_view': false });
         `;
         document.head.appendChild(script2);
       }

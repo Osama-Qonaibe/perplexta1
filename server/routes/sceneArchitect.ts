@@ -9,7 +9,7 @@ const router = express.Router();
  * Transforms raw multilingual prompts (Arabic, Hebrew, English, voice transcripts) into
  * production-grade JSON blueprints for direct GPU vision/video pipelines.
  */
-router.post(['/', '/v1', '/compile', '/v1/scene-architect'], async (req: any, res: any) => {
+router.post(['/', '/v1', '/compile', '/v1/scene-architect'], authenticateToken, async (req: any, res: any) => {
   try {
     const { prompt, userLang, mediaType, preferredModelId } = req.body;
 

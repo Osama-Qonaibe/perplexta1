@@ -58,7 +58,7 @@ router.patch('/transfer', authenticateToken, async (req: any, res: any) => {
 
     // Audit logging in user_activity_logs with previous owner ID, new owner ID, record ID, and timestamp
     await pool.query(
-      `INSERT INTO user_activity_logs (user_id, action, details, ip_address) VALUES ($1, $2, $3, $4)`,
+      `INSERT INTO user_activity_logs (user_id, event_type, event_details, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5)`,
       [
         requesterId,
         'OWNERSHIP_TRANSFER',
@@ -69,9 +69,12 @@ router.patch('/transfer', authenticateToken, async (req: any, res: any) => {
           new_owner_id: Number(new_owner_id),
           timestamp: transferTimestamp
         }),
-        req.ip || req.headers['x-forwarded-for'] || 'unknown'
+        req.ip || (Array.isArray(req.headers['x-forwarded-for']) ? req.headers['x-forwarded-for'][0] : req.headers['x-forwarded-for']) || 'unknown',
+        req.headers['user-agent'] || 'system'
       ]
-    ).catch(() => {});
+    ).catch((auditErr: any) => {
+      console.error('[Ownership] Failed to record user_activity_log audit entry:', auditErr?.message || auditErr);
+    });
 
     return res.json({
       success: true,

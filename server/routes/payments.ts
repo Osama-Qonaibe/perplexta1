@@ -204,8 +204,8 @@ router.get("/verify-subscription-session", authenticateToken, async (req: any, r
 router.post("/stripe-checkout", authenticateToken, async (req: any, res) => {
   try {
     const { planId, billingCycle } = req.body;
-    if (billingCycle !== 'monthly' && billingCycle !== 'annual') {
-      return res.status(400).json({ error: 'Invalid billing cycle. Must be monthly or annual.' });
+    if (billingCycle !== 'monthly' && billingCycle !== 'annual' && billingCycle !== 'daily') {
+      return res.status(400).json({ error: 'Invalid billing cycle. Must be daily, monthly, or annual.' });
     }
     const stripe = await getStripe();
     if (!stripe) return res.status(400).json({ error: 'Payments not configured' });
@@ -213,28 +213,69 @@ router.post("/stripe-checkout", authenticateToken, async (req: any, res) => {
     const planRes = await pool.query('SELECT * FROM plans WHERE id = $1 AND is_active = true', [planId]);
     if (planRes.rows.length === 0) return res.status(404).json({ error: 'Plan not found or is no longer available.' });
     const plan  = planRes.rows[0];
-    const price = billingCycle === 'annual' ? Number(plan.annual_price) : Number(plan.monthly_price);
-    const appUrl = process.env.APP_URL || 'http://localhost:3000';
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: { name: `Perplexta - ${plan.name_en}`, description: `Subscription: ${billingCycle}` },
-          unit_amount: Math.round(price * 100),
-          recurring: { interval: billingCycle === 'annual' ? 'year' : 'month' },
-        },
-        quantity: 1,
-      }],
-      mode: 'subscription',
-      subscription_data: {
+    // Check availability
+    if (billingCycle === 'daily' && !plan.is_daily_enabled) {
+      return res.status(400).json({ error: 'Daily/Custom period billing is not enabled for this plan' });
+    }
+    if (billingCycle === 'monthly' && plan.is_monthly_enabled === false) {
+      return res.status(400).json({ error: 'Monthly billing is not enabled for this plan' });
+    }
+    if (billingCycle === 'annual' && plan.is_annual_enabled === false) {
+      return res.status(400).json({ error: 'Annual billing is not enabled for this plan' });
+    }
+
+    let price = 0;
+    if (billingCycle === 'daily') {
+      price = Number(plan.daily_price || 0);
+    } else if (billingCycle === 'annual') {
+      price = Number(plan.annual_price || 0);
+    } else {
+      price = Number(plan.monthly_price || 0);
+    }
+
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const periodDesc = billingCycle === 'daily' ? `${plan.daily_days || 7} Days` : billingCycle;
+
+    let session: any;
+    if (billingCycle === 'daily') {
+      // One-time payment session for custom days duration
+      session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: { name: `Perplexta - ${plan.name_en}`, description: `Access Pass: ${periodDesc}` },
+            unit_amount: Math.round(price * 100),
+          },
+          quantity: 1,
+        }],
+        mode: 'payment',
+        success_url: `${appUrl}/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url:  `${appUrl}/subscription?canceled=true`,
         metadata: { userId: req.user.id.toString(), planId: planId.toString(), billingCycle },
-      },
-      success_url: `${appUrl}/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url:  `${appUrl}/subscription?canceled=true`,
-      metadata: { userId: req.user.id.toString(), planId: planId.toString(), billingCycle },
-    });
+      });
+    } else {
+      session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: { name: `Perplexta - ${plan.name_en}`, description: `Subscription: ${billingCycle}` },
+            unit_amount: Math.round(price * 100),
+            recurring: { interval: billingCycle === 'annual' ? 'year' : 'month' },
+          },
+          quantity: 1,
+        }],
+        mode: 'subscription',
+        subscription_data: {
+          metadata: { userId: req.user.id.toString(), planId: planId.toString(), billingCycle },
+        },
+        success_url: `${appUrl}/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url:  `${appUrl}/subscription?canceled=true`,
+        metadata: { userId: req.user.id.toString(), planId: planId.toString(), billingCycle },
+      });
+    }
     res.json({ url: session.url });
   } catch (error: any) {
     console.error('[Stripe] Checkout error:', error);
@@ -275,6 +316,19 @@ router.post("/webhook", async (req: any, res) => {
       return false;
     }
     return true;
+  }
+
+  const target = ledgerTarget();
+  if (target && event && event.id) {
+    try {
+      const eventCheck = await target.query('SELECT 1 FROM stripe_events WHERE stripe_event_id = $1', [event.id]);
+      if (eventCheck.rows.length > 0) {
+        console.log(`[Stripe Webhook] Duplicate event ignored (event.id already processed): ${event.id}`);
+        return res.json({ received: true, duplicate: true });
+      }
+    } catch (dbErr) {
+      console.error('[Stripe Webhook] Replay check DB error:', dbErr);
+    }
   }
 
   try {
@@ -491,6 +545,17 @@ router.post("/webhook", async (req: any, res) => {
 
       default:
         console.log(`[Stripe Webhook] Unhandled event: ${event.type}`);
+    }
+
+    if (target && event && event.id) {
+      try {
+        await target.query(
+          'INSERT INTO stripe_events (stripe_event_id, type, status, metadata) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING',
+          [event.id, event.type, 'processed', JSON.stringify({ type: event.type, created: event.created })]
+        );
+      } catch (insertErr) {
+        console.error('[Stripe Webhook] Failed to log processed event.id:', insertErr);
+      }
     }
 
     res.json({ received: true });

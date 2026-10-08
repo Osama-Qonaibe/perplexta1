@@ -1,0 +1,68 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: perplexta_app
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgres://${POSTGRES_USER:-perplexta}:${POSTGRES_PASSWORD:-secret}@postgres_core:5432/${CORE_DB_NAME:-perplexta_core}
+      - LEDGER_DATABASE_URL=postgres://${POSTGRES_USER:-perplexta}:${POSTGRES_PASSWORD:-secret}@postgres_ledger:5432/${LEDGER_DB_NAME:-perplexta_ledger}
+      - SECURITY_DATABASE_URL=postgres://${POSTGRES_USER:-perplexta}:${POSTGRES_PASSWORD:-secret}@postgres_security:5432/${SECURITY_DB_NAME:-perplexta_security}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - postgres_core
+      - postgres_ledger
+      - redis_cache
+    networks:
+      - perplexta_internal
+
+  postgres_core:
+    image: postgres:16-alpine
+    container_name: perplexta_pg_core
+    restart: always
+    environment:
+      POSTGRES_DB: ${CORE_DB_NAME:-perplexta_core}
+      POSTGRES_USER: ${POSTGRES_USER:-perplexta}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
+    volumes:
+      - pg_core_data:/var/lib/postgresql/data
+    networks:
+      - perplexta_internal
+
+  postgres_ledger:
+    image: postgres:16-alpine
+    container_name: perplexta_pg_ledger
+    restart: always
+    environment:
+      POSTGRES_DB: ${LEDGER_DB_NAME:-perplexta_ledger}
+      POSTGRES_USER: ${POSTGRES_USER:-perplexta}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
+    volumes:
+      - pg_ledger_data:/var/lib/postgresql/data
+    networks:
+      - perplexta_internal
+
+  redis_cache:
+    image: redis:7-alpine
+    container_name: perplexta_redis
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - perplexta_internal
+
+networks:
+  perplexta_internal:
+    driver: bridge
+
+volumes:
+  pg_core_data:
+  pg_ledger_data:
+  redis_data:

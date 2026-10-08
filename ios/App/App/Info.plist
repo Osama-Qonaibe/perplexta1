@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>perplexta</string>
+	<string>Perplexta</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -24,6 +24,16 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Perplexta requires camera access to capture photos and videos for posts, reels, and visual AI analysis.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Perplexta requires microphone access for voice notes, audio recording, and multimodal AI interactions.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Perplexta requires photo library access to upload media, avatars, and documents.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Perplexta requires permission to save photos and generated media to your photo library.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

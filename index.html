@@ -2,32 +2,59 @@
 <html lang="en" class="light theme-booting" data-theme="light">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
-    <meta id="theme-color-meta" name="theme-color" content="#f8fafc" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta id="theme-color-meta" name="theme-color" content="#ffffff" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Perplexta" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="application-name" content="Perplexta AI" />
-    <meta name="msapplication-TileColor" content="#f8fafc" />
+    <meta name="msapplication-TileColor" content="#ffffff" />
     <meta name="msapplication-tap-highlight" content="no" />
     <meta name="edge-sidebar" content="disable" />
     <meta name="format-detection" content="telephone=no" />
 
+    <!-- Google Fonts for Sovereign Studio Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@400;600;700;900&family=Almarai:wght@400;700;800&family=Amiri:ital,wght@0,400;0,700;1,400&family=Aref+Ruqaa:wght@400;700&family=Bebas+Neue&family=Cairo:wght@400;600;700;900&family=Changa:wght@400;600;700;800&family=Cinzel:wght@500;700;900&family=El+Messiri:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;600;700&family=Inter:wght@400;600;700;900&family=Lalezar&family=Lateef:wght@400;700&family=Marhey:wght@400;600;700&family=Montserrat:wght@400;600;700;900&family=Noto+Kufi+Arabic:wght@400;600;700;900&family=Noto+Sans+Arabic:wght@400;600;700;900&family=Pacifico&family=Playfair+Display:wght@400;700;900&family=Poppins:wght@400;600;700;800&family=Readex+Pro:wght@400;600;700&family=Reem+Kufi:wght@400;600;700&family=Rubik:wght@400;600;700;900&family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet" />
+
+    <!-- Visual Viewport & Keyboard Handler -->
+    <script>
+      (function() {
+        function updateViewportVars() {
+          if (!window.visualViewport) return;
+          var vv = window.visualViewport;
+          var kbHeight = Math.max(0, window.innerHeight - vv.height);
+          document.documentElement.style.setProperty('--kb-height', kbHeight + 'px');
+          document.documentElement.style.setProperty('--vv-height', vv.height + 'px');
+        }
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener('resize', updateViewportVars);
+          window.visualViewport.addEventListener('scroll', updateViewportVars);
+          window.addEventListener('orientationchange', function() {
+            setTimeout(updateViewportVars, 200);
+          });
+        }
+      })();
+    </script>
+
     <!-- Canonical Theme & Language Bootstrap (Executes synchronously before first paint) -->
     <script>
       (function () {
-        const STORAGE_KEY = 'perplexta.theme.bootstrap.v1';
+        const STORAGE_KEY = 'perplexta.theme.bootstrap.v5';
         const MODE_KEY = 'perplexta.theme.mode.v1';
         const root = document.documentElement;
 
         try {
-          // Language & Direction bootstrap
+          localStorage.removeItem('perplexta.theme.bootstrap.v1');
+          localStorage.removeItem('perplexta.theme.bootstrap.v2');
+          localStorage.removeItem('perplexta.theme.bootstrap.v3');
+          localStorage.removeItem('perplexta.theme.bootstrap.v4');
           const savedLang = localStorage.getItem('language') || 'en';
           root.setAttribute('lang', savedLang);
           root.setAttribute('dir', savedLang === 'ar' ? 'rtl' : 'ltr');
 
-          // Mode resolution
           const savedMode = localStorage.getItem(MODE_KEY) || localStorage.getItem('perplexta_theme') || localStorage.getItem('theme');
           const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
@@ -48,14 +75,13 @@
 
           const meta = document.getElementById('theme-color-meta') || document.querySelector('meta[name="theme-color"]');
           if (meta) {
-            meta.setAttribute('content', resolvedMode === 'dark' ? '#080c14' : '#f8fafc');
+            meta.setAttribute('content', resolvedMode === 'dark' ? '#0d1117' : '#ffffff');
           }
 
-          // Apply saved tokens if available
           const raw = localStorage.getItem(STORAGE_KEY);
           if (raw) {
             const payload = JSON.parse(raw);
-            if (payload && payload.version === 1 && payload.tokens) {
+            if (payload && payload.tokens) {
               const modeTokens = payload.tokens[resolvedMode];
               if (modeTokens && typeof modeTokens === 'object') {
                 for (const [key, value] of Object.entries(modeTokens)) {
@@ -63,7 +89,7 @@
                     typeof key === 'string' &&
                     key.startsWith('--') &&
                     typeof value === 'string' &&
-                    value.length <= 200
+                    value.length <= 250
                   ) {
                     root.style.setProperty(key, value);
                   }
@@ -71,23 +97,21 @@
               }
             }
           }
-        } catch (_) {
-          /* Fallback remains intact */
-        }
+        } catch (_) {}
       })();
     </script>
 
     <style>
       :root.dark,
       :root[data-theme="dark"] {
-        --pwa-theme-color: #080c14;
-        --pwa-bg-color: #080c14;
+        --pwa-theme-color: #0d1117;
+        --pwa-bg-color: #0d1117;
         color-scheme: dark;
       }
       :root.light,
       :root[data-theme="light"] {
-        --pwa-theme-color: #f8fafc;
-        --pwa-bg-color: #f8fafc;
+        --pwa-theme-color: #ffffff;
+        --pwa-bg-color: #ffffff;
         color-scheme: light;
       }
       html {
@@ -101,17 +125,46 @@
       }
     </style>
     
-    <!-- Google Fonts Preconnect -->
+    <!-- Google Fonts Preconnect & Modern Global Typography Stack -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=Cairo:wght@400;500;600;700&family=Alexandria:wght@400;600;700&family=Almarai:wght@400;700&family=Amiri:ital,wght@0,400;0,700;1,400&family=Changa:wght@500;700&family=Lalezar&family=Inter:wght@400;600;700&family=Playfair+Display:ital,wght@0,600;1,600&family=JetBrains+Mono:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
     <!-- PWA Setup & Icons -->
     <link rel="icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <title>Perplexta</title>
-    <meta name="description" content="Professional Elite AI Analytics & Strategic Intelligence Platform" />
-    <meta property="og:title" content="Perplexta" />
-    <meta property="og:description" content="Professional Elite AI Analytics & Strategic Intelligence Platform" />
+    <title>Perplexta – Elite Multimodal AI Platform</title>
+    <meta name="description" content="Professional Elite Multimodal AI Platform featuring advanced forensic analysis and sovereign design system." />
+    
+    <!-- OpenGraph Metadata -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Perplexta – Elite Multimodal AI Platform" />
+    <meta property="og:description" content="Professional Elite Multimodal AI Platform featuring advanced forensic analysis and sovereign design system." />
+    <meta property="og:site_name" content="Perplexta" />
+    <meta property="og:image" content="/apple-touch-icon.png" />
+    
+    <!-- Twitter / X Card Metadata -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Perplexta – Elite Multimodal AI Platform" />
+    <meta name="twitter:description" content="Professional Elite Multimodal AI Platform featuring advanced forensic analysis and sovereign design system." />
+    <meta name="twitter:image" content="/apple-touch-icon.png" />
+
+    <!-- Schema.org JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Perplexta",
+      "applicationCategory": "ProductivityApplication",
+      "operatingSystem": "All",
+      "description": "Professional Elite Multimodal AI Platform featuring advanced forensic analysis and sovereign design system.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
 
     <link rel="manifest" href="/manifest.json" />
     <script>
@@ -125,7 +178,7 @@
       });
     </script>
   </head>
-  <body class="layout-locked">
+  <body class="layout-locked global-motion-lock">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <!-- Deferred Script Loader for Non-Essential Third-Party Analytics & WebMCP -->

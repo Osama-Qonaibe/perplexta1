@@ -7,9 +7,14 @@ import { ArtifactProvider } from './context/ArtifactContext';
 import { MainLayout } from './layouts/MainLayout';
 import { AdminLayout } from './layouts/AdminLayout';
 import { injectJsonLdSchema, removeJsonLdSchema } from './utils/seoSchemaBuilder';
+import {
+  fetchSeoMetadataWithCache,
+  fetchSeoRoutesListWithCache,
+  getCachedSeoMetadata,
+  getCachedSeoRoutesList
+} from './utils/seoCache';
 import { UnifiedFeedbackProvider } from '@/design-system';
 
-// Helper to extract default export cleanly from ES modules or named exports
 const resolveModule = (m: any, name?: string) => {
   if (!m) return { default: () => null };
   if (m.default) return m;
@@ -18,7 +23,6 @@ const resolveModule = (m: any, name?: string) => {
   return m;
 };
 
-// Lazy-loaded page components with robust retry wrapper to prevent dynamic import fetch failures
 const lazyRetry = (componentImport: () => Promise<any>, name?: string) =>
   React.lazy(async () => {
     const pageHasAlreadyBeenReloaded = JSON.parse(
@@ -31,7 +35,6 @@ const lazyRetry = (componentImport: () => Promise<any>, name?: string) =>
         sessionStorage.removeItem('page_reloaded_for_chunk');
         return resolveModule(m, name);
       } catch (err) {
-        console.warn(`[LazyRetry] Attempt ${attempt} failed for ${name || 'chunk'}:`, err);
         if (attempt < 3) {
           await new Promise((r) => setTimeout(r, 800 * attempt));
         }
@@ -44,11 +47,10 @@ const lazyRetry = (componentImport: () => Promise<any>, name?: string) =>
       return new Promise<any>(() => {});
     }
 
-    // Return a safe fallback component instead of throwing a hard crash error
     return {
       default: () => (
         <div className="flex flex-col items-center justify-center min-h-[50vh] p-8 text-center">
-          <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 max-w-md">
+          <div className="p-4 rounded-[var(--radius-lg)] bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 max-w-md">
             <h2 className="text-lg font-bold text-red-700 dark:text-red-400 mb-2">عذراً، تعذر تحميل الصفحة</h2>
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
               تعذر تحميل مكون {name || 'الصفحة'}. يرجى التحقق من اتصالك بالإنترنت أو إعادة تحميل الصفحة.
@@ -58,7 +60,7 @@ const lazyRetry = (componentImport: () => Promise<any>, name?: string) =>
                 sessionStorage.removeItem('page_reloaded_for_chunk');
                 window.location.reload();
               }}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-[var(--radius-md)] text-xs font-bold transition-all shadow-sm cursor-pointer"
             >
               إعادة تحميل الصفحة
             </button>
@@ -77,6 +79,7 @@ const Terms = lazyRetry(() => import('./pages/Terms'), 'Terms');
 const Privacy = lazyRetry(() => import('./pages/Privacy'), 'Privacy');
 const About = lazyRetry(() => import('./pages/About'), 'About');
 const Copyright = lazyRetry(() => import('./pages/Copyright'), 'Copyright');
+const LegalDocsPage = lazyRetry(() => import('./pages/LegalDocsPage'), 'LegalDocsPage');
 const ResetPasswordPage = lazyRetry(() => import('./pages/ResetPasswordPage'), 'ResetPasswordPage');
 const GoogleHubPage = lazyRetry(() => import('./pages/GoogleHubPage'));
 const BulletinBoardPage = lazyRetry(() => import('./pages/BulletinBoardPage'), 'BulletinBoardPage');
@@ -86,6 +89,9 @@ const StudioPage = lazyRetry(() => import('./pages/StudioPage'), 'StudioPage');
 const AudioStudioPage = lazyRetry(() => import('./pages/AudioStudioPage'), 'AudioStudioPage');
 const AppStudioPage = lazyRetry(() => import('./pages/AppStudioPage'), 'AppStudioPage');
 const AppHubPage = lazyRetry(() => import('./pages/AppHubPage'), 'AppHubPage');
+const ImageStudioPage = lazyRetry(() => import('./pages/ImageStudioPage'), 'ImageStudioPage');
+const CreatorProfilePage = lazyRetry(() => import('./pages/CreatorProfilePage'), 'CreatorProfilePage');
+const CreatorDashboardPage = lazyRetry(() => import('./pages/CreatorDashboardPage'), 'CreatorDashboardPage');
 import { IncentiveCard } from './components/IncentiveCard';
 import { GoogleAnalytics } from './components/GoogleAnalytics';
 import { CookieConsentBanner } from './components/CookieConsentBanner';
@@ -98,9 +104,10 @@ import { GlobalLoadingOverlay } from "./components/GlobalLoadingOverlay";
 import { InactivityWarningModal } from './components/InactivityWarningModal';
 import { ServiceUpdateToast } from './components/ServiceUpdateToast';
 import { PwaInstallBanner } from './components/PwaInstallBanner';
-import { PwaInstallSuccessService } from './components/PwaInstallSuccessService';
 import { CriticalResourcePreloader } from './utils/criticalResourcePreloader';
 import { DiagnosticMobileOverlay } from './components/DiagnosticMobileOverlay';
+import { useThemeCustomizations } from './hooks/useThemeCustomizations';
+import { ThemeSync } from './utils/ThemeSync';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isAuthReady } = useAppContext();
@@ -131,55 +138,64 @@ const SectionRouteGuard = ({ pathKey, children }: { pathKey: string; children: R
 const PWAWrapper = ({ children }: { children: React.ReactNode }) => {
   const { theme, siteSettings, language } = useAppContext();
   const location = useLocation();
-  const [dbRouteSeo, setDbRouteSeo] = useState<any[]>(() => {
-    try {
-      const cached = sessionStorage.getItem('perplexta_seo_routes');
-      return cached ? JSON.parse(cached) : [];
-    } catch {
-      return [];
+  
+  useThemeCustomizations(theme);
+
+  // Monitor theme context changes and delegate to single authoritative writer ThemeSync
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    ThemeSync.apply(theme);
+
+    let mediaQueryList: MediaQueryList | null = null;
+    let handleSystemChange: (() => void) | null = null;
+
+    if (theme === 'system' && window.matchMedia) {
+      mediaQueryList = window.matchMedia('(prefers-color-scheme: dark)');
+      handleSystemChange = () => {
+        ThemeSync.apply('system');
+      };
+
+      if (mediaQueryList.addEventListener) {
+        mediaQueryList.addEventListener('change', handleSystemChange);
+      } else {
+        (mediaQueryList as any).addListener(handleSystemChange);
+      }
     }
+
+    return () => {
+      if (mediaQueryList && handleSystemChange) {
+        if (mediaQueryList.removeEventListener) {
+          mediaQueryList.removeEventListener('change', handleSystemChange);
+        } else {
+          (mediaQueryList as any).removeListener(handleSystemChange);
+        }
+      }
+    };
+  }, [theme]);
+
+  const [dbRouteSeo, setDbRouteSeo] = useState<any[]>(() => {
+    const cached = getCachedSeoRoutesList();
+    return cached.hit ? cached.data : [];
   });
   const [dynamicSeoMap, setDynamicSeoMap] = useState<Record<string, any>>(() => {
-    try {
-      const cached = sessionStorage.getItem('perplexta_dynamic_seo_map');
-      return cached ? JSON.parse(cached) : {};
-    } catch {
-      return {};
-    }
+    if (typeof window === 'undefined') return {};
+    const norm = window.location.pathname === '/' ? '/' : window.location.pathname.replace(/\/+$/, '');
+    const initialMeta = getCachedSeoMetadata(norm);
+    return initialMeta.hit && initialMeta.data ? { [norm]: initialMeta.data } : {};
   });
-  const requestedRoutesRef = useRef<Set<string>>(new Set());
 
-  // Initialize cached and initial route-specific SEO paths
   useEffect(() => {
-    const initialRoute = typeof window !== 'undefined' ? (window.location.pathname === '/' ? '/' : window.location.pathname.replace(/\/$/, '')) : '/';
-    requestedRoutesRef.current.add(initialRoute);
-    try {
-      const cached = sessionStorage.getItem('perplexta_dynamic_seo_map');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        Object.keys(parsed).forEach(route => {
-          requestedRoutesRef.current.add(route);
-        });
+    let isCurrent = true;
+    fetchSeoRoutesListWithCache().then((routes) => {
+      if (isCurrent && routes && routes.length > 0) {
+        setDbRouteSeo(routes);
       }
-    } catch {}
+    });
+    return () => {
+      isCurrent = false;
+    };
   }, []);
-
-  // Load static/admin-configured routes from route_seo_settings table (cached in sessionStorage)
-  useEffect(() => {
-    if (dbRouteSeo.length > 0) return;
-    fetch('/api/seo-routes')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setDbRouteSeo(data);
-          try {
-            sessionStorage.setItem('perplexta_seo_routes', JSON.stringify(data));
-          } catch {}
-        }
-      })
-      .catch(() => {});
-  }, [dbRouteSeo.length]);
-
 
   const currentPath = location.pathname;
 
@@ -202,29 +218,31 @@ const PWAWrapper = ({ children }: { children: React.ReactNode }) => {
     return currentPath === cleanPath || currentPath.startsWith(cleanPath + '/');
   });
 
-  // Dynamically fetch route-specific SEO metadata from seo_metadata table (for dynamic/custom routes)
   useEffect(() => {
     if (isSensitive) return;
-    const normalizedPath = currentPath === '/' ? '/' : currentPath.replace(/\/$/, '');
-    if (requestedRoutesRef.current.has(normalizedPath) || dynamicSeoMap[normalizedPath]) return;
+    const normalizedPath = currentPath === '/' ? '/' : currentPath.replace(/\/+$/, '');
 
-    requestedRoutesRef.current.add(normalizedPath);
+    // 1. Synchronous Instant Cache Check (Memory / SessionStorage)
+    const cached = getCachedSeoMetadata(normalizedPath);
+    if (cached.hit) {
+      if (cached.data && !dynamicSeoMap[normalizedPath]) {
+        setDynamicSeoMap(prev => ({
+          ...prev,
+          [normalizedPath]: cached.data
+        }));
+      }
+      return;
+    }
+
+    // 2. Asynchronous In-Flight Deduplicated Fetch
     let isCurrent = true;
-
-    fetch(`/api/seo-metadata?route=${encodeURIComponent(normalizedPath)}`)
-      .then(res => res.json())
-      .then(data => {
-        if (isCurrent && data && data.metadata) {
-          setDynamicSeoMap(prev => {
-            const updated = {
-              ...prev,
-              [normalizedPath]: data.metadata
-            };
-            try {
-              sessionStorage.setItem('perplexta_dynamic_seo_map', JSON.stringify(updated));
-            } catch {}
-            return updated;
-          });
+    fetchSeoMetadataWithCache(normalizedPath)
+      .then(metadata => {
+        if (isCurrent && metadata) {
+          setDynamicSeoMap(prev => ({
+            ...prev,
+            [normalizedPath]: metadata
+          }));
         }
       })
       .catch(() => {});
@@ -232,10 +250,9 @@ const PWAWrapper = ({ children }: { children: React.ReactNode }) => {
     return () => {
       isCurrent = false;
     };
-  }, [currentPath, isSensitive, dynamicSeoMap]);
+  }, [currentPath, isSensitive]);
 
   useEffect(() => {
-    // Deduplicated meta tag update helper: updates the first matching element and removes duplicates
     const updateMetaTag = (attrType: string, attrValue: string, content: string) => {
       if (content === undefined || content === null) return;
       const elements = Array.from(document.querySelectorAll(`meta[${attrType}="${attrValue}"]`));
@@ -252,7 +269,6 @@ const PWAWrapper = ({ children }: { children: React.ReactNode }) => {
       }
     };
 
-    // Deduplicated canonical link helper
     const updateCanonicalLink = (href: string) => {
       const elements = Array.from(document.querySelectorAll('link[rel="canonical"]'));
       if (elements.length === 0) {
@@ -302,7 +318,6 @@ const PWAWrapper = ({ children }: { children: React.ReactNode }) => {
 
     const normalizedPath = currentPath === '/' ? '/' : currentPath.replace(/\/$/, '');
 
-    // 1. First priority: Dynamic route SEO from seo_metadata table
     const dynamicSeo = dynamicSeoMap[currentPath] || dynamicSeoMap[normalizedPath];
     const hasActiveDynamicSeo = dynamicSeo && dynamicSeo.is_active !== false;
 
@@ -318,17 +333,18 @@ const PWAWrapper = ({ children }: { children: React.ReactNode }) => {
     const dynamicOgImage = hasActiveDynamicSeo ? dynamicSeo.og_image_url : '';
     const dynamicCanonical = (hasActiveDynamicSeo && dynamicSeo.canonical_url) ? dynamicSeo.canonical_url : '';
 
-    // 2. Second priority: Static / Admin route SEO from route_seo_settings table
-    const routeMatch = dbRouteSeo.find(r => 
-      (r.route === currentPath || r.route === normalizedPath) && r.is_active !== false
-    );
+    const cleanCur = currentPath.toLowerCase().replace(/^\/+|\/+$/g, '');
+    const routeMatch = dbRouteSeo.find(r => {
+      if (!r.route || r.is_active === false) return false;
+      const cleanR = r.route.toLowerCase().replace(/^\/+|\/+$/g, '');
+      return cleanR === cleanCur || r.route === currentPath || r.route === normalizedPath;
+    });
 
     const dbTitle = routeMatch ? (language === 'ar' ? (routeMatch.title_ar || routeMatch.title_en) : (routeMatch.title_en || routeMatch.title_ar)) : '';
     const dbDesc = routeMatch ? (language === 'ar' ? (routeMatch.description_ar || routeMatch.description_en) : (routeMatch.description_en || routeMatch.description_ar)) : '';
     const dbKeywords = routeMatch ? (language === 'ar' ? (routeMatch.keywords_ar || routeMatch.keywords_en) : (routeMatch.keywords_en || routeMatch.keywords_ar)) : '';
     const dbOgImage = routeMatch?.og_image_url;
 
-    // 3. Third priority: Known path presets
     let pageTitlePart = '';
     if (currentPath === '/subscription') {
       pageTitlePart = language === 'ar' ? 'خطط الاشتراك والترقيات النخبة' : 'Premium Elite Subscription Plans';
@@ -354,7 +370,6 @@ const PWAWrapper = ({ children }: { children: React.ReactNode }) => {
     const resolvedDesc = (language === 'ar' ? siteSettings?.seoDescriptionAr : siteSettings?.seoDescriptionEn) || siteDesc || '';
     const resolvedKeywords = (language === 'ar' ? siteSettings?.keywordsAr : siteSettings?.keywordsEn) || '';
 
-    // Final Hierarchical Merging: seo_metadata > route_seo_settings > path presets > siteSettings
     const finalTitle = dynamicTitle || dbTitle || defaultTitle;
     const finalDesc = dynamicDesc || dbDesc || resolvedDesc;
     const finalKeywords = dynamicKeywords || dbKeywords || resolvedKeywords;
@@ -378,7 +393,6 @@ const PWAWrapper = ({ children }: { children: React.ReactNode }) => {
 
     updateCanonicalLink(finalCanonical);
 
-    // Dynamic JSON-LD Structured Data Schema handling
     if (hasActiveDynamicSeo && dynamicSeo.structured_data && typeof dynamicSeo.structured_data === 'object') {
       injectJsonLdSchema('jsonld-dynamic-route', dynamicSeo.structured_data);
     } else {
@@ -386,33 +400,37 @@ const PWAWrapper = ({ children }: { children: React.ReactNode }) => {
     }
   }, [currentPath, isSensitive, siteSettings, language, dbRouteSeo, dynamicSeoMap]);
 
+  const isAdminPath = currentPath.startsWith('/admin');
+
   return (
     <Suspense fallback={null}>
       <GoogleAnalytics />
-      <div 
-        id="platform-banners-stack"
-        className={`fixed z-[9990] flex flex-col gap-2 pointer-events-none transition-all duration-300 items-center md:items-start max-w-[calc(100vw-2rem)] md:max-w-[320px] left-1/2 -translate-x-1/2 bottom-[calc(185px+env(safe-area-inset-bottom,0px))] ${
-          language === 'ar' 
-            ? 'md:left-6 md:right-auto md:translate-x-0 md:bottom-6' 
-            : 'md:right-6 md:left-auto md:translate-x-0 md:bottom-6'
-        }`}
-      >
-        <ServiceUpdateToast />
-        <PwaInstallBanner />
-        <CookieConsentBanner />
-      </div>
+      {!isAdminPath && <PwaInstallBanner />}
+      {!isAdminPath && (
+        <div 
+          id="platform-banners-stack"
+          className={`fixed z-[9990] flex flex-col gap-2 pointer-events-none transition-all duration-media items-center md:items-start max-w-[calc(100vw-2rem)] md:max-w-[320px] left-1/2 -translate-x-1/2 bottom-[calc(185px+env(safe-area-inset-bottom,0px))] ${
+            language === 'ar' 
+              ? 'md:left-6 md:right-auto md:translate-x-0 md:bottom-6' 
+              : 'md:right-6 md:left-auto md:translate-x-0 md:bottom-6'
+          }`}
+        >
+          <ServiceUpdateToast />
+          <CookieConsentBanner />
+        </div>
+      )}
 
-
-      <IncentiveCard />
-      <InactivityWarningModal />
+      {!isAdminPath && <IncentiveCard />}
+      {!isAdminPath && <InactivityWarningModal />}
       <GlobalLoadingOverlay />
-      <PwaInstallSuccessService />
       <CriticalResourcePreloader />
 
       <motion.div
+        key={isAdminPath ? 'admin-root' : 'client-root'}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         className="block h-full w-full"
       >
         {children}
@@ -424,10 +442,10 @@ const PWAWrapper = ({ children }: { children: React.ReactNode }) => {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppProvider>
-        <UnifiedFeedbackProvider>
-          <PwaProvider>
-              <VideoResourceProvider>
+      <PwaProvider>
+        <AppProvider>
+          <UnifiedFeedbackProvider>
+            <VideoResourceProvider>
                 <ArtifactProvider>
                   <ErrorBoundary name="Perplexta Core Runtime">
                     <PWAWrapper>
@@ -437,21 +455,34 @@ export default function App() {
               <Route path="rewards" element={<SectionRouteGuard pathKey="/rewards"><ProtectedRoute><RewardsPage /></ProtectedRoute></SectionRouteGuard>} />
               <Route path="subscription" element={<SectionRouteGuard pathKey="/subscription"><SubscriptionPage /></SectionRouteGuard>} />
               <Route path="chat/:id?" element={<ChatPage />} />
-              <Route path="viralbook/:id?/:subPath?/:subId?" element={<SectionRouteGuard pathKey="/viralbook"><BulletinBoardPage /></SectionRouteGuard>} />
-              <Route path="bulletin/:id?/:subPath?/:subId?" element={<SectionRouteGuard pathKey="/viralbook"><BulletinBoardPage /></SectionRouteGuard>} />
+              <Route path="viralbook/*" element={<SectionRouteGuard pathKey="/viralbook"><BulletinBoardPage /></SectionRouteGuard>} />
+              <Route path="bulletin/*" element={<SectionRouteGuard pathKey="/viralbook"><BulletinBoardPage /></SectionRouteGuard>} />
+              <Route path="reels/*" element={<SectionRouteGuard pathKey="/viralbook"><BulletinBoardPage /></SectionRouteGuard>} />
+              <Route path="p/*" element={<SectionRouteGuard pathKey="/viralbook"><BulletinBoardPage /></SectionRouteGuard>} />
+              <Route path="post/*" element={<SectionRouteGuard pathKey="/viralbook"><BulletinBoardPage /></SectionRouteGuard>} />
               <Route path="google-hub" element={<SectionRouteGuard pathKey="/google-hub"><GoogleHubPage /></SectionRouteGuard>} />
               <Route path="discover" element={<SectionRouteGuard pathKey="/explore"><RecommendationsPage /></SectionRouteGuard>} />
               <Route path="studio" element={<SectionRouteGuard pathKey="/studio"><StudioPage /></SectionRouteGuard>} />
+              <Route path="image-studio" element={<ImageStudioPage />} />
+              <Route path="studio/image" element={<ImageStudioPage />} />
               <Route path="app" element={<AppHubPage />} />
               <Route path="app/canvas" element={<AppStudioPage />} />
               <Route path="app/studio" element={<AppStudioPage />} />
               <Route path="audio-studio" element={<SectionRouteGuard pathKey="/audio-studio"><ProtectedRoute><AudioStudioPage /></ProtectedRoute></SectionRouteGuard>} />
+              <Route path="creator/:username" element={<CreatorProfilePage />} />
+              <Route path="creator" element={<CreatorProfilePage />} />
+              <Route path="creator-dashboard" element={<ProtectedRoute><CreatorDashboardPage /></ProtectedRoute>} />
+              <Route path="settings/creators-hub" element={<ProtectedRoute><CreatorDashboardPage /></ProtectedRoute>} />
               <Route path="terms" element={<Terms />} />
               <Route path="privacy" element={<Privacy />} />
               <Route path="about" element={<About />} />
               <Route path="copyright" element={<Copyright />} />
               <Route path="reset-password" element={<ResetPasswordPage />} />
             </Route>
+
+            <Route path="docs/legal/:docId?" element={<LegalDocsPage />} />
+            <Route path="docs/legal" element={<LegalDocsPage />} />
+            <Route path="legal" element={<Navigate to="/docs/legal" replace />} />
 
             <Route path="share/:id" element={<SharedSnapshotPage />} />
 
@@ -468,11 +499,11 @@ export default function App() {
         </PWAWrapper>
       </ErrorBoundary>
     </ArtifactProvider>
-    <DiagnosticMobileOverlay />
+      {import.meta.env.DEV && <DiagnosticMobileOverlay />}
     </VideoResourceProvider>
-  </PwaProvider>
-</UnifiedFeedbackProvider>
-</AppProvider>
+    </UnifiedFeedbackProvider>
+    </AppProvider>
+    </PwaProvider>
 </BrowserRouter>
   );
 }

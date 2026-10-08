@@ -36,19 +36,18 @@ const originalConnect = Pool.prototype.connect as any;
   });
 };
 
-import { decrypt } from "../utils/crypto.js";
+import { decrypt, encrypt } from "../utils/crypto.js";
 
-const safeMockPool = {
+const fallbackPool = {
   query: async (text: any, params?: any) => {
     const queryStr = typeof text === 'string' ? text.trim().toLowerCase() : (text?.text ? text.text.trim().toLowerCase() : '');
-    console.warn(`[DB Mock Mode] Query intercepted while database is not connected: "${queryStr.substring(0, 60)}..."`);
     if (queryStr.includes('select 1') || queryStr.includes('select version')) {
       return { rows: [{ '?column?': 1 }], raw: [], rowCount: 1 };
     }
     return { rows: [], raw: [], rowCount: 0 };
   },
   connect: async () => ({
-    query: async (text: any, params?: any) => ({ rows: [], raw: [], rowCount: 0 }),
+    query: async () => ({ rows: [], raw: [], rowCount: 0 }),
     release: () => {}
   }),
   end: async () => {},
@@ -68,7 +67,7 @@ let rawMediaPool: any = null;
 
 export const pool: any = new Proxy({}, {
   get(target, prop) {
-    const p = rawPool || safeMockPool;
+    const p = rawPool || fallbackPool;
     const val = (p as any)[prop];
     return typeof val === 'function' ? val.bind(p) : val;
   }
@@ -76,7 +75,7 @@ export const pool: any = new Proxy({}, {
 
 export const ledgerPool: any = new Proxy({}, {
   get(target, prop) {
-    const p = rawLedgerPool || rawPool || safeMockPool;
+    const p = rawLedgerPool || rawPool || fallbackPool;
     const val = (p as any)[prop];
     return typeof val === 'function' ? val.bind(p) : val;
   }
@@ -84,7 +83,7 @@ export const ledgerPool: any = new Proxy({}, {
 
 export const externalPool: any = new Proxy({}, {
   get(target, prop) {
-    const p = rawExternalPool || rawPool || safeMockPool;
+    const p = rawExternalPool || rawPool || fallbackPool;
     const val = (p as any)[prop];
     return typeof val === 'function' ? val.bind(p) : val;
   }
@@ -92,7 +91,7 @@ export const externalPool: any = new Proxy({}, {
 
 export const securityPool: any = new Proxy({}, {
   get(target, prop) {
-    const p = rawSecurityPool || rawPool || safeMockPool;
+    const p = rawSecurityPool || rawPool || fallbackPool;
     const val = (p as any)[prop];
     return typeof val === 'function' ? val.bind(p) : val;
   }
@@ -100,18 +99,18 @@ export const securityPool: any = new Proxy({}, {
 
 export const mediaPool: any = new Proxy({}, {
   get(target, prop) {
-    const p = rawMediaPool || rawPool || safeMockPool;
+    const p = rawMediaPool || rawPool || fallbackPool;
     const val = (p as any)[prop];
     return typeof val === 'function' ? val.bind(p) : val;
   }
 });
 
 export function getDatabasePool(poolName: 'core' | 'ledger' | 'external' | 'security' | 'media' = 'core') {
-  if (poolName === 'ledger') return rawLedgerPool || rawPool || safeMockPool;
-  if (poolName === 'external') return rawExternalPool || rawPool || safeMockPool;
-  if (poolName === 'security') return rawSecurityPool || rawPool || safeMockPool;
-  if (poolName === 'media') return rawMediaPool || rawPool || safeMockPool;
-  return rawPool || safeMockPool;
+  if (poolName === 'ledger') return rawLedgerPool || rawPool || fallbackPool;
+  if (poolName === 'external') return rawExternalPool || rawPool || fallbackPool;
+  if (poolName === 'security') return rawSecurityPool || rawPool || fallbackPool;
+  if (poolName === 'media') return rawMediaPool || rawPool || fallbackPool;
+  return rawPool || fallbackPool;
 }
 
 let currentCoreUrl     = '';
@@ -187,6 +186,35 @@ function validateDatabaseUrl(url: any, name: string) {
   }
 }
 
+export function isLocalhost(urlStr?: string): boolean {
+  if (!urlStr) return false;
+  try {
+    const u = new URL(urlStr);
+    return u.hostname === 'localhost' || u.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
+/** Check if database URL is a mock/placeholder/dummy or unreachable host (e.g. host:5432, example.com, user:pass) */
+export function isPlaceholderOrUnreachableUrl(urlStr?: string): boolean {
+  if (!urlStr) return true;
+  try {
+    const u = new URL(urlStr);
+    const host = u.hostname?.toLowerCase() || '';
+    if (!host || host === 'host' || host === 'example.com' || host === 'base') {
+      return true;
+    }
+    // Check dummy user:pass credentials commonly set in demo/placeholder envs
+    if (u.username === 'user' && u.password === 'pass') {
+      return true;
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 /** Normalize database URL to ensure sslmode=verify-full and strip unsupported params */
 export function normalizeDatabaseUrl(url: string): string {
   if (!url) return url;
@@ -218,12 +246,39 @@ export function normalizeDatabaseUrl(url: string): string {
 export function getBasePoolConfig(max: number, connectionTimeoutMillis = 15000, urlStr?: string) {
   return {
     ssl: getSslConfig(urlStr),
-    idleTimeoutMillis: 60000,
+    idleTimeoutMillis: 10000,
     connectionTimeoutMillis,
     max,
     keepAlive: true,
-    keepAliveInitialDelayMillis: 10000,
+    keepAliveInitialDelayMillis: 5000,
+    allowExitOnIdle: false,
   };
+}
+
+function handleIdleClientError(poolName: string, err: any) {
+  const msg = (err?.message || err?.code || String(err || '')).toLowerCase();
+  // Remote serverless Postgres instances (e.g. Neon, Supabase, Cloud SQL scale-to-zero)
+  // routinely terminate idle pooled TCP sockets via ECONNRESET, ETIMEDOUT, or "Connection terminated unexpectedly".
+  // pg-pool automatically destroys dead idle clients and spawns fresh ones upon query arrival.
+  if (
+    /connection terminated unexpectedly|econnreset|etimedout|terminating connection|socket closed|broken pipe|econnrefused|closed/i.test(msg) ||
+    err?.code === 'ECONNRESET' ||
+    err?.code === 'ETIMEDOUT'
+  ) {
+    // Suppress from stderr; log only when DEBUG_DB is enabled to keep terminal error-free
+    if (process.env.DEBUG_DB === 'true') {
+      console.log(`[DB] Idle ${poolName} socket closed by remote host (normal lifecycle event):`, err?.message || msg);
+    }
+    return;
+  }
+  console.error(`[DB] Idle ${poolName} client error:`, err?.message || msg);
+}
+
+export function isQuotaExceededError(err: any): boolean {
+  if (!err) return false;
+  const msg = (err?.message || String(err)).toLowerCase();
+  const code = String(err?.code || '');
+  return code === '53000' || /quota|exceeded the quota|exceeded the data transfer|upgrade your plan/i.test(msg);
 }
 
 function patchPoolQuery(p: any) {
@@ -237,7 +292,7 @@ function patchPoolQuery(p: any) {
         return await originalQuery(text, params);
       } catch (err: any) {
         const msg = err?.message || String(err);
-        const isQuotaExceeded = /quota|data transfer quota|exceeded the data transfer/i.test(msg);
+        const isQuotaExceeded = isQuotaExceededError(err);
         const isTransient = !isQuotaExceeded && /Connection terminated unexpectedly|ECONNRESET|ETIMEDOUT|terminating connection|closed|SSL|too many connections|connection slots reserved|remaining connection slots reserved|timeout/i.test(msg);
         if (isTransient && attempt < maxRetries) {
           const jitter = Math.floor(Math.random() * 300);
@@ -259,14 +314,22 @@ export function resetPoolsToDegradedMode() {
   if (rawLedgerPool && rawLedgerPool !== rawPool) { try { rawLedgerPool.end().catch(() => {}); } catch {} }
   if (rawExternalPool && rawExternalPool !== rawPool) { try { rawExternalPool.end().catch(() => {}); } catch {} }
   if (rawSecurityPool && rawSecurityPool !== rawPool) { try { rawSecurityPool.end().catch(() => {}); } catch {} }
+  if (rawMediaPool && rawMediaPool !== rawPool) { try { rawMediaPool.end().catch(() => {}); } catch {} }
   rawPool = null;
   rawLedgerPool = null;
   rawExternalPool = null;
   rawSecurityPool = null;
+  rawMediaPool = null;
   currentCoreUrl = '';
   currentLedgerUrl = '';
   currentExternalUrl = '';
   currentSecurityUrl = '';
+  currentMediaUrl = '';
+  currentCoreMax = 0;
+  currentLedgerMax = 0;
+  currentExternalMax = 0;
+  currentSecurityMax = 0;
+  currentMediaMax = 0;
 }
 
 export function createInternalPool(connectionString: string, max = 1, connectionTimeoutMillis = 15000) {
@@ -276,7 +339,7 @@ export function createInternalPool(connectionString: string, max = 1, connection
     ...getBasePoolConfig(max, connectionTimeoutMillis, safeConnStr),
   });
   p.on('error', (e: any) => {
-    console.error('[DB] Idle internal client error:', e?.message || e);
+    handleIdleClientError('internal', e);
   });
   return patchPoolQuery(p);
 }
@@ -284,6 +347,17 @@ export function createInternalPool(connectionString: string, max = 1, connection
 export function getLedgerPool() { return ledgerPool || pool; }
 export function getExternalPool() { return externalPool || pool; }
 export function getSecurityPool() { return securityPool || pool; }
+export function getMediaPool() { return mediaPool || pool; }
+
+export function isMediaPoolDistinct(): boolean {
+  const m = rawMediaPool || rawPool;
+  const c = rawPool;
+  return m !== null && c !== null && m !== c;
+}
+
+export function isDatabaseConnected(): boolean {
+  return rawPool !== null;
+}
 
 
 export async function initializePerplextaPools(
@@ -298,10 +372,53 @@ export async function initializePerplextaPools(
   securityMaxOverride?: number,
   mediaMaxOverride?: number,
 ): Promise<void> {
-  const finalLedgerUrl   = ledgerUrl   || coreUrl;
-  const finalExternalUrl = externalUrl || coreUrl;
-  const finalSecurityUrl = securityUrl || coreUrl;
-  const finalMediaUrl    = mediaUrl    || process.env.MEDIA_DATABASE_URL || coreUrl;
+  // Helper to discover if a valid remote cloud database exists in any env or param
+  const findRemoteDatabase = (...candidates: (string | undefined)[]): string | null => {
+    for (const c of candidates) {
+      if (c && typeof c === 'string' && /^postgres(ql)?:\/\//.test(c)) {
+        if (!isPlaceholderOrUnreachableUrl(c)) {
+          return c;
+        }
+      }
+    }
+    return null;
+  };
+
+  const detectedRemote = findRemoteDatabase(
+    coreUrl,
+    securityUrl,
+    ledgerUrl,
+    externalUrl,
+    mediaUrl,
+    process.env.DATABASE_URL,
+    process.env.SECURITY_DATABASE_URL,
+    process.env.LEDGER_DATABASE_URL,
+    process.env.EXTERNAL_DATABASE_URL,
+    process.env.MEDIA_DATABASE_URL
+  );
+
+  let effectiveCoreUrl = coreUrl;
+  if ((!effectiveCoreUrl || isPlaceholderOrUnreachableUrl(effectiveCoreUrl)) && detectedRemote) {
+    console.log(`[DB] Notice: Core DB URL is localhost/missing/placeholder; adopting detected active remote cloud database: ${redactUrl(detectedRemote)}`);
+    effectiveCoreUrl = detectedRemote;
+  }
+
+  let finalLedgerUrl = ledgerUrl || effectiveCoreUrl;
+  if (isPlaceholderOrUnreachableUrl(finalLedgerUrl) && !isPlaceholderOrUnreachableUrl(effectiveCoreUrl)) {
+    finalLedgerUrl = effectiveCoreUrl;
+  }
+  let finalExternalUrl = externalUrl || effectiveCoreUrl;
+  if (isPlaceholderOrUnreachableUrl(finalExternalUrl) && !isPlaceholderOrUnreachableUrl(effectiveCoreUrl)) {
+    finalExternalUrl = effectiveCoreUrl;
+  }
+  let finalSecurityUrl = securityUrl || effectiveCoreUrl;
+  if (isPlaceholderOrUnreachableUrl(finalSecurityUrl) && !isPlaceholderOrUnreachableUrl(effectiveCoreUrl)) {
+    finalSecurityUrl = effectiveCoreUrl;
+  }
+  let finalMediaUrl = mediaUrl || process.env.MEDIA_DATABASE_URL || effectiveCoreUrl;
+  if (isPlaceholderOrUnreachableUrl(finalMediaUrl) && !isPlaceholderOrUnreachableUrl(effectiveCoreUrl)) {
+    finalMediaUrl = effectiveCoreUrl;
+  }
 
   const envSizes = getPoolSizesFromEnv();
   const finalCoreMax     = coreMaxOverride     || envSizes.coreMax;
@@ -312,7 +429,7 @@ export async function initializePerplextaPools(
 
   if (
     rawPool &&
-    currentCoreUrl     === coreUrl           &&
+    currentCoreUrl     === effectiveCoreUrl  &&
     currentLedgerUrl   === finalLedgerUrl    &&
     currentExternalUrl === finalExternalUrl  &&
     currentSecurityUrl === finalSecurityUrl  &&
@@ -329,7 +446,7 @@ export async function initializePerplextaPools(
 
   if (
     poolInitPromise &&
-    lastInitUrls.core        === coreUrl           &&
+    lastInitUrls.core        === effectiveCoreUrl  &&
     lastInitUrls.ledger      === finalLedgerUrl    &&
     lastInitUrls.external    === finalExternalUrl  &&
     lastInitUrls.security    === finalSecurityUrl  &&
@@ -345,30 +462,30 @@ export async function initializePerplextaPools(
   }
 
   lastInitUrls = {
-    core: coreUrl, ledger: finalLedgerUrl, external: finalExternalUrl, security: finalSecurityUrl, media: finalMediaUrl,
+    core: effectiveCoreUrl, ledger: finalLedgerUrl, external: finalExternalUrl, security: finalSecurityUrl, media: finalMediaUrl,
     coreMax: finalCoreMax, ledgerMax: finalLedgerMax, externalMax: finalExternalMax, securityMax: finalSecurityMax, mediaMax: finalMediaMax,
   };
 
   poolInitPromise = (async () => {
     console.log('[DB] Initializing Perplexta Pools...');
-    if (coreUrl) console.log(`[DB] Core Target: ${redactUrl(coreUrl)}`);
+    if (effectiveCoreUrl) console.log(`[DB] Core Target: ${redactUrl(effectiveCoreUrl)}`);
     console.log(`[DB] Pool Sizes — Core: ${finalCoreMax}, Ledger: ${finalLedgerMax}, External: ${finalExternalMax}, Security: ${finalSecurityMax}, Media: ${finalMediaMax}`);
 
-    if (!coreUrl) {
+    if (!effectiveCoreUrl) {
       console.warn('[DB] ⚠️ DATABASE_URL missing. Operating in Degraded Mode.');
       rawPool = rawLedgerPool = rawExternalPool = rawSecurityPool = rawMediaPool = null;
       return;
     }
 
     try {
-      validateDatabaseUrl(coreUrl,           'DATABASE_URL');
+      validateDatabaseUrl(effectiveCoreUrl, 'DATABASE_URL');
       validateDatabaseUrl(finalLedgerUrl,   'LEDGER_DATABASE_URL');
       validateDatabaseUrl(finalExternalUrl, 'EXTERNAL_DATABASE_URL');
       validateDatabaseUrl(finalSecurityUrl, 'SECURITY_DATABASE_URL');
       validateDatabaseUrl(finalMediaUrl,    'MEDIA_DATABASE_URL');
     } catch (err: any) {
       console.error(`[DB] Validation failed: ${err.message}`);
-      if (process.env.NODE_ENV === 'production' && coreUrl) throw err;
+      if (process.env.NODE_ENV === 'production' && effectiveCoreUrl) throw err;
       rawPool = rawLedgerPool = rawExternalPool = rawSecurityPool = rawMediaPool = null;
       return;
     }
@@ -380,13 +497,13 @@ export async function initializePerplextaPools(
     const prevMedia = rawMediaPool;
 
     try {
-      const normCoreUrl     = normalizeDatabaseUrl(coreUrl);
+      const normCoreUrl     = normalizeDatabaseUrl(effectiveCoreUrl);
       const normLedgerUrl   = normalizeDatabaseUrl(finalLedgerUrl);
       const normExternalUrl = normalizeDatabaseUrl(finalExternalUrl);
       const normSecurityUrl = normalizeDatabaseUrl(finalSecurityUrl);
       const normMediaUrl    = normalizeDatabaseUrl(finalMediaUrl);
 
-      const newPool = patchPoolQuery(new Pool({
+      let newPool = patchPoolQuery(new Pool({
         connectionString: normCoreUrl,
         ...getBasePoolConfig(finalCoreMax, 15000, normCoreUrl),
       }));
@@ -407,32 +524,11 @@ export async function initializePerplextaPools(
         ...getBasePoolConfig(finalMediaMax, 15000, normMediaUrl),
       }));
 
-      newPool.on('error', (e: any) => console.error('[DB] Idle core client error:', e?.message || e));
-      if (newLedgerPool   !== newPool) newLedgerPool.on('error',   (e: any) => console.error('[DB] Idle ledger client error:', e?.message || e));
-      if (newExternalPool !== newPool) newExternalPool.on('error', (e: any) => console.error('[DB] Idle external client error:', e?.message || e));
-      if (newSecurityPool !== newPool) newSecurityPool.on('error', (e: any) => console.error('[DB] Idle security client error:', e?.message || e));
-      if (newMediaPool    !== newPool) newMediaPool.on('error',    (e: any) => console.error('[DB] Idle media client error:', e?.message || e));
-
-      // Swap globals immediately so any new query runs on valid, open pools
-      rawPool = newPool;
-      rawLedgerPool = newLedgerPool;
-      rawExternalPool = newExternalPool;
-      rawSecurityPool = newSecurityPool;
-      rawMediaPool = newMediaPool;
-
-      currentCoreUrl = coreUrl; currentLedgerUrl = finalLedgerUrl;
-      currentExternalUrl = finalExternalUrl; currentSecurityUrl = finalSecurityUrl;
-      currentMediaUrl = finalMediaUrl;
-      currentCoreMax = finalCoreMax; currentLedgerMax = finalLedgerMax;
-      currentExternalMax = finalExternalMax; currentSecurityMax = finalSecurityMax;
-      currentMediaMax = finalMediaMax;
-
-      // Close previous distinct pools safely in background
-      if (prevPool && prevPool !== newPool) prevPool.end().catch((e: any) => console.error('[DB] Error closing previous core pool:', e.message));
-      if (prevLedger && prevLedger !== prevPool && prevLedger !== newLedgerPool && prevLedger !== newPool) prevLedger.end().catch((e: any) => console.error('[DB] Error closing previous ledger pool:', e.message));
-      if (prevExternal && prevExternal !== prevPool && prevExternal !== newExternalPool && prevExternal !== newPool) prevExternal.end().catch((e: any) => console.error('[DB] Error closing previous external pool:', e.message));
-      if (prevSecurity && prevSecurity !== prevPool && prevSecurity !== newSecurityPool && prevSecurity !== newPool) prevSecurity.end().catch((e: any) => console.error('[DB] Error closing previous security pool:', e.message));
-      if (prevMedia && prevMedia !== prevPool && prevMedia !== newMediaPool && prevMedia !== newPool) prevMedia.end().catch((e: any) => console.error('[DB] Error closing previous media pool:', e.message));
+      newPool.on('error', (e: any) => handleIdleClientError('core', e));
+      if (newLedgerPool   !== newPool) newLedgerPool.on('error',   (e: any) => handleIdleClientError('ledger', e));
+      if (newExternalPool !== newPool) newExternalPool.on('error', (e: any) => handleIdleClientError('external', e));
+      if (newSecurityPool !== newPool) newSecurityPool.on('error', (e: any) => handleIdleClientError('security', e));
+      if (newMediaPool    !== newPool) newMediaPool.on('error',    (e: any) => handleIdleClientError('media', e));
 
       console.log('[DB] Pools created. Verifying connectivity...');
 
@@ -447,7 +543,7 @@ export async function initializePerplextaPools(
                 settled = true;
                 resolve(false);
               }
-            }, 15000);
+            }, 8000);
             p.query('SELECT 1')
               .then(() => {
                 if (!settled) {
@@ -461,7 +557,7 @@ export async function initializePerplextaPools(
                   settled = true;
                   clearTimeout(timer);
                   const msg = e?.message || String(e);
-                  if (msg.includes('password authentication failed') || msg.includes('does not exist')) {
+                  if (msg.includes('password authentication failed') || msg.includes('does not exist') || msg.includes('ECONNREFUSED') || isQuotaExceededError(e)) {
                     fatalErr = msg;
                   }
                   resolve(false);
@@ -472,7 +568,7 @@ export async function initializePerplextaPools(
           if (success) return true;
 
           if (fatalErr) {
-            console.warn(`[DB] ${name} authentication failed: ${fatalErr}. Falling back immediately.`);
+            console.warn(`[DB] ${name} connectivity check failed: ${fatalErr}.`);
             return false;
           }
 
@@ -486,18 +582,60 @@ export async function initializePerplextaPools(
         return false;
       };
 
-      const coreOk = await verify(rawPool, 'Core DB', 3);
+      let coreOk = await verify(newPool, 'Core DB', 2);
+      if (!coreOk && process.env.EXTERNAL_DATABASE_URL && effectiveCoreUrl !== process.env.EXTERNAL_DATABASE_URL && !isPlaceholderOrUnreachableUrl(process.env.EXTERNAL_DATABASE_URL)) {
+        console.warn(`[DB Failover] ⚠️ Core DB (${redactUrl(effectiveCoreUrl)}) failed check. Testing failover to active External database (${redactUrl(process.env.EXTERNAL_DATABASE_URL)})...`);
+        const failoverUrl = normalizeDatabaseUrl(process.env.EXTERNAL_DATABASE_URL);
+        const failoverPool = patchPoolQuery(new Pool({
+          connectionString: failoverUrl,
+          ...getBasePoolConfig(finalCoreMax, 15000, failoverUrl),
+        }));
+        failoverPool.on('error', (e: any) => handleIdleClientError('core-failover', e));
+        const failoverOk = await verify(failoverPool, 'Failover Core DB', 2);
+        if (failoverOk) {
+          console.log('[DB Failover] ✅ Successfully activated healthy failover database as Core DB.');
+          try { await newPool.end(); } catch {}
+          newPool = failoverPool;
+          effectiveCoreUrl = process.env.EXTERNAL_DATABASE_URL;
+          coreOk = true;
+        } else {
+          try { await failoverPool.end(); } catch {}
+        }
+      }
+
       if (coreOk) {
         console.log('[DB] Core DB connection verified.');
+        // Safe swap
+        rawPool = newPool;
+        rawLedgerPool = newLedgerPool;
+        rawExternalPool = newExternalPool;
+        rawSecurityPool = newSecurityPool;
+        rawMediaPool = newMediaPool;
+
+        currentCoreUrl = effectiveCoreUrl; currentLedgerUrl = finalLedgerUrl;
+        currentExternalUrl = finalExternalUrl; currentSecurityUrl = finalSecurityUrl;
+        currentMediaUrl = finalMediaUrl;
+        currentCoreMax = finalCoreMax; currentLedgerMax = finalLedgerMax;
+        currentExternalMax = finalExternalMax; currentSecurityMax = finalSecurityMax;
+        currentMediaMax = finalMediaMax;
       } else {
         console.error('[DB] ❌ Core DB unreachable or data quota exceeded. Operating in Degraded Mode.');
+        newPool.end().catch(() => {});
+        if (newLedgerPool !== newPool) newLedgerPool.end().catch(() => {});
+        if (newExternalPool !== newPool) newExternalPool.end().catch(() => {});
+        if (newSecurityPool !== newPool) newSecurityPool.end().catch(() => {});
+        if (newMediaPool !== newPool) newMediaPool.end().catch(() => {});
         resetPoolsToDegradedMode();
         throw new Error('Core DB is unreachable or data transfer quota exceeded.');
       }
 
       if (rawLedgerPool !== rawPool) {
-        if (!await verify(rawLedgerPool, 'Ledger DB', 2)) {
-          console.warn('[DB] Ledger DB unreachable — falling back to Core pool.');
+        if (isPlaceholderOrUnreachableUrl(finalLedgerUrl) || !await verify(rawLedgerPool, 'Ledger DB', 2)) {
+          if (process.env.STRICT_DB_SEGREGATION === 'true') {
+            resetPoolsToDegradedMode();
+            throw new Error('[DB FATAL] STRICT_DB_SEGREGATION is active: Ledger DB is unreachable or misconfigured. Silent fallback to Core pool is prohibited.');
+          }
+          console.warn('[DB ARCHITECTURE ALERT] ⚠️ Ledger DB unreachable or placeholder — falling back to Core pool. (To strictly forbid fallback, enable STRICT_DB_SEGREGATION=true).');
           const oldLedger = rawLedgerPool;
           rawLedgerPool = rawPool;
           currentLedgerUrl = currentCoreUrl;
@@ -517,11 +655,17 @@ export async function initializePerplextaPools(
             } catch {}
           }
         }
-      } else { console.log('[DB] Ledger DB sharing Core pool.'); }
+      } else { 
+        if (process.env.STRICT_DB_SEGREGATION === 'true') {
+          resetPoolsToDegradedMode();
+          throw new Error('[DB FATAL] STRICT_DB_SEGREGATION is active: Ledger DB URL is identical to or sharing Core pool. Absolute separation is required.');
+        }
+        console.log('[DB] Ledger DB sharing Core pool (Unified Mode).'); 
+      }
 
       if (rawExternalPool !== rawPool) {
-        if (!await verify(rawExternalPool, 'External DB', 2)) {
-          console.warn('[DB] External DB unreachable — falling back to Core pool.');
+        if (isPlaceholderOrUnreachableUrl(finalExternalUrl) || !await verify(rawExternalPool, 'External DB', 2)) {
+          console.warn('[DB] External DB unreachable or placeholder — falling back to Core pool.');
           const oldExternal = rawExternalPool;
           rawExternalPool = rawPool;
           currentExternalUrl = currentCoreUrl;
@@ -544,8 +688,12 @@ export async function initializePerplextaPools(
       } else { console.log('[DB] External DB sharing Core pool.'); }
 
       if (rawSecurityPool !== rawPool) {
-        if (!await verify(rawSecurityPool, 'Security DB', 2)) {
-          console.warn('[DB] Security DB unreachable — falling back to Core pool.');
+        if (isPlaceholderOrUnreachableUrl(finalSecurityUrl) || !await verify(rawSecurityPool, 'Security DB', 2)) {
+          if (process.env.STRICT_DB_SEGREGATION === 'true') {
+            resetPoolsToDegradedMode();
+            throw new Error('[DB FATAL] STRICT_DB_SEGREGATION is active: Security DB is unreachable or misconfigured. Silent fallback to Core pool is prohibited.');
+          }
+          console.warn('[DB ARCHITECTURE ALERT] ⚠️ Security DB unreachable or placeholder — falling back to Core pool. (To strictly forbid fallback, enable STRICT_DB_SEGREGATION=true).');
           const oldSecurity = rawSecurityPool;
           rawSecurityPool = rawPool;
           currentSecurityUrl = currentCoreUrl;
@@ -565,11 +713,17 @@ export async function initializePerplextaPools(
             } catch {}
           }
         }
-      } else { console.log('[DB] Security DB sharing Core pool.'); }
+      } else { 
+        if (process.env.STRICT_DB_SEGREGATION === 'true') {
+          resetPoolsToDegradedMode();
+          throw new Error('[DB FATAL] STRICT_DB_SEGREGATION is active: Security DB URL is identical to or sharing Core pool. Absolute separation is required.');
+        }
+        console.log('[DB] Security DB sharing Core pool (Unified Mode).'); 
+      }
 
       if (rawMediaPool !== rawPool) {
-        if (!await verify(rawMediaPool, 'Media DB', 2)) {
-          console.warn('[DB] Media DB unreachable — falling back to Core pool.');
+        if (isPlaceholderOrUnreachableUrl(finalMediaUrl) || !await verify(rawMediaPool, 'Media DB', 2)) {
+          console.warn('[DB] Media DB unreachable or placeholder — falling back to Core pool.');
           const oldMedia = rawMediaPool;
           rawMediaPool = rawPool;
           currentMediaUrl = currentCoreUrl;
@@ -594,8 +748,8 @@ export async function initializePerplextaPools(
       console.log('[DB] Pool initialization complete.');
     } catch (err: any) {
       console.error('[DB] Critical error during pool creation:', err.message);
-      if (process.env.NODE_ENV === 'production') throw err;
-      rawPool = rawLedgerPool = rawExternalPool = rawSecurityPool = null;
+      resetPoolsToDegradedMode();
+      console.warn('[DB] Database is unreachable or quota exceeded. Operating in Resilient Degraded Mode with safe in-memory fallbacks.');
     }
   })();
 
@@ -614,6 +768,53 @@ export async function synchronizePerplextaPoolsFromRegistry() {
   try {
     await pool.query("UPDATE db_connections_registry SET is_active = false, host = NULL WHERE host = 'base'");
 
+    const findCloudRemote = (...candidates: (string | undefined)[]) => {
+      for (const c of candidates) {
+        if (c && typeof c === 'string' && /^postgres(ql)?:\/\//.test(c)) {
+          if (!isPlaceholderOrUnreachableUrl(c)) return c;
+        }
+      }
+      return null;
+    };
+    const detectedCloudDb = findCloudRemote(
+      process.env.DATABASE_URL,
+      process.env.SECURITY_DATABASE_URL,
+      process.env.LEDGER_DATABASE_URL,
+      process.env.EXTERNAL_DATABASE_URL,
+      process.env.MEDIA_DATABASE_URL
+    );
+    const rawDefaultCore  = currentCoreUrl || process.env.DATABASE_URL || '';
+    const defaultCore     = (isPlaceholderOrUnreachableUrl(rawDefaultCore) || !rawDefaultCore) && detectedCloudDb ? detectedCloudDb : rawDefaultCore;
+    const defaultLedger   = (process.env.LEDGER_DATABASE_URL && !isPlaceholderOrUnreachableUrl(process.env.LEDGER_DATABASE_URL)) ? process.env.LEDGER_DATABASE_URL : defaultCore;
+    const defaultExternal = (process.env.EXTERNAL_DATABASE_URL && !isPlaceholderOrUnreachableUrl(process.env.EXTERNAL_DATABASE_URL)) ? process.env.EXTERNAL_DATABASE_URL : defaultCore;
+    const defaultSecurity = (process.env.SECURITY_DATABASE_URL && !isPlaceholderOrUnreachableUrl(process.env.SECURITY_DATABASE_URL)) ? process.env.SECURITY_DATABASE_URL : defaultCore;
+    const defaultMedia    = (process.env.MEDIA_DATABASE_URL && !isPlaceholderOrUnreachableUrl(process.env.MEDIA_DATABASE_URL)) ? process.env.MEDIA_DATABASE_URL : defaultCore;
+
+    // Self-healing: If Core is cloud/remote, ensure registry rows do not store stale/unreachable placeholder URLs
+    if (defaultCore && !isPlaceholderOrUnreachableUrl(defaultCore) && !isLocalhost(defaultCore)) {
+      const encryptedCore = encrypt(defaultCore);
+      const regRows = await pool.query(
+        "SELECT id, connection_string, host FROM db_connections_registry WHERE id IN ('ledger', 'external', 'security', 'media')"
+      );
+      for (const row of regRows.rows) {
+        let isStaleLocal = false;
+        if (row.host === 'host' || row.host === 'base' || row.host === 'example.com') {
+          isStaleLocal = true;
+        } else if (row.connection_string) {
+          try {
+            const decrypted = decrypt(row.connection_string);
+            if (decrypted && isPlaceholderOrUnreachableUrl(decrypted)) isStaleLocal = true;
+          } catch {}
+        }
+        if (isStaleLocal) {
+          await pool.query(
+            "UPDATE db_connections_registry SET connection_string = $1, host = NULL, status = 'healthy' WHERE id = $2",
+            [encryptedCore, row.id]
+          ).catch(() => {});
+        }
+      }
+    }
+
     const result = await pool.query(
       "SELECT * FROM db_connections_registry WHERE is_active = true AND id IN ('core','ledger','external','security','media')"
     );
@@ -621,11 +822,6 @@ export async function synchronizePerplextaPoolsFromRegistry() {
     if (result.rows.length === 0) {
       console.log('[DB] No active registry overrides found.');
       const env = getPoolSizesFromEnv();
-      const defaultCore     = process.env.DATABASE_URL || '';
-      const defaultLedger   = process.env.LEDGER_DATABASE_URL   || defaultCore;
-      const defaultExternal = process.env.EXTERNAL_DATABASE_URL || defaultCore;
-      const defaultSecurity = process.env.SECURITY_DATABASE_URL || defaultCore;
-      const defaultMedia    = process.env.MEDIA_DATABASE_URL    || defaultCore;
 
       if (
         currentCoreUrl     !== defaultCore     ||
@@ -681,11 +877,6 @@ export async function synchronizePerplextaPoolsFromRegistry() {
       return fallback;
     };
 
-    const defaultCore     = process.env.DATABASE_URL || '';
-    const defaultLedger   = process.env.LEDGER_DATABASE_URL   || defaultCore;
-    const defaultExternal = process.env.EXTERNAL_DATABASE_URL || defaultCore;
-    const defaultSecurity = process.env.SECURITY_DATABASE_URL || defaultCore;
-    const defaultMedia    = process.env.MEDIA_DATABASE_URL    || defaultCore;
     const envSizes        = getPoolSizesFromEnv();
 
     const coreUrl     = getUrlFromReg(coreReg,     defaultCore);
@@ -730,6 +921,20 @@ export async function synchronizePerplextaPoolsFromRegistry() {
       const normCore = normalizeDatabaseUrl(coreUrl);
       if (normUrl === normCore) return coreUrl;
 
+      // If core is remote and url is localhost/placeholder/unreachable, skip test and immediately use defaultUrl/coreUrl
+      if (!isPlaceholderOrUnreachableUrl(normCore) && isPlaceholderOrUnreachableUrl(normUrl)) {
+        if (pool) {
+          try {
+            const encryptedCore = encrypt(coreUrl);
+            await pool.query(
+              "UPDATE db_connections_registry SET connection_string = $1, host = NULL, status = 'healthy' WHERE id = $2",
+              [encryptedCore, id]
+            );
+          } catch {}
+        }
+        return coreUrl;
+      }
+
       let p: any = null;
       try {
         p = createInternalPool(url, 1, 15000);
@@ -748,7 +953,16 @@ export async function synchronizePerplextaPoolsFromRegistry() {
         console.warn(`[DB] Registry ${id} DB check failed: ${e.message}. Falling back to Core.`);
         if (pool) {
           try {
-            await pool.query("UPDATE db_connections_registry SET status = 'down' WHERE id = $1", [id]);
+            const isFatalQuotaOrUnreachable = /quota|limit|exceeded|disabled|suspended|terminated|ECONNREFUSED|ENOTFOUND/i.test(e.message || '');
+            if (isFatalQuotaOrUnreachable) {
+              const encryptedCore = encrypt(coreUrl);
+              await pool.query(
+                "UPDATE db_connections_registry SET connection_string = $1, host = NULL, status = 'down' WHERE id = $2",
+                [encryptedCore, id]
+              );
+            } else {
+              await pool.query("UPDATE db_connections_registry SET status = 'down' WHERE id = $1", [id]);
+            }
           } catch {}
         }
         return coreUrl;
@@ -805,6 +1019,8 @@ export function getPoolMetrics(p: any, name?: string) {
       active: 0,
       waiting: 0,
       max: 0,
+      utilization_percent: 0,
+      backpressure_level: 'normal' as 'normal' | 'elevated' | 'critical' | 'saturated',
       saturated: false,
       available: false,
       connection_leak_risk: false
@@ -813,9 +1029,25 @@ export function getPoolMetrics(p: any, name?: string) {
   const total = p.totalCount ?? 0;
   const idle = p.idleCount ?? 0;
   const waiting = p.waitingCount ?? 0;
-  const max = p.options?.max ?? 20;
+  const max = Math.max(1, p.options?.max ?? 20);
   const active = Math.max(0, total - idle);
-  const saturated = total >= max && waiting > 15;
+  const utilization_percent = Math.min(100, Math.round((active / max) * 100));
+
+  // Dynamic backpressure thresholds relative to max pool capacity
+  const queueThreshold = Math.max(2, Math.floor(max * 0.35));
+  const saturationQueueThreshold = Math.max(3, Math.floor(max * 0.4));
+
+  let backpressure_level: 'normal' | 'elevated' | 'critical' | 'saturated' = 'normal';
+  let saturated = false;
+
+  if (total >= max && waiting >= saturationQueueThreshold) {
+    backpressure_level = 'saturated';
+    saturated = true;
+  } else if (waiting >= queueThreshold || utilization_percent >= 90) {
+    backpressure_level = 'critical';
+  } else if (waiting > 0 || utilization_percent >= 75) {
+    backpressure_level = 'elevated';
+  }
 
   let connection_leak_risk = false;
   if (name) {
@@ -846,10 +1078,63 @@ export function getPoolMetrics(p: any, name?: string) {
     active,
     waiting,
     max,
+    utilization_percent,
+    backpressure_level,
     saturated,
     connection_leak_risk,
     available: true
   };
+}
+
+/**
+ * Executes a query or database task on the external database pool with adaptive backpressure protection.
+ * Prevents queue buildup during high concurrency spikes by enforcing queue timeouts and priority-based shedding.
+ */
+export async function executeWithExternalBackpressure<T>(
+  task: (poolInstance: any) => Promise<T>,
+  options?: {
+    timeoutMs?: number;
+    priority?: 'high' | 'normal' | 'low';
+    fallback?: () => Promise<T>;
+  }
+): Promise<T> {
+  const targetPool = rawExternalPool || rawPool || fallbackPool;
+  const metrics = getPoolMetrics(targetPool, 'external');
+  const priority = options?.priority || 'normal';
+  const timeoutMs = options?.timeoutMs || 10000;
+
+  // Shed low-priority background external tasks if pool is in critical or saturated backpressure state
+  if ((metrics.saturated || metrics.backpressure_level === 'critical') && priority === 'low') {
+    console.warn(`[External Backpressure] Low-priority external task shed due to pool saturation (active: ${metrics.active}/${metrics.max}, waiting: ${metrics.waiting}).`);
+    if (options?.fallback) {
+      return await options.fallback();
+    }
+    throw new Error('External database pool is under heavy backpressure. Task shed.');
+  }
+
+  // Wrap execution in a hard connection queue timeout to prevent connection starvation
+  let timeoutId: NodeJS.Timeout | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`External DB pool backpressure queue timeout after ${timeoutMs}ms.`));
+    }, timeoutMs);
+  });
+
+  try {
+    const result = await Promise.race([
+      task(targetPool),
+      timeoutPromise
+    ]);
+    return result;
+  } catch (err: any) {
+    if (options?.fallback && (metrics.saturated || /backpressure|timeout/i.test(err?.message || ''))) {
+      console.warn(`[External Backpressure] Falling back to secondary handler for external pool query due to: ${err?.message}`);
+      return await options.fallback();
+    }
+    throw err;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 }
 
 export async function forceReconnectPool(poolName: 'core' | 'ledger' | 'external' | 'security' | 'media'): Promise<void> {
@@ -861,78 +1146,164 @@ export async function forceReconnectPool(poolName: 'core' | 'ledger' | 'external
   }
 
   if (poolName === 'core') {
-    const url = currentCoreUrl || process.env.DATABASE_URL;
+    let url = currentCoreUrl || process.env.DATABASE_URL;
     if (!url) throw new Error('Core DB URL not found');
-    if (rawPool) {
-      await rawPool.end().catch((e: any) => console.error('[DB] Error ending core pool:', e.message));
-    }
-    rawPool = patchPoolQuery(new Pool({
+    const oldPool = rawPool;
+    let testPool = patchPoolQuery(new Pool({
       connectionString: url,
       ...getBasePoolConfig(currentCoreMax || envSizes.coreMax, 10000, url),
     }));
-    rawPool.on('error', (e: any) => console.error('[DB] Idle core client error:', e?.message || e));
-    await rawPool.query('SELECT 1');
-    console.log('[DB] Core pool reconnected successfully.');
+    testPool.on('error', (e: any) => handleIdleClientError('core', e));
+    try {
+      await testPool.query('SELECT 1');
+      rawPool = testPool;
+      if (oldPool && oldPool !== testPool) {
+        await oldPool.end().catch((e: any) => console.error('[DB] Error ending old core pool:', e.message));
+      }
+      console.log('[DB] Core pool reconnected successfully.');
+    } catch (err: any) {
+      try { await testPool.end(); } catch {}
+      const isQuota = isQuotaExceededError(err);
+      if (isQuota && process.env.EXTERNAL_DATABASE_URL && url !== process.env.EXTERNAL_DATABASE_URL && !isPlaceholderOrUnreachableUrl(process.env.EXTERNAL_DATABASE_URL)) {
+        console.warn(`[DB Failover] Primary Core DB exceeded quota. Reconnecting to failover database...`);
+        const failoverUrl = normalizeDatabaseUrl(process.env.EXTERNAL_DATABASE_URL);
+        const failoverPool = patchPoolQuery(new Pool({
+          connectionString: failoverUrl,
+          ...getBasePoolConfig(currentCoreMax || envSizes.coreMax, 10000, failoverUrl),
+        }));
+        failoverPool.on('error', (e: any) => handleIdleClientError('core-failover', e));
+        try {
+          await failoverPool.query('SELECT 1');
+          currentCoreUrl = process.env.EXTERNAL_DATABASE_URL;
+          rawPool = failoverPool;
+          if (oldPool && oldPool !== failoverPool) {
+            await oldPool.end().catch(() => {});
+          }
+          console.log('[DB Failover] ✅ Core pool reconnected successfully via active failover database.');
+          return;
+        } catch (failoverErr) {
+          try { await failoverPool.end(); } catch {}
+        }
+      }
+      resetPoolsToDegradedMode();
+      if (isQuota) {
+        console.warn(`[DB] Notice: Remote database account exceeded cloud quota. Running in Degraded Mode.`);
+        return;
+      }
+      throw err;
+    }
   } else if (poolName === 'ledger') {
     const url = currentLedgerUrl || process.env.LEDGER_DATABASE_URL || currentCoreUrl || process.env.DATABASE_URL;
     if (!url) throw new Error('Ledger DB URL not found');
-    if (rawLedgerPool && rawLedgerPool !== rawPool) {
-      await rawLedgerPool.end().catch((e: any) => console.error('[DB] Error ending ledger pool:', e.message));
+    const oldPool = rawLedgerPool;
+    if (url === (currentCoreUrl || process.env.DATABASE_URL)) {
+      rawLedgerPool = rawPool;
+      if (oldPool && oldPool !== rawPool) {
+        await oldPool.end().catch(() => {});
+      }
+      return;
     }
-    rawLedgerPool = url === (currentCoreUrl || process.env.DATABASE_URL) ? rawPool : patchPoolQuery(new Pool({
+    const testPool = patchPoolQuery(new Pool({
       connectionString: url,
       ...getBasePoolConfig(currentLedgerMax || envSizes.ledgerMax, 5000, url),
     }));
-    if (rawLedgerPool !== rawPool) {
-      rawLedgerPool.on('error', (e: any) => console.error('[DB] Idle ledger client error:', e?.message || e));
+    testPool.on('error', (e: any) => handleIdleClientError('ledger', e));
+    try {
+      await testPool.query('SELECT 1');
+      rawLedgerPool = testPool;
+      if (oldPool && oldPool !== rawPool && oldPool !== testPool) {
+        await oldPool.end().catch((e: any) => console.error('[DB] Error ending old ledger pool:', e.message));
+      }
+      console.log('[DB] Ledger pool reconnected successfully.');
+    } catch (err) {
+      try { await testPool.end(); } catch {}
+      rawLedgerPool = rawPool;
+      throw err;
     }
-    await rawLedgerPool.query('SELECT 1');
-    console.log('[DB] Ledger pool reconnected successfully.');
   } else if (poolName === 'external') {
     const url = currentExternalUrl || process.env.EXTERNAL_DATABASE_URL || currentCoreUrl || process.env.DATABASE_URL;
     if (!url) throw new Error('External DB URL not found');
-    if (rawExternalPool && rawExternalPool !== rawPool) {
-      await rawExternalPool.end().catch((e: any) => console.error('[DB] Error ending external pool:', e.message));
+    const oldPool = rawExternalPool;
+    if (url === (currentCoreUrl || process.env.DATABASE_URL)) {
+      rawExternalPool = rawPool;
+      if (oldPool && oldPool !== rawPool) {
+        await oldPool.end().catch(() => {});
+      }
+      return;
     }
-    rawExternalPool = url === (currentCoreUrl || process.env.DATABASE_URL) ? rawPool : patchPoolQuery(new Pool({
+    const testPool = patchPoolQuery(new Pool({
       connectionString: url,
       ...getBasePoolConfig(currentExternalMax || envSizes.externalMax, 5000, url),
     }));
-    if (rawExternalPool !== rawPool) {
-      rawExternalPool.on('error', (e: any) => console.error('[DB] Idle external client error:', e?.message || e));
+    testPool.on('error', (e: any) => handleIdleClientError('external', e));
+    try {
+      await testPool.query('SELECT 1');
+      rawExternalPool = testPool;
+      if (oldPool && oldPool !== rawPool && oldPool !== testPool) {
+        await oldPool.end().catch((e: any) => console.error('[DB] Error ending old external pool:', e.message));
+      }
+      console.log('[DB] External pool reconnected successfully.');
+    } catch (err) {
+      try { await testPool.end(); } catch {}
+      rawExternalPool = rawPool;
+      throw err;
     }
-    await rawExternalPool.query('SELECT 1');
-    console.log('[DB] External pool reconnected successfully.');
   } else if (poolName === 'security') {
     const url = currentSecurityUrl || process.env.SECURITY_DATABASE_URL || currentCoreUrl || process.env.DATABASE_URL;
     if (!url) throw new Error('Security DB URL not found');
-    if (rawSecurityPool && rawSecurityPool !== rawPool) {
-      await rawSecurityPool.end().catch((e: any) => console.error('[DB] Error ending security pool:', e.message));
+    const oldPool = rawSecurityPool;
+    if (url === (currentCoreUrl || process.env.DATABASE_URL)) {
+      rawSecurityPool = rawPool;
+      if (oldPool && oldPool !== rawPool) {
+        await oldPool.end().catch(() => {});
+      }
+      return;
     }
-    rawSecurityPool = url === (currentCoreUrl || process.env.DATABASE_URL) ? rawPool : patchPoolQuery(new Pool({
+    const testPool = patchPoolQuery(new Pool({
       connectionString: url,
       ...getBasePoolConfig(currentSecurityMax || envSizes.securityMax, 5000, url),
     }));
-    if (rawSecurityPool !== rawPool) {
-      rawSecurityPool.on('error', (e: any) => console.error('[DB] Idle security client error:', e?.message || e));
+    testPool.on('error', (e: any) => handleIdleClientError('security', e));
+    try {
+      await testPool.query('SELECT 1');
+      rawSecurityPool = testPool;
+      if (oldPool && oldPool !== rawPool && oldPool !== testPool) {
+        await oldPool.end().catch((e: any) => console.error('[DB] Error ending old security pool:', e.message));
+      }
+      console.log('[DB] Security pool reconnected successfully.');
+    } catch (err) {
+      try { await testPool.end(); } catch {}
+      rawSecurityPool = rawPool;
+      throw err;
     }
-    await rawSecurityPool.query('SELECT 1');
-    console.log('[DB] Security pool reconnected successfully.');
   } else if (poolName === 'media') {
     const url = currentMediaUrl || process.env.MEDIA_DATABASE_URL || currentCoreUrl || process.env.DATABASE_URL;
     if (!url) throw new Error('Media DB URL not found');
-    if (rawMediaPool && rawMediaPool !== rawPool) {
-      await rawMediaPool.end().catch((e: any) => console.error('[DB] Error ending media pool:', e.message));
+    const oldPool = rawMediaPool;
+    if (url === (currentCoreUrl || process.env.DATABASE_URL)) {
+      rawMediaPool = rawPool;
+      if (oldPool && oldPool !== rawPool) {
+        await oldPool.end().catch(() => {});
+      }
+      return;
     }
-    rawMediaPool = url === (currentCoreUrl || process.env.DATABASE_URL) ? rawPool : patchPoolQuery(new Pool({
+    const testPool = patchPoolQuery(new Pool({
       connectionString: url,
       ...getBasePoolConfig(currentMediaMax || envSizes.mediaMax, 5000, url),
     }));
-    if (rawMediaPool !== rawPool) {
-      rawMediaPool.on('error', (e: any) => console.error('[DB] Idle media client error:', e?.message || e));
+    testPool.on('error', (e: any) => handleIdleClientError('media', e));
+    try {
+      await testPool.query('SELECT 1');
+      rawMediaPool = testPool;
+      if (oldPool && oldPool !== rawPool && oldPool !== testPool) {
+        await oldPool.end().catch((e: any) => console.error('[DB] Error ending old media pool:', e.message));
+      }
+      console.log('[DB] Media pool reconnected successfully.');
+    } catch (err) {
+      try { await testPool.end(); } catch {}
+      rawMediaPool = rawPool;
+      throw err;
     }
-    await rawMediaPool.query('SELECT 1');
-    console.log('[DB] Media pool reconnected successfully.');
   }
 }
 
@@ -974,9 +1345,11 @@ export async function cleanupAbandonedConnections(poolInstance: any, poolName: s
   }
 }
 
-export function startPoolSaturationGuardian(intervalMs = 60000) {
+export function startPoolSaturationGuardian(intervalMs = 30000) {
   if (poolSaturationGuardianInterval) return;
   poolSaturationGuardianInterval = setInterval(async () => {
+    if (!rawPool) return;
+
     const poolsToCheck: Array<{ name: 'core' | 'ledger' | 'external' | 'security' | 'media'; poolInstance: any }> = [
       { name: 'core', poolInstance: pool },
       { name: 'ledger', poolInstance: ledgerPool },
@@ -988,13 +1361,16 @@ export function startPoolSaturationGuardian(intervalMs = 60000) {
     for (const { name, poolInstance } of poolsToCheck) {
       if (!poolInstance) continue;
 
-      // 1. Terminate abandoned or hanging connections
-      await cleanupAbandonedConnections(poolInstance, name);
-
-      // 2. Analyze pool metrics for saturation or leaks
       const metrics = getPoolMetrics(poolInstance, name);
-      if (metrics.waiting > 10 || (metrics.connection_leak_risk && metrics.waiting > 2)) {
-        console.warn(`[Pool Guardian] ⚠️ Pool '${name}' saturation detected (waiting: ${metrics.waiting}, active: ${metrics.active}/${metrics.max}). Initiating emergency pool recycling...`);
+
+      // 1. Terminate abandoned or lingering idle-in-transaction connections if waiting count or active connections are elevated
+      if (metrics.waiting > 0 || metrics.active >= Math.floor(metrics.max * 0.8)) {
+        await cleanupAbandonedConnections(poolInstance, name);
+      }
+
+      // 2. Analyze pool metrics for saturation, leaks, or sustained queue buildup
+      if (metrics.saturated || metrics.backpressure_level === 'critical' || (metrics.connection_leak_risk && metrics.waiting > 1)) {
+        console.warn(`[Pool Guardian] ⚠️ Pool '${name}' backpressure alert (level: ${metrics.backpressure_level}, waiting: ${metrics.waiting}, active: ${metrics.active}/${metrics.max}, utilization: ${metrics.utilization_percent}%). Initiating emergency pool recycling...`);
         try {
           await forceReconnectPool(name);
         } catch (reconnectErr: any) {
@@ -1012,6 +1388,8 @@ export function startPoolSaturationGuardian(intervalMs = 60000) {
 export function startConnectionHealthCheck(intervalMs = 60000) {
   if (healthCheckInterval) return;
   healthCheckInterval = setInterval(async () => {
+    if (!rawPool) return;
+
     const poolsToCheck: Array<{ name: 'core' | 'ledger' | 'external' | 'security' | 'media'; poolInstance: any }> = [
       { name: 'core', poolInstance: pool },
       { name: 'ledger', poolInstance: ledgerPool },
@@ -1025,11 +1403,18 @@ export function startConnectionHealthCheck(intervalMs = 60000) {
       try {
         await poolInstance.query('SELECT 1');
       } catch (err: any) {
-        console.warn(`[DB Health Check] Pool '${name}' failed health check ("${err?.message || err}"). Attempting automatic reconnection...`);
+        const isQuota = isQuotaExceededError(err);
+        if (isQuota) {
+          console.warn(`[DB Health Check] Pool '${name}' quota limit reached on cloud provider. Triggering auto-failover...`);
+        } else {
+          console.warn(`[DB Health Check] Pool '${name}' failed health check ("${err?.message || err}"). Attempting automatic reconnection...`);
+        }
         try {
           await forceReconnectPool(name);
         } catch (reconnectErr: any) {
-          console.error(`[DB Health Check] Failed to reconnect pool '${name}':`, reconnectErr?.message || reconnectErr);
+          if (!isQuotaExceededError(reconnectErr)) {
+            console.error(`[DB Health Check] Failed to reconnect pool '${name}':`, reconnectErr?.message || reconnectErr);
+          }
         }
       }
     }

@@ -7,9 +7,9 @@ export const LEDGER_SCHEMA_TABLES: { name: string; query: string }[] = [
     query: `CREATE TABLE IF NOT EXISTS wallets (
   id SERIAL PRIMARY KEY,
   user_id INTEGER UNIQUE NOT NULL,
-  balance DECIMAL(20,4) DEFAULT 0.00,
-  usd_balance DECIMAL(20,4) DEFAULT 0.00,
-  points INTEGER DEFAULT 0,
+  balance DECIMAL(20,4) DEFAULT 0.00 CHECK (balance >= 0),
+  usd_balance DECIMAL(20,4) DEFAULT 0.00 CHECK (usd_balance >= 0),
+  points INTEGER DEFAULT 0 CHECK (points >= 0),
   total_deposited DECIMAL(20,4) DEFAULT 0.00,
   total_withdrawn DECIMAL(20,4) DEFAULT 0.00,
   total_earned_referral DECIMAL(20,4) DEFAULT 0.00,
@@ -87,16 +87,19 @@ export const LEDGER_SCHEMA_TABLES: { name: string; query: string }[] = [
     query: `CREATE TABLE IF NOT EXISTS withdrawal_requests (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL,
-  amount DECIMAL(20,4) NOT NULL,
+  amount DECIMAL(20,4) DEFAULT 0,
   amount_cents INTEGER DEFAULT 0,
-  payout_method VARCHAR(50) NOT NULL,
-  payout_details JSONB NOT NULL,
+  method VARCHAR(50),
+  payout_method VARCHAR(50),
+  details TEXT,
+  payout_details JSONB DEFAULT '{}',
   status VARCHAR(20) DEFAULT 'pending',
   rejection_reason TEXT,
   processed_by INTEGER,
   processed_at TIMESTAMP,
   transaction_hash VARCHAR(255),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )`
   },
   {
@@ -293,6 +296,15 @@ export async function applyLedgerColumnEnforcements(targetLedgerPool: QueryClien
     created_at: { type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP' },
     updated_at: { type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP' }
   });
+
+  try {
+    await targetLedgerPool.query(`
+      ALTER TABLE withdrawal_requests ALTER COLUMN amount SET DEFAULT 0;
+      ALTER TABLE withdrawal_requests ALTER COLUMN amount DROP NOT NULL;
+      ALTER TABLE withdrawal_requests ALTER COLUMN payout_method DROP NOT NULL;
+      ALTER TABLE withdrawal_requests ALTER COLUMN payout_details DROP NOT NULL;
+    `);
+  } catch {}
 
   await ensureColumnsBulk(targetLedgerPool, 'payout_accounts', {
     user_id: { type: 'INTEGER' },

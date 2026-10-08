@@ -2,6 +2,9 @@ import { ledgerPool, pool } from '../db/index.js';
 import { encrypt, decrypt } from '../utils/crypto.js';
 import { createNotification } from './notifications.js';
 import { io } from '../config/socket.js';
+import { logFinancialAudit } from './auditLogger.js';
+import { AppError } from '../middleware/errorHandler.js';
+import { ERROR_CODES } from '../utils/errorCodes.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -54,7 +57,7 @@ export async function getUserWallet(userId: string | number, txClient?: any) {
   // When inside a transaction, use FOR UPDATE to prevent concurrent modifications
   if (txClient) {
     const existing = await txClient.query(
-      'SELECT id, balance, points, referral_activated FROM wallets WHERE user_id = $1 FOR UPDATE',
+      'SELECT id, user_id, balance, COALESCE(usd_balance, balance) as usd_balance, points, total_deposited, total_withdrawn, total_earned_referral, is_frozen, currency, referral_activated, created_at, updated_at FROM wallets WHERE user_id = $1 FOR UPDATE',
       [userIdNum]
     );
     if (existing.rows.length > 0) {
@@ -99,10 +102,10 @@ export async function getUserWallet(userId: string | number, txClient?: any) {
   }
 
   const result = await target.query(`
-    INSERT INTO wallets (user_id, balance, points)
-    VALUES ($1, 0, $2)
+    INSERT INTO wallets (user_id, balance, usd_balance, points, total_deposited, total_withdrawn)
+    VALUES ($1, 0, 0, $2, 0, 0)
     ON CONFLICT (user_id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
-    RETURNING id, balance, points, referral_activated
+    RETURNING id, user_id, balance, COALESCE(usd_balance, balance) as usd_balance, points, total_deposited, total_withdrawn, total_earned_referral, is_frozen, currency, referral_activated, created_at, updated_at
   `, [userIdNum, welcomeBonusPoints]);
 
   const wallet = result.rows[0];
@@ -232,31 +235,52 @@ export async function convertPointsToBalance(userId: string, amountPoints: numbe
   if (isNaN(amountPoints) || amountPoints <= 0) throw new Error('Points amount must be a positive integer greater than zero.');
 
   const settings  = await getEconomySettings();
-  const rate      = parseFloat(settings.conversion_rate || '0.001');
-  const usdAmount = amountPoints * rate;
+  const pointsPerDollar = parseFloat(settings.points_per_dollar || '1000');
+  const rate      = pointsPerDollar > 0 ? (1 / pointsPerDollar) : parseFloat(settings.conversion_rate || '0.001');
+  const usdAmount = Number((amountPoints * rate).toFixed(4));
 
   const client = await ledgerPool.connect();
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
-      'SELECT id, points FROM wallets WHERE user_id = $1 FOR UPDATE', [userId]
+      'SELECT id, balance, points FROM wallets WHERE user_id = $1 FOR UPDATE', [userId]
     );
     if (!rows.length)                       throw new Error('Wallet not found');
     if (Number(rows[0].points) < amountPoints) throw new Error('Insufficient points');
 
-    await client.query(
-      'UPDATE wallets SET points = points - $1, balance = balance + $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+    const updateRes = await client.query(
+      'UPDATE wallets SET points = points - $1, balance = balance + $2, usd_balance = balance + $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING balance, points',
       [amountPoints, usdAmount, rows[0].id]
     );
-    // Fix: record points deduction in `points` column, USD gain in `amount`
+    // Record points deduction in `points` column, USD gain in `amount`
     await client.query(
-      `INSERT INTO ledger_transactions (user_id, wallet_id, amount, points, transaction_type, description)
-       VALUES ($1, $2, $3, $4, 'conversion', $5)`,
-      [userId, rows[0].id, usdAmount, -amountPoints, `Converted ${amountPoints} pts → $${usdAmount.toFixed(2)}`]
+      `INSERT INTO ledger_transactions (user_id, wallet_id, amount, points, transaction_type, status, description)
+       VALUES ($1, $2, $3, $4, 'conversion', 'success', $5)`,
+      [userId, rows[0].id, usdAmount, -amountPoints, `Converted ${amountPoints} pts → $${usdAmount.toFixed(2)} USD`]
     );
     await enforceTransactionLimit(userId, client);
     await client.query('COMMIT');
-    return { usdAmount };
+
+    try {
+      await createNotification(
+        userId,
+        'points_converted',
+        'Points Converted to Balance',
+        'تم تحويل النقاط إلى رصيد بنجاح',
+        `You have successfully converted ${amountPoints.toLocaleString()} points into $${usdAmount.toFixed(2)} USD added to your wallet.`,
+        `تم تحويل ${amountPoints.toLocaleString()} نقطة بنجاح إلى رصيد بقيمة $${usdAmount.toFixed(2)} دولار تمت إضافتها لمحفظتك.`
+      );
+    } catch {}
+
+    return { 
+      success: true, 
+      usdAmount, 
+      convertedUSD: usdAmount, 
+      amountUSD: usdAmount, 
+      pointsDeducted: amountPoints,
+      newBalance: updateRes.rows[0].balance,
+      newPoints: updateRes.rows[0].points
+    };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -270,16 +294,29 @@ export async function convertPointsToBalance(userId: string, amountPoints: numbe
 export async function requestWithdrawal(userId: string, amountUSD: number, method: string, details: string) {
   if (!ledgerPool) throw new Error('Ledger database not available');
 
-  const cleanedMethod   = method?.trim().toLowerCase() ?? '';
-  const allowedMethods  = ['paypal', 'bank', 'crypto'];
-  if (!allowedMethods.includes(cleanedMethod)) throw new Error('Invalid withdrawal method. Allowed: PayPal, Bank, Crypto.');
-  if (isNaN(amountUSD) || amountUSD <= 0)      throw new Error('Withdrawal amount must be greater than zero.');
+  const rawMethod = method?.trim().toLowerCase() ?? '';
+  let cleanedMethod = 'paypal';
+  if (rawMethod.includes('crypto') || rawMethod.includes('usdt') || rawMethod.includes('trc')) {
+    cleanedMethod = 'crypto';
+  } else if (rawMethod.includes('bank') || rawMethod.includes('iban') || rawMethod.includes('swift')) {
+    cleanedMethod = 'bank';
+  } else if (rawMethod.includes('paypal')) {
+    cleanedMethod = 'paypal';
+  } else {
+    throw new AppError('Invalid withdrawal method. Allowed: PayPal, Bank, Crypto.', 400, 'INVALID_WITHDRAWAL_METHOD');
+  }
+
+  if (isNaN(amountUSD) || amountUSD <= 0) {
+    throw new AppError('Withdrawal amount must be greater than zero.', 400, 'INVALID_AMOUNT');
+  }
 
   const sanitizedDetails = details?.toString().replace(/<[^>]*>/g, '').substring(0, 500).trim() ?? '';
 
   const settings = await getEconomySettings();
   const minCents = settings.min_withdrawal_cents || 2000;
-  if (amountUSD * 100 < minCents) throw new Error(`Minimum withdrawal is $${(minCents / 100).toFixed(2)}`);
+  if (amountUSD * 100 < minCents) {
+    throw new AppError(`Minimum withdrawal is $${(minCents / 100).toFixed(2)}`, 400, 'MINIMUM_WITHDRAWAL_LIMIT');
+  }
 
   const client = await ledgerPool.connect();
   try {
@@ -287,17 +324,49 @@ export async function requestWithdrawal(userId: string, amountUSD: number, metho
     const { rows } = await client.query(
       'SELECT id, balance FROM wallets WHERE user_id = $1 FOR UPDATE', [userId]
     );
-    if (!rows.length)                        throw new Error('Wallet not found');
-    if (Number(rows[0].balance) < amountUSD) throw new Error('Insufficient USD balance');
+    if (!rows.length) {
+      throw new AppError('Wallet not found', 404, 'WALLET_NOT_FOUND');
+    }
+    const currentBalance = Number(rows[0].balance);
+    if (currentBalance < amountUSD) {
+      throw new AppError(
+        `Insufficient USD balance. Current balance: $${currentBalance.toFixed(2)}, requested: $${amountUSD.toFixed(2)}`,
+        400,
+        'INSUFFICIENT_BALANCE'
+      );
+    }
 
     await client.query(
-      'UPDATE wallets SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      'UPDATE wallets SET balance = balance - $1, usd_balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [amountUSD, rows[0].id]
     );
+
+    const amountCents = Math.round(amountUSD * 100);
     const witRes = await client.query(
-      'INSERT INTO withdrawal_requests (user_id, amount_cents, method, details, status) VALUES ($1,$2,$3,$4,$5) RETURNING id',
-      [userId, Math.round(amountUSD * 100), cleanedMethod, sanitizedDetails, 'pending']
+      `INSERT INTO withdrawal_requests (
+        user_id,
+        amount,
+        amount_cents,
+        method,
+        payout_method,
+        details,
+        payout_details,
+        status,
+        created_at,
+        updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id`,
+      [
+        userId,
+        amountUSD,
+        amountCents,
+        cleanedMethod,
+        cleanedMethod,
+        sanitizedDetails,
+        JSON.stringify({ details: sanitizedDetails, method: cleanedMethod, originalMethod: method }),
+        'pending'
+      ]
     );
+
     await client.query(
       `INSERT INTO ledger_transactions (user_id, wallet_id, amount, transaction_type, status, reference_id, description)
        VALUES ($1,$2,$3,'withdrawal','pending',$4,$5)`,
@@ -306,7 +375,36 @@ export async function requestWithdrawal(userId: string, amountUSD: number, metho
     );
     await enforceTransactionLimit(userId, client);
     await client.query('COMMIT');
-    return { success: true };
+
+    await logFinancialAudit(parseInt(userId as string, 10), 'withdrawal', amountUSD, {
+      method: cleanedMethod,
+      details: sanitizedDetails
+    });
+
+    try {
+      await createNotification(
+        userId,
+        'withdrawal_submitted',
+        'Withdrawal Request Received',
+        'تم استلام طلب السحب بنجاح',
+        `Your withdrawal request of $${amountUSD.toFixed(2)} via ${cleanedMethod.toUpperCase()} has been submitted and is pending review.`,
+        `تم استلام طلب السحب الخاص بك بقيمة $${amountUSD.toFixed(2)} عبر ${cleanedMethod === 'crypto' ? 'USDT' : cleanedMethod.toUpperCase()} وهو قيد المراجعة الفورية.`,
+        { withdrawal_id: witRes.rows[0].id, amountUSD, method: cleanedMethod }
+      );
+    } catch {}
+
+    try {
+      io?.emit('admin_new_financial_request', {
+        type: 'withdrawal',
+        id: witRes.rows[0].id,
+        userId,
+        amountUSD,
+        method: cleanedMethod,
+        timestamp: new Date().toISOString()
+      });
+    } catch {}
+
+    return { success: true, id: witRes.rows[0].id };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -416,19 +514,32 @@ export async function deductFromWallet(userId: string | number, amount: number, 
     const { rows } = await client.query(
       'SELECT id, balance FROM wallets WHERE user_id = $1 FOR UPDATE', [userIdNum]
     );
-    if (!rows.length)                       throw new Error('Wallet not found');
-    if (Number(rows[0].balance) < amount)   throw new Error('Insufficient balance');
+    if (!rows.length) throw new AppError('Wallet not found', ERROR_CODES.RESOURCE_NOT_FOUND.status, ERROR_CODES.RESOURCE_NOT_FOUND.code);
+    const wallet = rows[0];
+    if (Number(wallet.balance) < amount || wallet.balance < amount) {
+      throw new AppError(
+        'Insufficient balance',
+        ERROR_CODES.AUTH_FORBIDDEN.status,
+        ERROR_CODES.AUTH_FORBIDDEN.code
+      );
+    }
 
     const result = await client.query(
       'UPDATE wallets SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING balance',
       [amount, rows[0].id]
     );
-    await client.query(
-      'INSERT INTO ledger_transactions (user_id, wallet_id, amount, transaction_type, description) VALUES ($1,$2,$3,$4,$5)',
+    const txResult = await client.query(
+      'INSERT INTO ledger_transactions (user_id, wallet_id, amount, transaction_type, description) VALUES ($1,$2,$3,$4,$5) RETURNING id',
       [userIdNum, rows[0].id, -amount, transactionType, description]
     );
     await enforceTransactionLimit(userIdNum, client);
     await client.query('COMMIT');
+
+    await logFinancialAudit(userIdNum, 'purchase', amount, {
+      transactionId: txResult.rows[0]?.id,
+      balance: result.rows[0].balance
+    });
+
     return result.rows[0].balance;
   } catch (err) {
     await client.query('ROLLBACK');
@@ -534,7 +645,7 @@ export async function depositToWallet(userId: string | number, amount: number, m
     await client.query('BEGIN');
     const wallet = await getUserWallet(userIdNum, client);
     const result = await client.query(
-      'UPDATE wallets SET balance = balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING balance, points',
+      'UPDATE wallets SET balance = balance + $1, usd_balance = balance + $1, total_deposited = total_deposited + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, balance, usd_balance, points, total_deposited',
       [amount, wallet.id]
     );
     await client.query(
@@ -545,8 +656,34 @@ export async function depositToWallet(userId: string | number, amount: number, m
     await enforceTransactionLimit(userIdNum, client);
     await client.query('COMMIT');
 
+    await logFinancialAudit(userIdNum, 'deposit', amount, {
+      method,
+      description,
+      newBalance: result.rows[0].balance
+    });
+
     try { await checkReferralActivation(userIdNum); }
     catch (refErr) { console.warn('[Wallet] Referral activation check failed:', refErr); }
+
+    try {
+      await createNotification(
+        userIdNum,
+        'deposit_approved',
+        'Deposit Credited Successfully',
+        'تم شحن رصيد المحفظة بنجاح',
+        `An amount of $${amount.toFixed(2)} USD has been credited to your wallet via ${method}.`,
+        `تمت إضافة مبلغ $${amount.toFixed(2)} دولار إلى رصيد محفظتك بنجاح عبر ${method}.`
+      );
+    } catch {}
+
+    try {
+      io?.emit(`wallet_update_${userIdNum}`, {
+        type: 'deposit_credited',
+        amount,
+        method
+      });
+      io?.to(`user_${userIdNum}`).emit('wallet_updated', { balance_usd: true });
+    } catch {}
 
     return { success: true, newBalance: result.rows[0].balance, newPoints: result.rows[0].points };
   } catch (err) {

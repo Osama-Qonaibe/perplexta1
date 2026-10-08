@@ -6,12 +6,10 @@ import {
   RefreshCw, 
   Maximize2, 
   Download, 
-  Sparkles,
   Palette
 } from 'lucide-react';
 import { toast } from '@/design-system';
 import { useAppContext } from '../../../../context/AppContext';
-import { Logo } from '../../../common/Logo';
 import { ArtifactContext } from '../../../../context/ArtifactContext';
 import { ASPECT_RATIO_CLASSES } from '../../../../constants/chat';
 
@@ -21,24 +19,33 @@ export const SimpleImageLoadingPlaceholder = ({ dir, aspectRatio = '1:1' }: { di
   return (
     <div className="w-full flex flex-col my-2 items-start">
       <div 
-        className={`relative overflow-hidden rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-subtle)] ${containerAspectClass} w-full flex items-center justify-center`}
+        className={`relative overflow-hidden rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-subtle)]/70 backdrop-blur-xl ${containerAspectClass} w-full`}
       >
-        <div className="absolute inset-0 backdrop-blur-md bg-zinc-950/30 flex flex-col items-center justify-center gap-2 z-10">
-          <Logo size={28} fallbackType="cpu" className="animate-pulse" />
-          <span className="text-[11px] font-bold text-white tracking-wide select-none">
-            {dir === 'rtl' ? 'جارٍ إنشاء الصورة...' : 'Generating image...'}
-          </span>
-        </div>
+        {/* Calm, serene ambient breathing pulse */}
         <motion.div
           animate={{
-            x: dir === 'rtl' ? ['150%', '-150%'] : ['-150%', '150%']
+            opacity: [0.35, 0.65, 0.35],
+            scale: [1, 1.02, 1],
           }}
           transition={{
-            duration: 2.0,
+            duration: 4.0,
             repeat: Infinity,
             ease: "easeInOut"
           }}
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent skew-x-12 pointer-events-none z-0"
+          className="absolute inset-0 bg-gradient-to-br from-accent/10 via-[var(--surface-card)]/50 to-accent/5 pointer-events-none"
+        />
+
+        {/* Gentle, subtle light sheen sweep */}
+        <motion.div
+          animate={{
+            x: dir === 'rtl' ? ['160%', '-160%'] : ['-160%', '160%']
+          }}
+          transition={{
+            duration: 3.2,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.06] dark:via-white/[0.03] to-transparent skew-x-12 pointer-events-none z-10"
         />
       </div>
     </div>
@@ -81,14 +88,22 @@ export const ShareableImageOutput = ({ src, dir: propDir, alt }: { src?: string;
   const { dir: contextDir } = useAppContext();
   const artifactContext = useContext(ArtifactContext);
   const dir = propDir || contextDir || (document.documentElement.dir === 'rtl' ? 'rtl' : 'ltr');
-  const rawSrc = src || '';
-  const cleanUrl = rawSrc.split('#')[0];
+  
+  const rawSrc = (src || '').trim();
+  const unescapedSrc = rawSrc.replace(/^!\[.*?\]\((.*?)\)$/, '$1').trim();
+  const withoutHash = unescapedSrc.split('#')[0].trim();
+  
+  const cleanUrl = withoutHash.startsWith('http://') || withoutHash.startsWith('https://') || withoutHash.startsWith('data:') || withoutHash.startsWith('blob:')
+    ? withoutHash
+    : (withoutHash.startsWith('/') ? withoutHash : (withoutHash ? `/${withoutHash}` : ''));
+
   const aspectMatch = rawSrc.match(/#aspect=([0-9]+:[0-9]+)/);
   const selectedRatio = aspectMatch ? aspectMatch[1] : '1:1';
   const containerAspectClass = ASPECT_RATIO_CLASSES[selectedRatio] || ASPECT_RATIO_CLASSES['1:1'];
 
-  const [isImageFocused, setIsImageFocused] = useState(() => loadedImageCache.has(cleanUrl));
+  const [isImageFocused, setIsImageFocused] = useState(() => Boolean(cleanUrl && loadedImageCache.has(cleanUrl)));
   const [imageError, setImageError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
 
@@ -103,22 +118,38 @@ export const ShareableImageOutput = ({ src, dir: propDir, alt }: { src?: string;
     const timer = setTimeout(() => {
       setIsImageFocused(true);
       if (cleanUrl) loadedImageCache.add(cleanUrl);
-    }, 600);
+    }, 400);
 
     return () => clearTimeout(timer);
   }, [cleanUrl]);
 
+  const handleImageError = () => {
+    if (retryCount < 3 && cleanUrl && !cleanUrl.startsWith('data:')) {
+      const nextRetry = retryCount + 1;
+      setRetryCount(nextRetry);
+      setTimeout(() => {
+        if (imgRef.current) {
+          const sep = cleanUrl.includes('?') ? '&' : '?';
+          imgRef.current.src = `${cleanUrl}${sep}_r=${Date.now()}`;
+        }
+      }, 500 * nextRetry);
+    } else {
+      setIsImageFocused(true);
+      setImageError(true);
+    }
+  };
+
   const handleEditImage = () => {
     if (!cleanUrl) return;
     if (!artifactContext) {
-      toast.error(dir === 'rtl' ? 'محرر الكانفاس غير متوفر حالياً' : 'Canvas editor is not available');
+      toast.error(dir === 'rtl' ? 'محرر رينكس غير متوفر حالياً' : 'Rinex editor is not available');
       return;
     }
     
     // Open the image editor in the canvas layout
     artifactContext.setActiveArtifact({
       id: cleanUrl,
-      title: dir === 'rtl' ? 'محرر الصور الميكرو' : 'Micro Image Editor',
+      title: dir === 'rtl' ? 'استوديو رينكس' : 'Rinex Studio',
       type: 'image',
       content: cleanUrl,
       version: 1,
@@ -126,7 +157,7 @@ export const ShareableImageOutput = ({ src, dir: propDir, alt }: { src?: string;
     });
     artifactContext.setIsArtifactOpen(true);
     artifactContext.setActiveTab('preview');
-    toast.success(dir === 'rtl' ? 'تم فتح الصورة في محرر ميكرو كانفاس' : 'Image opened in Micro-Canvas Editor');
+    toast.success(dir === 'rtl' ? 'تم فتح الصورة في استوديو رينكس' : 'Image opened in Rinex Studio');
   };
 
   const handleDownload = async () => {
@@ -161,25 +192,23 @@ export const ShareableImageOutput = ({ src, dir: propDir, alt }: { src?: string;
       <div 
         className={`relative group overflow-hidden rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-subtle)] ${containerAspectClass} w-full transition-all duration-300 shadow-sm`}
       >
-        {!imageError && (
+        {!imageError && cleanUrl && (
           <img 
             ref={imgRef}
             onLoad={() => {
               setIsImageFocused(true);
+              setImageError(false);
               if (cleanUrl) loadedImageCache.add(cleanUrl);
             }}
-            onError={() => {
-              setIsImageFocused(true);
-              setImageError(true);
-            }}
+            onError={handleImageError}
             src={cleanUrl}
             alt={alt || "Generated Image"}
             className="block w-full h-full object-cover select-none cursor-pointer"
             onClick={() => setIsPreviewOpen(true)}
             style={{
-              filter: isImageFocused ? 'blur(0px)' : 'blur(16px)',
-              opacity: isImageFocused ? 1 : 0.4,
-              transition: 'filter 0.5s ease-out, opacity 0.5s ease-out'
+              filter: isImageFocused ? 'blur(0px)' : 'blur(8px)',
+              opacity: isImageFocused ? 1 : 0.6,
+              transition: 'filter 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
             referrerPolicy="no-referrer"
           />
@@ -222,11 +251,7 @@ export const ShareableImageOutput = ({ src, dir: propDir, alt }: { src?: string;
         )}
 
         {!isImageFocused && !imageError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/10 backdrop-blur-sm pointer-events-none">
-            <span className="text-[10px] font-mono tracking-widest text-[var(--text-muted)] uppercase animate-pulse">
-              {dir === 'rtl' ? 'جارٍ العرض...' : 'Loading image...'}
-            </span>
-          </div>
+          <div className="absolute inset-0 bg-white/10 backdrop-blur-[6px] pointer-events-none transition-all duration-300" />
         )}
 
         {imageError && (
@@ -235,6 +260,19 @@ export const ShareableImageOutput = ({ src, dir: propDir, alt }: { src?: string;
             <span className="text-[11px] font-bold text-rose-500">
               {dir === 'rtl' ? 'تعذر تحميل الصورة' : 'Failed to load image'}
             </span>
+            <button
+              onClick={() => {
+                setImageError(false);
+                setRetryCount(0);
+                if (imgRef.current) {
+                  const sep = cleanUrl.includes('?') ? '&' : '?';
+                  imgRef.current.src = `${cleanUrl}${sep}_t=${Date.now()}`;
+                }
+              }}
+              className="mt-2 text-[11px] underline font-bold cursor-pointer text-rose-500 hover:text-rose-600"
+            >
+              {dir === 'rtl' ? 'إعادة المحاولة' : 'Retry'}
+            </button>
           </div>
         )}
       </div>
@@ -258,7 +296,7 @@ export const ShareableImageOutput = ({ src, dir: propDir, alt }: { src?: string;
                   setIsPreviewOpen(false);
                   handleEditImage();
                 }}
-                className="px-4 py-2 rounded-shape-sm bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-2 shadow-md transition-colors cursor-pointer"
+                className="px-4 py-2 min-h-[44px] rounded-shape-sm bg-[var(--comp-button-primary-bg)] text-[var(--comp-button-primary-fg)] hover:opacity-90 text-xs font-bold flex items-center gap-2 shadow-md transition-theme cursor-pointer"
               >
                 <Palette size={14} />
                 <span>{dir === 'rtl' ? 'تعديل الصورة' : 'Edit Image'}</span>

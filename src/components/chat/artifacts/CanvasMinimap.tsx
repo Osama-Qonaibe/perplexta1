@@ -128,7 +128,7 @@ export function CanvasMinimap({
 
   return (
     <div
-      className={`absolute bottom-4 ${isRtl ? 'start-4' : 'end-4'} z-30 p-1.5 rounded-shape-md bg-[var(--surface-card)]/95 backdrop-blur-md border border-[var(--border-default)] shadow-xl select-none animate-in fade-in zoom-in-95 duration-150 flex flex-col gap-1`}
+      className={`absolute bottom-4 ${isRtl ? 'start-4' : 'end-4'} z-30 p-1.5 rounded-shape-md bg-[var(--surface-card)]/95 backdrop-blur-md border border-[var(--border-default)] shadow-xl select-none animate-in fade-in zoom-in-95 duration-fast flex flex-col gap-1`}
       style={{ width: MINIMAP_WIDTH + 12 }}
     >
       <div className="flex items-center justify-between px-1 text-[10px] font-bold text-[var(--text-muted)] tracking-wider uppercase">

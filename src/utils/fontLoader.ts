@@ -15,14 +15,14 @@ export interface FontLoadingConfig {
 
 export const DEFAULT_FONT_CONFIG: FontLoadingConfig = {
   ar: {
-    fontFamily: 'Tajawal',
+    fontFamily: 'Cairo',
     enabled: true,
-    url: 'https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700&display=swap'
+    url: 'https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap'
   },
   en: {
-    fontFamily: 'Space Grotesk',
+    fontFamily: 'Geist',
     enabled: true,
-    url: 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap'
+    url: 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap'
   },
   dynamicLoading: true
 };
@@ -71,10 +71,6 @@ export function applyLanguageFont(lang: 'ar' | 'en', config?: FontLoadingConfig 
 
     // 2. To ensure zero-jitter, instant language swapping, we keep both font stylesheets in DOM memory once loaded.
     // (Omit dynamic unloading of the alternate font link to bypass any Flash of Unstyled Text)
-
-    // 3. Set primary font family variable
-    const fontStack = `"${currentConfig.ar.fontFamily}", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
-    document.documentElement.style.setProperty('--font-sans', fontStack);
   } else {
     // When active language is English ('en'):
     // 1. Ensure Space Grotesk font link is attached if enabled
@@ -92,9 +88,5 @@ export function applyLanguageFont(lang: 'ar' | 'en', config?: FontLoadingConfig 
 
     // 2. To ensure zero-jitter, instant language swapping, we keep both font stylesheets in DOM memory once loaded.
     // (Omit dynamic unloading of the alternate font link to bypass any Flash of Unstyled Text)
-
-    // 3. Set primary font family variable
-    const fontStack = `"${currentConfig.en.fontFamily}", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
-    document.documentElement.style.setProperty('--font-sans', fontStack);
   }
 }

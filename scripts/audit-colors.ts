@@ -21,12 +21,15 @@ function shouldSkip(filePath: string): boolean {
 }
 
 function scanDir(dir: string, results = new Map<string, string[]>()) {
-  if (!fs.existsSync(dir)) return results;
+  const resolvedDir = path.resolve(dir);
+  if (!fs.existsSync(resolvedDir)) return results;
 
-  const files = fs.readdirSync(dir);
+  const files = fs.readdirSync(resolvedDir);
 
   for (const file of files) {
-    const fullPath = path.join(dir, file);
+    if (file.includes('..') || file.includes('/') || file.includes('\\') || file.includes('\0')) continue;
+    const fullPath = path.resolve(resolvedDir, file);
+    if (!fullPath.startsWith(resolvedDir + path.sep)) continue;
     const stat = fs.statSync(fullPath);
 
     if (stat.isDirectory()) {

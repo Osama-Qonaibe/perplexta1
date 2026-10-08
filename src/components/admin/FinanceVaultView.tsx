@@ -631,7 +631,7 @@ export const FinanceVaultView = ({
               <button
                 onClick={handleSaveEconomySettings}
                 disabled={isSaving}
-                className="flex items-center gap-2 px-4 py-2 rounded-md border transition-theme bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--fg-accent)] hover:border-[var(--border-accent)] disabled:opacity-50 group"
+                className="flex items-center gap-2 px-4 py-2 rounded-shape-sm border transition-theme bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--fg-accent)] hover:border-[var(--border-accent)] disabled:opacity-50 group"
               >
                 {isSaving ? (
                   <RefreshCw size={18} className="animate-spin" />
@@ -659,7 +659,7 @@ export const FinanceVaultView = ({
                       welcome_bonus_points: Number(e.target.value),
                     })
                   }
-                  className="w-full max-w-xs h-12 px-4 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] text-center text-lg font-medium focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:outline-none transition-theme"
+                  className="w-full max-w-xs h-12 px-4 rounded-shape-sm border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] text-center text-lg font-medium focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:outline-none transition-theme"
                 />
                 <p className="text-xs text-[var(--text-muted)] mt-3 text-center max-w-xs">
                   {t("welcomeBonusDesc")}
@@ -679,7 +679,7 @@ export const FinanceVaultView = ({
                       referral_bonus_points: Number(e.target.value),
                     })
                   }
-                  className="w-full max-w-xs h-12 px-4 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] text-center text-lg font-medium focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:outline-none transition-theme"
+                  className="w-full max-w-xs h-12 px-4 rounded-shape-sm border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] text-center text-lg font-medium focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:outline-none transition-theme"
                 />
                 <p className="text-xs text-[var(--text-muted)] mt-3 text-center max-w-xs">
                   {t("referralBonusDesc")}
@@ -701,7 +701,7 @@ export const FinanceVaultView = ({
                       min_payout_usd: Number(e.target.value),
                     })
                   }
-                  className="w-full max-w-xs h-12 px-4 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] text-center text-lg font-medium focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:outline-none transition-theme"
+                  className="w-full max-w-xs h-12 px-4 rounded-shape-sm border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] text-center text-lg font-medium focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:outline-none transition-theme"
                 />
                 <p className="text-xs text-[var(--text-muted)] mt-3 text-center max-w-xs">
                   {language === "ar"
@@ -725,7 +725,7 @@ export const FinanceVaultView = ({
                       min_deposit_usd: Number(e.target.value),
                     })
                   }
-                  className="w-full max-w-xs h-12 px-4 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] text-center text-lg font-medium focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:outline-none transition-theme"
+                  className="w-full max-w-xs h-12 px-4 rounded-shape-sm border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] text-center text-lg font-medium focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:outline-none transition-theme"
                 />
                 <p className="text-xs text-[var(--text-muted)] mt-3 text-center max-w-xs">
                   {language === "ar"
@@ -749,7 +749,7 @@ export const FinanceVaultView = ({
                       referral_activation_min_deposit: Number(e.target.value),
                     })
                   }
-                  className="w-full max-w-xs h-12 px-4 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] text-center text-lg font-medium focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:outline-none transition-theme"
+                  className="w-full max-w-xs h-12 px-4 rounded-shape-sm border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] text-center text-lg font-medium focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:outline-none transition-theme"
                 />
                 <p className="text-xs text-[var(--text-muted)] mt-3 text-center max-w-xs">
                   {language === "ar"
@@ -770,7 +770,7 @@ export const FinanceVaultView = ({
                   onChange={(e) =>
                     updatePointsPerDollar(Number(e.target.value))
                   }
-                  className="w-full max-w-xs h-12 px-4 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] text-center text-lg font-medium focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:outline-none transition-theme"
+                  className="w-full max-w-xs h-12 px-4 rounded-shape-sm border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] text-center text-lg font-medium focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:outline-none transition-theme"
                 />
                 <div className="mt-3 flex flex-col items-center gap-1">
                   <p className="text-xs text-[var(--text-muted)] text-center max-w-xs">
@@ -792,7 +792,7 @@ export const FinanceVaultView = ({
                   step="0.0001"
                   value={economySettings.conversion_rate || 0}
                   onChange={(e) => updateConversionRate(Number(e.target.value))}
-                  className="w-full max-w-xs h-12 px-4 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] text-center text-lg font-medium focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:outline-none transition-theme"
+                  className="w-full max-w-xs h-12 px-4 rounded-shape-sm border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] text-center text-lg font-medium focus:border-[var(--border-accent)] focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:outline-none transition-theme"
                 />
                 <div className="mt-3 flex flex-col items-center gap-1">
                   <p className="text-xs text-[var(--text-muted)] text-center max-w-xs">
@@ -825,7 +825,7 @@ export const FinanceVaultView = ({
                 type="button"
                 onClick={handleReconcileAll}
                 disabled={isReconciling}
-                className="flex items-center gap-2 px-4 py-2 rounded-md bg-[var(--bg-accent-emphasis)] text-[var(--fg-accent-contrast)] text-xs font-bold hover:opacity-90 disabled:opacity-50 transition-theme shadow-sm self-start sm:self-auto"
+                className="flex items-center gap-2 px-4 py-2 rounded-shape-sm bg-[var(--bg-accent-emphasis)] text-[var(--fg-accent-contrast)] text-xs font-bold hover:opacity-90 disabled:opacity-50 transition-theme shadow-sm self-start sm:self-auto"
               >
                 <RefreshCw size={14} className={isReconciling ? "animate-spin" : ""} />
                 <span>{isReconciling ? (language === "ar" ? "جاري التدقيق والمطابقة..." : "Reconciling...") : (language === "ar" ? "تدقيق ومطابقة الخزنة" : "Audit & Reconcile Vault")}</span>
@@ -837,7 +837,7 @@ export const FinanceVaultView = ({
                 <RefreshCw className="animate-spin text-[var(--fg-accent)]" size={24} />
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)]">
+              <div className="overflow-x-auto rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-card)]">
                 <table className="w-full text-left rtl:text-right text-xs">
                   <thead className="text-[10px] font-black uppercase tracking-widest bg-[var(--surface-subtle)] text-[var(--text-muted)] border-b border-[var(--border-default)]">
                     <tr>
@@ -880,19 +880,19 @@ export const FinanceVaultView = ({
                               <div className="text-[10px] text-[var(--text-muted)] font-normal">{log.user?.email}</div>
                             </td>
                             <td className="p-4">
-                              <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider ${isDep ? 'bg-[var(--bg-accent-emphasis)]/10 text-[var(--fg-accent)]' : 'bg-amber-500/10 text-amber-500'}`}>
+                              <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider ${isDep ? 'bg-[var(--bg-accent-emphasis)]/10 text-[var(--fg-accent)]' : 'bg-[var(--status-warning-subtle)] text-[var(--fg-warning)]'}`}>
                                 {isDep ? (language === "ar" ? "إيداع" : "DEPOSIT") : (language === "ar" ? "سحب" : "WITHDRAWAL")}
                               </span>
                             </td>
-                            <td className={`p-4 font-bold font-mono text-xs ${isDep ? 'text-[var(--fg-accent)]' : 'text-rose-500'}`}>
+                            <td className={`p-4 font-bold font-mono text-xs ${isDep ? 'text-[var(--fg-accent)]' : 'text-[var(--fg-danger)]'}`}>
                               {isDep ? '+' : '-'}${Number(log.realAmount).toFixed(2)}
                             </td>
                             <td className="p-4 text-[var(--text-muted)] font-mono text-[10px] uppercase">{log.method}</td>
                             <td className="p-4">
                               <span className={`px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-widest ${
                                 log.status === 'approved' || log.status === 'success' ? 'bg-[var(--bg-accent-emphasis)]/10 text-[var(--fg-accent)]' :
-                                log.status === 'rejected' || log.status === 'failed' ? 'bg-rose-500/10 text-rose-500' :
-                                'bg-amber-500/10 text-amber-500 animate-pulse'
+                                log.status === 'rejected' || log.status === 'failed' ? 'bg-[var(--status-danger-subtle)] text-[var(--fg-danger)]' :
+                                'bg-[var(--status-warning-subtle)] text-[var(--fg-warning)] animate-pulse'
                               }`}>
                                 {log.status}
                               </span>
@@ -903,7 +903,7 @@ export const FinanceVaultView = ({
                               {log.status !== 'pending' && (
                                 <button
                                   onClick={() => handleDeleteRequest(log.id, log.logType)}
-                                  className="px-2 py-1 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded text-[10px] uppercase font-bold transition-theme cursor-pointer select-none"
+                                  className="px-2 py-1 bg-[var(--status-danger-subtle)] hover:bg-[var(--fg-danger)] text-[var(--fg-danger)] hover:text-white rounded text-[10px] uppercase font-bold transition-theme cursor-pointer select-none"
                                   title={language === "ar" ? "مسح هذا السجل المنتهي نهائيا" : "Delete expired or finished record"}
                                 >
                                   {language === "ar" ? "مسح" : "DELETE"}
@@ -978,7 +978,7 @@ export const FinanceVaultView = ({
                     return (
                       <div
                         key={request.id}
-                        className="p-5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] space-y-4 transition-theme"
+                        className="p-5 rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-card)] space-y-4 transition-theme"
                       >
                         <div className="flex items-start justify-between">
                           <div className="space-y-1">
@@ -1044,7 +1044,7 @@ export const FinanceVaultView = ({
                                 handleDepositAction(request.id, 'reject');
                               }}
                               disabled={actioningId !== null}
-                              className="px-4 h-9 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white font-bold active:scale-[0.99] rounded text-[10px] uppercase tracking-wider transition-theme"
+                              className="px-4 h-9 bg-[var(--status-danger-subtle)] hover:bg-[var(--fg-danger)] text-[var(--fg-danger)] hover:text-white font-bold active:scale-[0.99] rounded text-[10px] uppercase tracking-wider transition-theme"
                             >
                               {language === "ar" ? "رفض" : "REJECT"}
                             </button>
@@ -1055,7 +1055,7 @@ export const FinanceVaultView = ({
                             value={rejectionReasons[request.id] || ''}
                             onChange={(e) => setRejectionReasons(prev => ({ ...prev, [request.id]: e.target.value }))}
                             placeholder={language === "ar" ? "أدخل سبب الرفض في حال نقر الزر..." : "Write rejection memo if choosing to deny..."}
-                            className="w-full h-8 px-3 text-[10px] bg-[var(--surface-subtle)] border border-rose-500/20 focus:border-rose-500 rounded focus:outline-none placeholder:text-[var(--text-muted)] text-rose-500 font-sans"
+                            className="w-full h-8 px-3 text-[10px] bg-[var(--surface-subtle)] border border-[var(--fg-danger)]/20 focus:border-[var(--fg-danger)]/40 rounded focus:outline-none placeholder:text-[var(--text-muted)] text-[var(--fg-danger)] font-sans"
                           />
                         </div>
                       </div>
@@ -1063,7 +1063,7 @@ export const FinanceVaultView = ({
                   })}
 
                   {financialRequests.deposits.filter(d => d.status === 'pending').length === 0 && (
-                    <div className="p-8 text-center text-xs text-[var(--text-muted)] bg-[var(--surface-card)] border border-[var(--border-default)] rounded-lg">
+                    <div className="p-8 text-center text-xs text-[var(--text-muted)] bg-[var(--surface-card)] border border-[var(--border-default)] rounded-shape-md">
                       {language === "ar" ? "لا توجد معاملات إيداع يدوية معلقة حالياً." : "No deposits waiting code alignment details."}
                     </div>
                   )}
@@ -1080,11 +1080,11 @@ export const FinanceVaultView = ({
                     return (
                       <div
                         key={request.id}
-                        className="p-5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] space-y-4 transition-theme"
+                        className="p-5 rounded-shape-md border border-[var(--border-default)] bg-[var(--surface-card)] space-y-4 transition-theme"
                       >
                         <div className="flex items-start justify-between font-sans">
                           <div className="space-y-1">
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--fg-warning)] bg-[var(--status-warning-subtle)] px-2 py-0.5 rounded">
                               {request.method}
                             </span>
                             <div className="font-bold text-xs text-[var(--text-primary)] mt-1 font-sans">
@@ -1095,7 +1095,7 @@ export const FinanceVaultView = ({
 
                           <div className="text-right">
                             <div className="text-[9px] text-[var(--text-muted)] font-bold uppercase tracking-widest">Disbursement Amount</div>
-                            <div className="text-sm font-bold text-rose-500 font-mono">${amountUSD.toFixed(2)} USD</div>
+                            <div className="text-sm font-bold text-[var(--fg-danger)] font-mono">${amountUSD.toFixed(2)} USD</div>
                           </div>
                         </div>
 
@@ -1133,7 +1133,7 @@ export const FinanceVaultView = ({
                                 handleWithdrawalAction(request.id, 'reject');
                               }}
                               disabled={actioningId !== null}
-                              className="px-4 h-9 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white font-bold active:scale-[0.99] rounded text-[10px] uppercase tracking-wider transition-theme"
+                              className="px-4 h-9 bg-[var(--status-danger-subtle)] hover:bg-[var(--fg-danger)] text-[var(--fg-danger)] hover:text-white font-bold active:scale-[0.99] rounded text-[10px] uppercase tracking-wider transition-theme"
                             >
                               {language === "ar" ? "رفض مع الإرجاع" : "REJECT & REFUND"}
                             </button>
@@ -1144,7 +1144,7 @@ export const FinanceVaultView = ({
                             value={rejectionReasons[request.id] || ''}
                             onChange={(e) => setRejectionReasons(prev => ({ ...prev, [request.id]: e.target.value }))}
                             placeholder={language === "ar" ? "أدخل سبب الرفض في حال رفض المعاملة..." : "Write refund explanation reason memo..."}
-                            className="w-full h-8 px-3 text-[10px] bg-[var(--surface-subtle)] border border-rose-500/20 focus:border-rose-500 rounded focus:outline-none placeholder:text-[var(--text-muted)] text-rose-500 font-sans"
+                            className="w-full h-8 px-3 text-[10px] bg-[var(--surface-subtle)] border border-[var(--fg-danger)]/20 focus:border-[var(--fg-danger)]/40 rounded focus:outline-none placeholder:text-[var(--text-muted)] text-[var(--fg-danger)] font-sans"
                           />
                         </div>
                       </div>
@@ -1152,7 +1152,7 @@ export const FinanceVaultView = ({
                   })}
 
                   {financialRequests.withdrawals.filter(w => w.status === 'pending').length === 0 && (
-                    <div className="p-8 text-center text-xs text-[var(--text-muted)] bg-[var(--surface-card)] border border-[var(--border-default)] rounded-lg">
+                    <div className="p-8 text-center text-xs text-[var(--text-muted)] bg-[var(--surface-card)] border border-[var(--border-default)] rounded-shape-md">
                       {language === "ar" ? "لا توجد طلبات سحب معلقة حالياً." : "No withdrawal requests pending action."}
                     </div>
                   )}
@@ -1164,598 +1164,28 @@ export const FinanceVaultView = ({
         )}
 
         {activeTab === "payment_gateways" && (
-          <div className="space-y-8 font-sans">
-            {/* OFFICIAL AUTOMATED API PORTALS */}
-            <div>
-              <div className="mb-6">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--fg-accent)] mb-1">
-                  {dir === "rtl" ? "بوابات الدفع الرسمية المؤتمتة (APIs)" : "Official Automated Payment Gateways"}
-                </h4>
-                <p className="text-xs text-[var(--text-muted)]">
-                  {dir === "rtl" ? "تكوين المفاتيح والاتصال الفوري لمعالجة الاشتراكات وتلقي المدفوعات التلقائية." : "Configure secure API keys for automated checkouts, subscription renewals, and balance increases."}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* STRIPE OFFICIAL GATEWAY */}
-                <div
-                  className="p-6 md:p-8 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] flex flex-col justify-between transition-theme shadow-sm hover:border-[var(--border-accent)]"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-6 pb-4 border-b border-[var(--border-default)]">
-                      <div className="flex items-center gap-3">
-                        <div className="p-3 rounded-lg bg-[var(--bg-accent-emphasis)]/10 text-[var(--fg-accent)]">
-                          <CreditCard size={24} />
-                        </div>
-                        <div>
-                          <h3 className="text-base font-bold text-[var(--text-primary)]">{t("stripeConfig")}</h3>
-                          <p className="text-xs text-[var(--text-muted)]">{t("stripeDesc")}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col items-end gap-1">
-                        <span
-                          className={`px-2.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1.5 ${
-                            stripeConfig.stripe_status === "active"
-                              ? "bg-[var(--bg-accent-emphasis)]/10 text-[var(--fg-accent)] border border-[var(--border-accent)]/30"
-                              : "bg-amber-500/10 text-amber-500 border border-amber-500/30"
-                          }`}
-                        >
-                          {stripeConfig.stripe_status === "active" ? (
-                            <>
-                              <div className="w-1.5 h-1.5 rounded-full bg-[var(--fg-accent)] animate-pulse" />
-                              {dir === "rtl" ? "نشط / معتمد" : "Active / Verified"}
-                            </>
-                          ) : (
-                            <>
-                              <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                              {dir === "rtl" ? "معلق" : "Pending"}
-                            </>
-                          )}
-                        </span>
-                        {stripeConfig.stripe_last_verified_at && (
-                          <span className="text-[9px] text-[var(--text-muted)] font-mono">
-                            {new Date(stripeConfig.stripe_last_verified_at).toLocaleDateString(
-                              language === "ar" ? "ar-EG" : "en-US",
-                            )}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Mode Toggle Banner */}
-                    <div
-                      className="mb-6 p-4 rounded-lg border border-[var(--border-default)] bg-[var(--surface-subtle)] flex items-center justify-between"
-                    >
-                      <div>
-                        <h4 className="text-xs font-bold mb-0.5 text-[var(--text-primary)]">{t("environment")}</h4>
-                        <p className="text-[11px] text-[var(--text-muted)]">
-                          {stripeConfig.isLiveMode
-                            ? dir === "rtl" ? "بيئة الإنتاج الحقيقية" : "Live Production Environment"
-                            : dir === "rtl" ? "بيئة الاختبار التجريبية" : "Test Sandbox Mode"}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-[9.5px] font-bold tracking-wider ${
-                            !stripeConfig.isLiveMode ? "text-amber-500" : "text-[var(--text-muted)]"
-                          }`}
-                        >
-                          TEST
-                        </span>
-                        <button
-                          onClick={() =>
-                            setStripeConfig((prev: any) => ({
-                              ...prev,
-                              isLiveMode: !prev.isLiveMode,
-                            }))
-                          }
-                          className={`relative w-11 h-5.5 rounded-full transition-colors border ${
-                            stripeConfig.isLiveMode
-                              ? "bg-[var(--bg-accent-emphasis)]/20 border-[var(--border-accent)]/40"
-                              : "bg-[var(--surface-card)] border-[var(--border-default)]"
-                          }`}
-                        >
-                          <div
-                            className={`absolute top-0.5 w-4.2 h-4.2 rounded-full shadow-md transition-theme ${
-                              stripeConfig.isLiveMode ? "bg-[var(--fg-accent)]" : "bg-[var(--text-muted)]"
-                            } ${
-                              dir === "rtl"
-                                ? stripeConfig.isLiveMode ? "right-5.5" : "right-0.5"
-                                : stripeConfig.isLiveMode ? "left-5.5" : "left-0.5"
-                            }`}
-                          />
-                        </button>
-                        <span
-                          className={`text-[9.5px] font-bold tracking-wider ${
-                            stripeConfig.isLiveMode ? "text-[var(--fg-accent)]" : "text-[var(--text-muted)]"
-                          }`}
-                        >
-                          LIVE
-                        </span>
-                      </div>
-                    </div>
-
-                    <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                          {t("publishableKey")}
-                        </label>
-                        <input
-                          type="text"
-                          value={stripeConfig.publishableKey || ""}
-                          onChange={(e) =>
-                            setStripeConfig({
-                              ...stripeConfig,
-                              publishableKey: e.target.value,
-                            })
-                          }
-                          placeholder="pk_test_..."
-                          className="w-full px-4 py-2.5 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:border-[var(--border-accent)] font-mono text-xs transition-theme"
-                          dir="ltr"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                          {t("secretKey")}
-                        </label>
-                        <input
-                          type="password"
-                          value={stripeConfig.secretKey || ""}
-                          onChange={(e) =>
-                            setStripeConfig({
-                              ...stripeConfig,
-                              secretKey: e.target.value,
-                            })
-                          }
-                          placeholder="sk_test_..."
-                          className="w-full px-4 py-2.5 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:border-[var(--border-accent)] font-mono text-xs transition-theme"
-                          dir="ltr"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                          {t("webhookSecret")}
-                        </label>
-                        <input
-                          type="password"
-                          value={stripeConfig.webhookSecret || ""}
-                          onChange={(e) =>
-                            setStripeConfig({
-                              ...stripeConfig,
-                              webhookSecret: e.target.value,
-                            })
-                          }
-                          placeholder="whsec_..."
-                          className="w-full px-4 py-2.5 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--border-accent)]/20 focus:border-[var(--border-accent)] font-mono text-xs transition-theme"
-                          dir="ltr"
-                        />
-                        <p className="text-[10px] text-[var(--text-muted)] mt-2 flex items-start gap-1">
-                          <Info size={12} className="text-[var(--text-muted)] mt-0.5 shrink-0" />
-                          {dir === "rtl"
-                            ? "مطلوب لمعالجة التنبيهات المباشرة وترقية خطط المشتركين في الخلفية تلقائياً."
-                            : "Necessary to safely process events instantly and settle active subscriptions."}
-                        </p>
-                      </div>
-                    </form>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3 pt-6 mt-6 border-t border-[var(--border-default)]">
-                    <button
-                      onClick={handleSaveStripeConfig}
-                      disabled={isSaving}
-                      className="flex-1 bg-[var(--bg-accent-emphasis)] hover:opacity-90 text-[var(--fg-accent-contrast)] py-2.5 rounded-md font-bold transition-theme hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {isSaving ? (
-                        <RefreshCw size={16} className="animate-spin" />
-                      ) : (
-                        <Save size={16} />
-                      )}
-                      {t("saveStripeConfig")}
-                    </button>
-
-                    <button
-                      onClick={handleVerifyStripeConnection}
-                      disabled={isSaving || isVerifyingStripe}
-                      className="px-5 py-2.5 rounded-md font-bold transition-theme flex items-center justify-center gap-2 bg-[var(--surface-card)] text-[var(--text-muted)] border border-[var(--border-default)] hover:text-[var(--fg-accent)] hover:border-[var(--border-accent)] disabled:opacity-50 group"
-                    >
-                      {isVerifyingStripe ? (
-                        <RefreshCw size={16} className="animate-spin" />
-                      ) : (
-                        <Zap size={16} className="group-hover:text-[var(--fg-accent)]" />
-                      )}
-                      {dir === "rtl" ? "تحقق المزامنة" : "Verify Sync"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* PAYPAL OFFICIAL GATEWAY */}
-                <div
-                  className="p-6 md:p-8 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] flex flex-col justify-between transition-theme shadow-sm hover:border-[var(--border-accent)]"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-6 pb-4 border-b border-[var(--border-default)]">
-                      <div className="flex items-center gap-3">
-                        <div className="p-3 rounded-lg bg-blue-500/10 text-blue-500">
-                          <Globe size={24} />
-                        </div>
-                        <div>
-                          <h3 className="text-base font-bold text-[var(--text-primary)]">
-                            {dir === "rtl" ? "بوابة PayPal الرسمية" : "Official PayPal REST API"}
-                          </h3>
-                          <p className="text-xs text-[var(--text-muted)]">
-                            {dir === "rtl" ? "تصدير ومعالجة طلبات الإيداع المباشر عبر API." : "Link official merchant APIs for checkout automation."}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col items-end gap-1">
-                        <span
-                          className={`px-2.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1.5 ${
-                            paypalConfig.paypal_status === "verified"
-                              ? "bg-[var(--bg-accent-emphasis)]/10 text-[var(--fg-accent)] border border-[var(--border-accent)]/30"
-                              : "bg-amber-500/10 text-amber-500 border border-amber-500/30"
-                          }`}
-                        >
-                          {paypalConfig.paypal_status === "verified" ? (
-                            <>
-                              <div className="w-1.5 h-1.5 rounded-full bg-[var(--fg-accent)] animate-pulse" />
-                              {dir === "rtl" ? "نشط / معتمد" : "Active / Verified"}
-                            </>
-                          ) : (
-                            <>
-                              <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                              {dir === "rtl" ? "معلق" : "Pending"}
-                            </>
-                          )}
-                        </span>
-                        {paypalConfig.paypal_last_verified_at && (
-                          <span className="text-[9px] text-[var(--text-muted)] font-mono">
-                            {new Date(paypalConfig.paypal_last_verified_at).toLocaleDateString(
-                              language === "ar" ? "ar-EG" : "en-US",
-                            )}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Mode Toggle Banner */}
-                    <div
-                      className="mb-6 p-4 rounded-lg border border-[var(--border-default)] bg-[var(--surface-subtle)] flex items-center justify-between"
-                    >
-                      <div>
-                        <h4 className="text-xs font-bold mb-0.5 text-[var(--text-primary)]">{t("environment")}</h4>
-                        <p className="text-[11px] text-[var(--text-muted)]">
-                          {paypalConfig.mode === "live"
-                            ? dir === "rtl" ? "بيئة الإنتاج الحقيقية" : "Live Production Environment"
-                            : dir === "rtl" ? "بيئة الاختبار التجريبية" : "Test Sandbox Mode"}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-[9.5px] font-bold tracking-wider ${
-                            paypalConfig.mode !== "live" ? "text-amber-500" : "text-[var(--text-muted)]"
-                          }`}
-                        >
-                          SANDBOX
-                        </span>
-                        <button
-                          onClick={() =>
-                            setPaypalConfig((prev: any) => ({
-                              ...prev,
-                              mode: prev.mode === "live" ? "sandbox" : "live",
-                            }))
-                          }
-                          className={`relative w-11 h-5.5 rounded-full transition-colors border ${
-                            paypalConfig.mode === "live"
-                              ? "bg-[var(--bg-accent-emphasis)]/20 border-[var(--border-accent)]/40"
-                              : "bg-[var(--surface-card)] border-[var(--border-default)]"
-                          }`}
-                        >
-                          <div
-                            className={`absolute top-0.5 w-4.2 h-4.2 rounded-full shadow-md transition-theme ${
-                              paypalConfig.mode === "live" ? "bg-[var(--fg-accent)]" : "bg-[var(--text-muted)]"
-                            } ${
-                              dir === "rtl"
-                                ? paypalConfig.mode === "live" ? "right-5.5" : "right-0.5"
-                                : paypalConfig.mode === "live" ? "left-5.5" : "left-0.5"
-                            }`}
-                          />
-                        </button>
-                        <span
-                          className={`text-[9.5px] font-bold tracking-wider ${
-                            paypalConfig.mode === "live" ? "text-[var(--fg-accent)]" : "text-[var(--text-muted)]"
-                          }`}
-                        >
-                          LIVE
-                        </span>
-                      </div>
-                    </div>
-
-                    <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                          {dir === "rtl" ? "معرف العميل (Client ID)" : "PayPal Client ID"}
-                        </label>
-                        <input
-                          type="text"
-                          value={paypalConfig.clientId || ""}
-                          onChange={(e) =>
-                            setPaypalConfig({
-                              ...paypalConfig,
-                              clientId: e.target.value,
-                            })
-                          }
-                          placeholder="Ab_..."
-                          className="w-full px-4 py-2.5 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500/40 font-mono text-xs transition-theme"
-                          dir="ltr"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                          {dir === "rtl" ? "المفتاح السري (Client Secret)" : "PayPal Client Secret"}
-                        </label>
-                        <input
-                          type="password"
-                          value={paypalConfig.clientSecret || ""}
-                          onChange={(e) =>
-                            setPaypalConfig({
-                              ...paypalConfig,
-                              clientSecret: e.target.value,
-                            })
-                          }
-                          placeholder="EK_..."
-                          className="w-full px-4 py-2.5 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500/40 font-mono text-xs transition-theme"
-                          dir="ltr"
-                        />
-                      </div>
-                      <div className="opacity-70">
-                        <span className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                          {dir === "rtl" ? "شحن الرصيد التلقائي" : "Instant Ingestion Option"}
-                        </span>
-                        <p className="text-[10px] text-[var(--text-muted)] flex items-start gap-1">
-                          <Info size={12} className="text-[var(--text-muted)] mt-0.5 shrink-0" />
-                          {dir === "rtl"
-                            ? "يتم التسوية والقيد اللحظي للأرصدة في PostgreSQL بمجرد موافقة العميل على تفويض PayPal."
-                            : "Once dynamic payments are authorized, funds will be captures with immediate PostgreSQL ledger logs."}
-                        </p>
-                      </div>
-                    </form>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3 pt-6 mt-6 border-t border-[var(--border-default)]">
-                    <button
-                      onClick={handleSavePaypalConfig}
-                      disabled={isSaving}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-md font-bold transition-theme hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm"
-                    >
-                      {isSaving ? (
-                        <RefreshCw size={16} className="animate-spin" />
-                      ) : (
-                        <Save size={16} />
-                      )}
-                      {dir === "rtl" ? "حفظ إعدادات PayPal" : "Save PayPal Config"}
-                    </button>
-
-                    <button
-                      onClick={handleVerifyPaypalConnection}
-                      disabled={isSaving || isVerifyingPaypal}
-                      className="px-5 py-2.5 rounded-md font-bold transition-theme flex items-center justify-center gap-2 bg-[var(--surface-card)] text-[var(--text-muted)] border border-[var(--border-default)] hover:text-[var(--fg-accent)] hover:border-[var(--border-accent)] disabled:opacity-50 group"
-                    >
-                      {isVerifyingPaypal ? (
-                        <RefreshCw size={16} className="animate-spin" />
-                      ) : (
-                        <Zap size={16} className="group-hover:text-[var(--fg-accent)]" />
-                      )}
-                      {dir === "rtl" ? "تحقق المزامنة" : "Verify Sync"}
-                    </button>
-                  </div>
-                </div>
-              </div>
+          <div className="p-8 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-card)] text-center space-y-4 shadow-xs font-sans">
+            <div className="w-16 h-16 rounded-full bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-center justify-center mx-auto text-[var(--fg-accent)]">
+              <CreditCard size={32} />
             </div>
-
-            {/* MANUAL & ALTERNATIVE WALLET GATEWAYS CONFIG */}
-            <div>
-              <div className="mb-6">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--fg-accent)] mb-1">
-                  {dir === "rtl" ? "قنوات الإيداع والتحصيل اليدوي للمحافظ" : "Alternative Manual Deposit Routes"}
-                </h4>
-                <p className="text-xs text-[var(--text-muted)]">
-                  {dir === "rtl" ? "تعديل خيارات التحويل يدويًا خارج بوابات الدفع الفوري (العملات المشفرة، الحوالات والبريد الإلكتروني)." : "Configure custom payment instructions and wallet destinations displayed to users on the deposits tab."}
-                </p>
-              </div>
-
-              <div
-                className="p-6 md:p-8 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] transition-theme shadow-sm"
+            <div className="space-y-2 max-w-lg mx-auto">
+              <h3 className="text-lg font-bold text-[var(--text-primary)]">
+                {dir === "rtl" ? "خزانة بوابات الدفع انتقلت إلى البنية التحتية" : "Payment Gateways Vault Moved to Infrastructure"}
+              </h3>
+              <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                {dir === "rtl"
+                  ? "وفق المعيار المعماري السيادي الموحد للمنصة، تدار جميع مفاتيح بوابات الدفع (Stripe, PayPal, Crypto, Bank Wire) حصرياً من قسم البنية التحتية والذكاء لضمان التشفير والمركزية المطلقة."
+                  : "Following platform architecture standards, all payment gateway keys (Stripe, PayPal, USDT, Bank Wire) now reside exclusively in the Infrastructure Vault."}
+              </p>
+            </div>
+            <div className="pt-2">
+              <a
+                href="/admin/payments"
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-[var(--radius-sm)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] text-xs font-bold shadow-xs hover:opacity-90 transition-all cursor-pointer touch-target-44 min-h-[44px]"
               >
-                <div className="flex items-center gap-3 mb-8 pb-4 border-b border-[var(--border-default)]">
-                  <div className="p-3 rounded-lg bg-[var(--bg-accent-emphasis)]/10 text-[var(--fg-accent)]">
-                    <Landmark size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-[var(--text-primary)]">
-                      {dir === "rtl" ? "وجهات الإيداعات اليدوية" : "Alternative Manual Destinations"}
-                    </h3>
-                    <p className="text-xs text-[var(--text-muted)]">
-                      {dir === "rtl"
-                        ? "هذه الإعدادات توجه المستخدمين لإتمام الدفع خارج النظام مع إيقاظ طلبات الإيداع للتثبيت."
-                        : "Define where manual deposits are sent and specify international client routing numbers."}
-                    </p>
-                  </div>
-                </div>
-
-                {/* 3-Column horizontal grid for perfect utilization of space */}
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                  {/* Column 1: Crypto Wallet Setup */}
-                  <div className="border border-[var(--border-accent)]/20 rounded-lg p-5 bg-[var(--bg-accent-emphasis)]/[0.02] flex flex-col justify-between space-y-4">
-                    <div>
-                      <h4 className="text-sm font-bold text-[var(--fg-accent)] flex items-center gap-2 mb-2">
-                        <Smartphone size={16} />
-                        {dir === "rtl" ? "عملة USDT المستقرة (TRC-20)" : "USDT Stablecoin (TRC-20)"}
-                      </h4>
-                      <p className="text-xs text-[var(--text-muted)] mb-4 leading-relaxed">
-                        {dir === "rtl"
-                          ? "تلقي دفعات العملات الرقمية المستقرة وسحبها يدويًا إلى هذا العنوان بمطابقة المعاملات."
-                          : "Direct crypto deposit processing. Users request transactions using ledger hashes."}
-                      </p>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1.5">
-                          {dir === "rtl" ? "عنوان محفظة USDT المتلقية" : "Receiving USDT Address (TRC-20)"}
-                        </label>
-                        <input
-                          type="text"
-                          value={economySettings.crypto_address || ""}
-                          onChange={(e) =>
-                            setEconomySettings({
-                              ...economySettings,
-                              crypto_address: e.target.value,
-                            })
-                          }
-                          placeholder="TPh7eWpY..."
-                          className="w-full px-4 py-2.5 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1.5 focus:ring-[var(--border-accent)] font-mono text-xs transition-theme"
-                          dir="ltr"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Column 2: PayPal Direct Ingestion */}
-                  <div className="border border-indigo-500/20 rounded-lg p-5 bg-indigo-500/[0.02] flex flex-col justify-between space-y-4">
-                    <div>
-                      <h4 className="text-sm font-bold text-indigo-500 flex items-center gap-2 mb-2">
-                        <Globe size={16} />
-                        {dir === "rtl" ? "نظام باي بال المباشر" : "Direct PayPal Ingestion"}
-                      </h4>
-                      <p className="text-xs text-[var(--text-muted)] mb-4 leading-relaxed">
-                        {dir === "rtl"
-                          ? "بريد باي بال التجاري البديل لتلقي مبالغ الشحن مع توجيه آمن ومباشر لإتمام الدفع الفوري."
-                          : "Fallback client processing using structured commercial Paypal email routing."}
-                      </p>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1.5">
-                          {dir === "rtl" ? "البريد الإلكتروني لتلقي المدفوعات" : "Business PayPal Email Address"}
-                        </label>
-                        <input
-                          type="email"
-                          value={economySettings.paypal_email || ""}
-                          onChange={(e) =>
-                            setEconomySettings({
-                              ...economySettings,
-                              paypal_email: e.target.value,
-                            })
-                          }
-                          placeholder="paypal@yourdomain.com"
-                          className="w-full px-4 py-2.5 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1.5 focus:ring-indigo-500 font-mono text-xs transition-theme"
-                          dir="ltr"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Column 3: Custom Bank Transfer details */}
-                  <div className="border border-blue-500/20 rounded-lg p-5 bg-blue-500/[0.02] space-y-4">
-                    <h4 className="text-sm font-bold text-blue-500 flex items-center gap-2 mb-2">
-                      <Building size={16} />
-                      {dir === "rtl" ? "معلومات التحويل البنكي" : "Bank Transfer & IBAN Node Wire"}
-                    </h4>
-
-                    {/* Highly responsive interior layout for bank attributes */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[10px] font-bold tracking-wide text-[var(--text-muted)] uppercase mb-1">
-                          {dir === "rtl" ? "اسم البنك" : "Bank Name"}
-                        </label>
-                        <input
-                          type="text"
-                          value={economySettings.bank_name || ""}
-                          onChange={(e) =>
-                            setEconomySettings({
-                              ...economySettings,
-                              bank_name: e.target.value,
-                            })
-                          }
-                          placeholder="e.g. Bank Leumi"
-                          className="w-full px-3 py-2 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:ring-1.5 focus:ring-blue-500 text-xs transition-theme"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold tracking-wide text-[var(--text-muted)] uppercase mb-1">
-                          {dir === "rtl" ? "اسم المستلم / المستفيد" : "Beneficiary / Account Holder"}
-                        </label>
-                        <input
-                          type="text"
-                          value={economySettings.bank_recipient || ""}
-                          onChange={(e) =>
-                            setEconomySettings({
-                              ...economySettings,
-                              bank_recipient: e.target.value,
-                            })
-                          }
-                          placeholder="e.g. Perplexta Platforms"
-                          className="w-full px-3 py-2 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:ring-1.5 focus:ring-blue-500 text-xs transition-theme"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold tracking-wide text-[var(--text-muted)] uppercase mb-1">
-                          {dir === "rtl" ? "رمز السويفت SWIFT / BIC" : "SWIFT / BIC Code"}
-                        </label>
-                        <input
-                          type="text"
-                          value={economySettings.bank_swift || ""}
-                          onChange={(e) =>
-                            setEconomySettings({
-                              ...economySettings,
-                              bank_swift: e.target.value,
-                            })
-                          }
-                          placeholder="PPLXIL33"
-                          className="w-full px-3 py-2 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:ring-1.5 focus:ring-blue-500 text-xs font-mono transition-theme"
-                          dir="ltr"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold tracking-wide text-[var(--text-muted)] uppercase mb-1">
-                          {dir === "rtl" ? "رقم الحساب أو الآيبان" : "IBAN / Account Number"}
-                        </label>
-                        <input
-                          type="text"
-                          value={economySettings.bank_iban || ""}
-                          onChange={(e) =>
-                            setEconomySettings({
-                              ...economySettings,
-                              bank_iban: e.target.value,
-                            })
-                          }
-                          placeholder="IL..."
-                          className="w-full px-3 py-2 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:ring-1.5 focus:ring-blue-500 text-xs font-mono transition-theme"
-                          dir="ltr"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-6 mt-6 border-t border-[var(--border-default)] flex justify-end">
-                  <button
-                    onClick={handleSaveWalletGateways}
-                    disabled={isSaving}
-                    className="w-full sm:w-auto px-8 bg-[var(--bg-accent-emphasis)] hover:opacity-90 text-[var(--fg-accent-contrast)] py-3 rounded-md font-bold transition-theme hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50 shadow-md"
-                  >
-                    {isSaving ? (
-                      <RefreshCw size={18} className="animate-spin" />
-                    ) : (
-                      <Save size={18} />
-                    )}
-                    {dir === "rtl" ? "حفظ تكوين بوابات المحفظة البديلة" : "Save Alternative Gateways"}
-                  </button>
-                </div>
-              </div>
+                <Zap size={14} />
+                <span>{dir === "rtl" ? "الانتقال إلى خزانة بوابات الدفع في البنية التحتية" : "Go to Payment Gateways Infrastructure"}</span>
+              </a>
             </div>
           </div>
         )}

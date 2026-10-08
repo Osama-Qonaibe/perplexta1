@@ -10,21 +10,31 @@ purgeOrphanedStorage();
 
 // Auto-reload on chunk load errors (PWA stale cache issue)
 const forceHardReload = async () => {
-  if (!sessionStorage.getItem('chunk_reloaded')) {
-    sessionStorage.setItem('chunk_reloaded', 'true');
-    console.error('[PWA] Stale chunk detected, updating Service Worker and forcing reload...');
-    try {
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        for (const registration of registrations) {
-          await registration.update();
-        }
-      }
-    } catch (e) {
-      console.error('SW update failed', e);
-    }
-    window.location.reload();
+  const reloaded = sessionStorage.getItem('chunk_reloaded');
+  if (reloaded) {
+    console.warn('[PWA] Chunk reload loop prevented. Staying on current page.');
+    return;
   }
+  sessionStorage.setItem('chunk_reloaded', 'true');
+  console.error('[PWA] Stale chunk detected, clearing Service Worker caches and forcing reload...');
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const registration of registrations) {
+        if (registration.active) {
+          registration.active.postMessage({ type: 'CLEAR_CACHE' });
+        }
+        await registration.unregister();
+      }
+    }
+  } catch (e) {
+    console.error('SW clear failed', e);
+  }
+  window.location.reload();
 };
 
 window.addEventListener('unhandledrejection', (event) => {
@@ -47,7 +57,7 @@ window.addEventListener('vite:preloadError', (event) => {
 window.addEventListener('load', () => {
   setTimeout(() => {
     sessionStorage.removeItem('chunk_reloaded');
-  }, 1000);
+  }, 2000);
 });
 
 // Initialize version auto-checker to prevent stale asset cache issues
@@ -56,29 +66,40 @@ VersionManager.initAutoCheck();
 // Initialize Native Push Notifications
 // initPushNotifications();
 
-// Register Service Worker for app shell precaching and offline support
+// Register Service Worker only in production to prevent DEV mode refresh interception & freeze
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    // Listen for controller changes when a new Service Worker takes control
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.dispatchEvent(new CustomEvent('service-worker-updated'));
-    });
-
-    navigator.serviceWorker.register('/sw.js').then((registration) => {
-      registration.addEventListener('updatefound', () => {
-        const installingWorker = registration.installing;
-        if (installingWorker) {
-          installingWorker.addEventListener('statechange', () => {
-            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              window.dispatchEvent(new CustomEvent('service-worker-updated'));
-            }
-          });
-        }
+  if (import.meta.env.DEV) {
+    // In DEV mode, unregister any existing service workers so Vite dev server modules are never intercepted
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister();
+      }
+    }).catch(() => {});
+  } else {
+    window.addEventListener('load', () => {
+      // Listen for controller changes when a new Service Worker takes control
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        window.dispatchEvent(new CustomEvent('service-worker-updated'));
       });
-    }).catch((err) => {
-      console.warn('[PWA] Service Worker registration failed:', err);
+
+      navigator.serviceWorker.register('/sw.js').then((registration) => {
+        // Check for updates on every page load
+        registration.update().catch(() => {});
+        registration.addEventListener('updatefound', () => {
+          const installingWorker = registration.installing;
+          if (installingWorker) {
+            installingWorker.addEventListener('statechange', () => {
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                window.dispatchEvent(new CustomEvent('service-worker-updated'));
+              }
+            });
+          }
+        });
+      }).catch((err) => {
+        console.warn('[PWA] Service Worker registration failed:', err);
+      });
     });
-  });
+  }
 }
 
 // Silence non-critical console calls in production to prevent telemetry / token leakage.

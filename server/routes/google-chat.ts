@@ -1,10 +1,19 @@
 import express from 'express';
-import { body, header } from 'express-validator';
+import { body, header, validationResult } from 'express-validator';
 
 const router = express.Router();
 
+const handleValidationErrors = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  next();
+};
+
 const validateToken = [
   header('authorization').exists().withMessage('Authorization header is required'),
+  handleValidationErrors,
 ];
 
 router.get('/spaces', validateToken, async (req: express.Request, res: express.Response) => {
@@ -37,8 +46,9 @@ router.get('/spaces/:spaceId/messages', validateToken, async (req: express.Reque
 });
 
 router.post('/spaces/:spaceId/messages', [
-  ...validateToken,
+  header('authorization').exists().withMessage('Authorization header is required'),
   body('text').notEmpty().withMessage('Message text is required'),
+  handleValidationErrors,
 ], async (req: express.Request, res: express.Response) => {
   try {
     const token = req.headers.authorization;

@@ -130,7 +130,7 @@ export const SharedSnapshotPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen-safe w-full bg-[var(--surface-page)] text-[var(--text-primary)] font-sans relative overflow-x-hidden flex flex-col transition-theme pb-24" dir={dir}>
+    <div className="h-[100dvh] w-full bg-[var(--surface-page)] text-[var(--text-primary)] font-sans relative overflow-y-auto overflow-x-hidden flex flex-col transition-theme pb-24 main-scroll-container custom-scrollbar" dir={dir}>
       {/* Background Decorative Gradients */}
       <div className="absolute top-0 inset-x-0 h-[500px] bg-gradient-to-b from-gray-500/10 via-transparent to-transparent pointer-events-none" />
       <div className="absolute top-1/4 -start-48 w-96 h-96 bg-accent/5 rounded-full blur-[100px] pointer-events-none" />
@@ -142,18 +142,18 @@ export const SharedSnapshotPage: React.FC = () => {
           onClick={() => navigate('/')} 
           className="flex items-center gap-3 cursor-pointer group transition-theme"
         >
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-gray-900 to-black border border-accent/20 flex items-center justify-center shadow-md shadow-none group-hover:border-accent group-hover: transition-theme">
+          <div className="w-10 h-10 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-accent)] flex items-center justify-center shadow-md group-hover:border-[var(--border-accent)] transition-theme">
             {siteSettings?.logoBase64 ? (
-              <img src={resolveImageUrl(siteSettings.logoBase64, 'general')} alt="Logo" className="w-7 h-7 object-cover rounded-sm" />
+              <img src={resolveImageUrl(siteSettings.logoBase64, 'general')} alt="Logo" className="w-7 h-7 object-cover rounded-[var(--radius-xs)]" />
             ) : (
-              <Sparkles size={18} className="text-accent animate-pulse" />
+              <Sparkles size={18} className="text-[var(--fg-accent)] animate-pulse" />
             )}
           </div>
           <div>
-            <h1 className="text-md font-black tracking-wider uppercase bg-gradient-to-r from-white via-gray-300 to-gray-500 bg-clip-text text-transparent">
+            <h1 className="text-md font-black tracking-wider uppercase text-[var(--text-primary)]">
               {siteName || (isAr ? 'بيربليكستا' : 'PERPLEXTA')}
             </h1>
-            <p className="text-[9px] font-mono text-accent uppercase tracking-widest leading-none mt-0.5">
+            <p className="text-[9px] font-mono text-[var(--fg-accent)] uppercase tracking-widest leading-none mt-0.5">
               {isAr ? 'منصة التحليل النخبوي' : 'Elite Analysis Platform'}
             </p>
           </div>
@@ -161,7 +161,7 @@ export const SharedSnapshotPage: React.FC = () => {
 
         <button
           onClick={() => navigate('/')}
-          className="px-4 py-2 rounded-[4px] bg-[var(--bg-overlay)] border border-[var(--border-default)] hover:border-accent/30 text-xs font-semibold flex items-center gap-2 text-[var(--text-muted)] hover:text-accent hover: transition-theme"
+          className="px-4 py-2 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] border border-[var(--border-default)] hover:border-[var(--border-accent)] text-xs font-semibold flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--fg-accent)] transition-theme cursor-pointer"
         >
           <ArrowLeft size={14} className={isAr ? 'rotate-180' : ''} />
           {isAr ? 'الذهاب للمنصة' : 'Go to Platform'}
@@ -173,20 +173,20 @@ export const SharedSnapshotPage: React.FC = () => {
         {loading ? (
           /* Loading Skeleton */
           <div className="flex flex-col gap-6 animate-pulse">
-            <div className="h-8 bg-[var(--bg-overlay)] border border-[var(--border-default)] rounded-md w-3/4" />
+            <div className="h-8 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-sm)] w-3/4" />
             <div className="flex items-center gap-4">
-              <div className="h-4 bg-[var(--bg-overlay)] border border-[var(--border-default)] rounded-md w-1/4" />
-              <div className="h-4 bg-[var(--bg-overlay)] border border-[var(--border-default)] rounded-md w-1/6" />
+              <div className="h-4 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-xs)] w-1/4" />
+              <div className="h-4 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-xs)] w-1/6" />
             </div>
-            <div className="h-96 bg-[var(--bg-overlay)] border border-[var(--border-default)] rounded-lg w-full" />
+            <div className="h-96 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-md)] w-full" />
           </div>
         ) : error ? (
           /* Error State */
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 mb-6 shadow-lg shadow-red-500/5">
+            <div className="w-16 h-16 rounded-[var(--radius-full)] bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 mb-6 shadow-lg shadow-red-500/5">
               <AlertCircle size={32} />
             </div>
-            <h2 className="text-xl font-bold mb-2">
+            <h2 className="text-xl font-bold mb-2 text-[var(--text-primary)]">
               {isAr ? 'فشل تحميل لقطة التحليل' : 'Snapshot Retrieval Failed'}
             </h2>
             <p className="text-sm text-[var(--text-muted)] max-w-md mb-8">
@@ -194,7 +194,7 @@ export const SharedSnapshotPage: React.FC = () => {
             </p>
             <button
               onClick={() => navigate('/')}
-              className="px-6 py-2.5 rounded-[4px] bg-accent text-black font-extrabold text-sm uppercase tracking-wider hover:bg-accent transition-theme shadow-lg shadow-none"
+              className="px-6 py-2.5 rounded-[var(--radius-xs)] bg-[var(--surface-card)] hover:bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] font-extrabold text-sm uppercase tracking-wider transition-theme cursor-pointer"
             >
               {isAr ? 'العودة للرئيسية' : 'Return to Home'}
             </button>
@@ -205,11 +205,11 @@ export const SharedSnapshotPage: React.FC = () => {
             {/* Snapshot Title/Prompt */}
             <div className="space-y-3">
               {snapshot.title ? (
-                <h2 className="text-xl sm:text-2xl font-black text-white leading-tight tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] leading-tight tracking-tight">
                   {snapshot.title}
                 </h2>
               ) : (
-                <h2 className="text-xl sm:text-2xl font-black text-white leading-tight tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] leading-tight tracking-tight">
                   {isAr ? 'تحليل تقني استراتيجي' : 'Strategic Technical Analysis'}
                 </h2>
               )}
@@ -217,18 +217,18 @@ export const SharedSnapshotPage: React.FC = () => {
               {/* Snapshot Meta Statistics */}
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-mono text-[var(--text-muted)] border-b border-[var(--border-default)] pb-4">
                 <div className="flex items-center gap-2">
-                  <Calendar size={14} className="text-accent/80" />
+                  <Calendar size={14} className="text-[var(--fg-accent)]" />
                   <span>{formatDate(snapshot.created_at)}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Eye size={14} className="text-accent/80" />
+                  <Eye size={14} className="text-[var(--fg-accent)]" />
                   <span>
                     {snapshot.views_count.toLocaleString()} {isAr ? 'مشاهدة' : 'Views'}
                   </span>
                 </div>
                 {snapshot.model_name && (
-                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] bg-accent/5 border border-accent/15 text-accent text-[11px] font-semibold">
-                    <Sparkles size={11} className="text-accent animate-pulse" />
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] border border-[var(--border-accent)] text-[var(--fg-accent)] text-[11px] font-semibold">
+                    <Sparkles size={11} className="text-[var(--fg-accent)] animate-pulse" />
                     <span>{snapshot.model_name}</span>
                   </div>
                 )}
@@ -236,11 +236,11 @@ export const SharedSnapshotPage: React.FC = () => {
             </div>
 
             {/* Content Display Card */}
-            <div className="bg-[var(--bg-overlay)] border border-[var(--border-default)] rounded-lg p-6 sm:p-8 shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gray-500/10 via-gray-500/10 to-gray-500/5" />
+            <div className="bg-[var(--surface-card)] border border-[var(--border-default)] rounded-[var(--radius-md)] p-6 sm:p-8 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--surface-subtle)]" />
               
               {/* Markdown Render Body */}
-              <article className="prose prose-invert max-w-none text-sm text-[var(--text-secondary)] leading-relaxed space-y-4 break-words select-text">
+              <article className="prose dark:prose-invert max-w-none text-sm text-[var(--text-secondary)] leading-relaxed space-y-4 break-words select-text">
                 <Markdown remarkPlugins={[remarkGfm]}>
                   {snapshot.content}
                 </Markdown>
@@ -248,9 +248,9 @@ export const SharedSnapshotPage: React.FC = () => {
             </div>
 
             {/* Sharing Toolbox & Widgets */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[var(--bg-overlay)]/40 border border-[var(--border-default)]/60 rounded-lg p-4 mt-2">
-              <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <Share2 size={14} className="text-accent" />
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-md)] p-4 mt-2">
+              <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-2">
+                <Share2 size={14} className="text-[var(--fg-accent)]" />
                 {isAr ? 'انشر هذا التحليل مع شبكتك' : 'Share this insight with your network'}
               </span>
 
@@ -260,16 +260,16 @@ export const SharedSnapshotPage: React.FC = () => {
                 <button
                   onClick={handleCopyLink}
                   title={isAr ? 'نسخ الرابط' : 'Copy Link'}
-                  className="w-10 h-10 rounded-[4px] bg-[var(--bg-overlay)] border border-[var(--border-default)] hover:border-accent/30 flex items-center justify-center text-[var(--text-muted)] hover:text-accent transition-theme"
+                  className="w-10 h-10 rounded-[var(--radius-xs)] bg-[var(--surface-card)] border border-[var(--border-default)] hover:border-[var(--border-accent)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--fg-accent)] transition-theme cursor-pointer"
                 >
-                  {copied ? <Check size={16} className="text-accent" /> : <Copy size={16} />}
+                  {copied ? <Check size={16} className="text-[var(--fg-accent)]" /> : <Copy size={16} />}
                 </button>
 
                 {/* X / Twitter */}
                 <button
                   onClick={() => shareToSocial('twitter')}
                   title={isAr ? 'انشر على إكس' : 'Share on X / Twitter'}
-                  className="w-10 h-10 rounded-[4px] bg-[var(--bg-overlay)] border border-[var(--border-default)] hover:border-accent/30 flex items-center justify-center text-[var(--text-muted)] hover:text-accent transition-theme"
+                  className="w-10 h-10 rounded-[var(--radius-xs)] bg-[var(--surface-card)] border border-[var(--border-default)] hover:border-[var(--border-accent)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--fg-accent)] transition-theme cursor-pointer"
                 >
                   <Twitter size={16} />
                 </button>
@@ -278,7 +278,7 @@ export const SharedSnapshotPage: React.FC = () => {
                 <button
                   onClick={() => shareToSocial('linkedin')}
                   title={isAr ? 'انشر على لينكد إن' : 'Share on LinkedIn'}
-                  className="w-10 h-10 rounded-[4px] bg-[var(--bg-overlay)] border border-[var(--border-default)] hover:border-accent/30 flex items-center justify-center text-[var(--text-muted)] hover:text-accent transition-theme"
+                  className="w-10 h-10 rounded-[var(--radius-xs)] bg-[var(--surface-card)] border border-[var(--border-default)] hover:border-[var(--border-accent)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--fg-accent)] transition-theme cursor-pointer"
                 >
                   <Linkedin size={16} />
                 </button>
@@ -287,7 +287,7 @@ export const SharedSnapshotPage: React.FC = () => {
                 <button
                   onClick={() => shareToSocial('telegram')}
                   title={isAr ? 'شارك على تيليجرام' : 'Share on Telegram'}
-                  className="w-10 h-10 rounded-[4px] bg-[var(--bg-overlay)] border border-[var(--border-default)] hover:border-accent/30 flex items-center justify-center text-[var(--text-muted)] hover:text-accent transition-theme"
+                  className="w-10 h-10 rounded-[var(--radius-xs)] bg-[var(--surface-card)] border border-[var(--border-default)] hover:border-[var(--border-accent)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--fg-accent)] transition-theme cursor-pointer"
                 >
                   <Send size={16} />
                 </button>
@@ -296,7 +296,7 @@ export const SharedSnapshotPage: React.FC = () => {
                 <button
                   onClick={() => shareToSocial('whatsapp')}
                   title={isAr ? 'شارك على واتساب' : 'Share on WhatsApp'}
-                  className="w-10 h-10 rounded-[4px] bg-[var(--bg-overlay)] border border-[var(--border-default)] hover:border-accent/30 flex items-center justify-center text-[var(--text-muted)] hover:text-accent transition-theme"
+                  className="w-10 h-10 rounded-[var(--radius-xs)] bg-[var(--surface-card)] border border-[var(--border-default)] hover:border-[var(--border-accent)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--fg-accent)] transition-theme cursor-pointer"
                 >
                   <MessageSquare size={16} />
                 </button>
@@ -304,12 +304,10 @@ export const SharedSnapshotPage: React.FC = () => {
             </div>
 
             {/* Viral Visitor CTA Card */}
-            <div className="relative mt-8 rounded-lg overflow-hidden border border-accent/20 bg-gradient-to-b from-gray-500/10[0.04] to-transparent p-6 text-center shadow-xl">
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-12 w-64 h-64 bg-accent/10 rounded-full blur-[60px] pointer-events-none" />
+            <div className="relative mt-8 rounded-[var(--radius-md)] overflow-hidden border border-[var(--border-default)] bg-[var(--surface-card)] p-6 text-center shadow-xl">
+              <Sparkles className="mx-auto text-[var(--fg-accent)] mb-4 animate-pulse" size={28} />
               
-              <Sparkles className="mx-auto text-accent mb-4 animate-pulse" size={28} />
-              
-              <h3 className="text-md font-bold text-white uppercase tracking-wider mb-2">
+              <h3 className="text-md font-bold text-[var(--text-primary)] uppercase tracking-wider mb-2">
                 {isAr ? 'ابدأ تحليلك التقني العالي الدقة مجاناً' : 'Analyze complex assets with Sovereign High-Precision AI'}
               </h3>
               
@@ -321,7 +319,7 @@ export const SharedSnapshotPage: React.FC = () => {
 
               <button
                 onClick={() => navigate('/')}
-                className="px-8 py-3 rounded-[4px] bg-gradient-to-r from-gray-500/10 to-gray-500/5 hover:from-gray-500/10 hover:to-gray-500/5 text-black font-extrabold text-xs uppercase tracking-widest transition-theme shadow-lg shadow-none hover:shadow-none border border-accent/20"
+                className="px-8 py-3 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-page)] text-[var(--text-primary)] font-extrabold text-xs uppercase tracking-widest transition-theme border border-[var(--border-default)] hover:border-[var(--border-accent)] cursor-pointer"
               >
                 {isAr ? 'ابدأ التحليل الاستراتيجي الآن' : 'Start Free Technical Analysis'}
               </button>

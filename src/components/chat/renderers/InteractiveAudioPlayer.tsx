@@ -499,7 +499,7 @@ export const InteractiveAudioPlayer: React.FC<InteractiveAudioPlayerProps> = ({
             <span className="w-1.5 h-1.5 rounded-shape-full bg-accent animate-ping" />
             {dir === 'rtl' ? styleLabel.ar : styleLabel.en}
           </div>
-          <p className="text-[10px] text-gray-400 font-medium px-1">
+          <p className="text-[10px] text-[var(--text-muted)] font-medium px-1">
             {dir === 'rtl' ? vocalLabel.ar : vocalLabel.en}
           </p>
         </div>
@@ -523,7 +523,7 @@ export const InteractiveAudioPlayer: React.FC<InteractiveAudioPlayerProps> = ({
                 <span className="text-[11px] font-black text-accent uppercase tracking-widest animate-pulse leading-none mb-1">
                   {dir === 'rtl' ? 'جاري التوليف الابتكاري والهندسة الفنية...' : 'SYNTHESIZING & ORCHESTRATING SOUNDWAVE...'}
                 </span>
-                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">
+                <span className="text-[9px] text-[var(--text-muted)] font-bold uppercase tracking-widest">
                   {dir === 'rtl' ? 'جودة فائقة الدقة استوديو 24 بت' : 'ULTRA-RES 24-BIT DIGITAL SIGNAL PROCESSING'}
                 </span>
               </div>
@@ -635,10 +635,10 @@ export const InteractiveAudioPlayer: React.FC<InteractiveAudioPlayerProps> = ({
           <div className="flex items-center gap-2">
             <button 
               onClick={toggleMute}
-              className="w-10 h-10 rounded-shape-sm bg-transparent border border-transparent transition-theme hover:bg-[var(--surface-inset)] flex items-center justify-center text-gray-400 hover:text-accent"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-shape-sm bg-transparent border border-transparent transition-theme hover:bg-[var(--surface-inset)] flex items-center justify-center text-[var(--text-muted)] hover:text-accent touch-target-44"
               title={isMuted ? (dir === 'rtl' ? 'إلغاء كتم الصوت' : 'Unmute') : (dir === 'rtl' ? 'كتم الصوت' : 'Mute')}
             >
-              <Volume2 size={16} className={isMuted ? 'text-gray-500 line-through' : 'text-accent'} />
+              <Volume2 size={16} className={isMuted ? 'text-[var(--text-muted)] line-through' : 'text-accent'} />
             </button>
 
             <input 
@@ -932,7 +932,7 @@ export const InteractiveAudioPlayer: React.FC<InteractiveAudioPlayerProps> = ({
                   type="button"
                   onClick={handleSaveTrackToLibrary}
                   disabled={isSavingTrack || isTrackSaved}
-                  className={`py-2.5 px-4 rounded-shape-sm border border-accent/30 bg-accent/10 text-accent font-bold text-[11px] uppercase tracking-wider flex items-center justify-center gap-2 transition-theme hover:bg-accent/20 disabled:opacity-50 disabled:cursor-not-allowed`}
+                  className="py-2 px-3.5 rounded-shape-xs border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-card)] text-[var(--text-primary)] font-bold text-xs flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs touch-target-44 box-border relative before:absolute before:-inset-1.5 before:content-['']"
                 >
                   {isSavingTrack ? (
                     <>
@@ -941,7 +941,7 @@ export const InteractiveAudioPlayer: React.FC<InteractiveAudioPlayerProps> = ({
                     </>
                   ) : isTrackSaved ? (
                     <>
-                      <Check size={13} className="text-accent" />
+                      <Check size={13} className="text-[var(--fg-success)]" />
                       <span>{dir === 'rtl' ? 'تم الحفظ في مكتبتك' : 'SAVED TO LIBRARY'}</span>
                     </>
                   ) : (
@@ -956,7 +956,7 @@ export const InteractiveAudioPlayer: React.FC<InteractiveAudioPlayerProps> = ({
                 type="button"
                 onClick={handleGenerateLyria}
                 disabled={isLyriaGenerating || !lyriaPrompt.trim()}
-                className={`py-2.5 px-5 rounded-shape-sm bg-accent text-white font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 transition-theme hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(156,163,175,0.3)] hover:scale-[1.02] active:scale-[0.98] ${
+                className={`py-2 px-4 rounded-shape-xs bg-[var(--comp-button-primary-bg)] hover:bg-[var(--comp-button-primary-bg)]/90 text-[var(--comp-button-primary-fg)] border border-[var(--border-default)] font-bold text-xs flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs active:scale-98 touch-target-44 box-border relative before:absolute before:-inset-1.5 before:content-[''] ${
                   isLyriaGenerating ? 'animate-pulse' : ''
                 }`}
               >
@@ -967,7 +967,7 @@ export const InteractiveAudioPlayer: React.FC<InteractiveAudioPlayerProps> = ({
                   </>
                 ) : (
                   <>
-                    <Sparkles size={13} className="drop-shadow-[0_0_4px_rgba(255,255,255,0.6)]" />
+                    <Sparkles size={13} />
                     <span>{dir === 'rtl' ? 'توليد المسار الفني بالذكاء الاصطناعي' : 'GENERATE AI TRACK NOW'}</span>
                   </>
                 )}

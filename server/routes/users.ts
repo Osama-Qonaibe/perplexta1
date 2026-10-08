@@ -29,6 +29,22 @@ router.post("/avatar", authenticateToken, checkDiskSpace, (upload.single('file')
   }
 });
 
+router.post("/cover", authenticateToken, checkDiskSpace, (upload.single('file') as any), handleMulterError, uploadValidator, async (req: any, res: any) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file attached' });
+    const optResult = await optimizeUploadedImage(req.file.path, req.file.originalname, 'banner', true, { userId: req.user.id });
+    const coverUrl = normalizeMediaUrl(optResult.fileUrl);
+
+    const updated = await updateUserProfile(req.user.id, { 
+      cover_image: coverUrl
+    });
+    res.json({ success: true, url: coverUrl, user: updated });
+  } catch (error: any) {
+    console.error('[CoverUpload] Failed to process cover:', error);
+    res.status(500).json({ error: 'Cover upload failed' });
+  }
+});
+
 router.get("/usage", authenticateToken, async (req: any, res) => {
    try {
      const usage = await getUserUsage(req.user.id);

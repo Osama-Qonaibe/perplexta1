@@ -98,7 +98,7 @@ export const QuoteShareModal: React.FC<QuoteShareModalProps> = ({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 8 }}
           transition={{ duration: 0.15 }}
-          className="relative w-full max-w-md bg-[var(--surface-card)] border border-[var(--border-default)] rounded-2xl shadow-2xl p-5 space-y-4 text-start overflow-hidden flex flex-col"
+          className="relative w-full max-w-md bg-[var(--surface-card)] border border-[var(--border-default)] rounded-[var(--radius-lg)] shadow-2xl p-5 space-y-4 text-start overflow-hidden flex flex-col"
           dir={dir}
         >
           {/* Modal Header */}
@@ -113,14 +113,14 @@ export const QuoteShareModal: React.FC<QuoteShareModalProps> = ({
                 onClick={handleCopyLink}
                 className="text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center gap-1 transition-colors cursor-pointer"
               >
-                {copied ? <Check size={13} className="text-emerald-500" /> : <LinkIcon size={13} />}
+                {copied ? <Check size={13} className="text-[var(--fg-success)]" /> : <LinkIcon size={13} />}
                 <span>{copied ? (isRtl ? 'تم النسخ' : 'Copied') : (isRtl ? 'نسخ الرابط' : 'Copy link')}</span>
               </button>
 
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] transition-colors cursor-pointer"
+                className="p-1 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -134,11 +134,11 @@ export const QuoteShareModal: React.FC<QuoteShareModalProps> = ({
               value={inviteInput}
               onChange={(e) => setInviteInput(e.target.value)}
               placeholder={isRtl ? 'إضافة أشخاص بالاسم أو البريد...' : 'Add people by name or email...'}
-              className="flex-1 px-3 py-2 text-xs rounded-xl border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-accent transition-all font-sans"
+              className="flex-1 px-3 py-2 text-xs rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-accent transition-all font-sans"
             />
             <button
               type="submit"
-              className="px-4 py-2 text-xs font-bold rounded-xl bg-[var(--surface-subtle)] hover:bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--text-primary)] transition-all cursor-pointer shrink-0"
+              className="px-4 py-2 text-xs font-bold rounded-[var(--radius-md)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--text-primary)] transition-all cursor-pointer shrink-0"
             >
               {isRtl ? 'مشاركة' : 'Share'}
             </button>
@@ -152,7 +152,7 @@ export const QuoteShareModal: React.FC<QuoteShareModalProps> = ({
 
             <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
               {/* Owner Item */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-[var(--surface-subtle)]/60 border border-[var(--border-default)]/60">
+              <div className="flex items-center justify-between p-2 rounded-[var(--radius-md)] bg-[var(--surface-subtle)]/60 border border-[var(--border-default)]/60">
                 <div className="flex items-center gap-2.5 min-w-0">
                   {ownerAvatar ? (
                     <img src={ownerAvatar} alt={ownerName} className="w-8 h-8 rounded-full object-cover shrink-0" />
@@ -173,9 +173,9 @@ export const QuoteShareModal: React.FC<QuoteShareModalProps> = ({
 
               {/* Invited People List */}
               {invitedPeople.map((person, idx) => (
-                <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-[var(--surface-subtle)]/40 border border-[var(--border-default)]/40">
+                <div key={idx} className="flex items-center justify-between p-2 rounded-[var(--radius-md)] bg-[var(--surface-subtle)]/40 border border-[var(--border-default)]/40">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-500 font-bold text-xs flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-[var(--fg-accent)]/15 border border-[var(--border-accent)]/30 text-[var(--fg-accent)] font-bold text-xs flex items-center justify-center shrink-0">
                       <UserIcon size={14} />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -183,7 +183,7 @@ export const QuoteShareModal: React.FC<QuoteShareModalProps> = ({
                       <div className="text-[11px] text-[var(--text-muted)] truncate">{person.email}</div>
                     </div>
                   </div>
-                  <span className="text-xs font-semibold text-emerald-500 shrink-0">
+                  <span className="text-xs font-semibold text-[var(--fg-success)] shrink-0">
                     {isRtl ? 'مُضاف' : 'Access'}
                   </span>
                 </div>
@@ -197,7 +197,7 @@ export const QuoteShareModal: React.FC<QuoteShareModalProps> = ({
               {isRtl ? 'الوصول العام' : 'General access'}
             </h4>
 
-            <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-subtle)]/50 divide-y divide-[var(--border-default)] overflow-hidden">
+            <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-subtle)]/50 divide-y divide-[var(--border-default)] overflow-hidden">
               {/* Option 1: Restricted */}
               <button
                 type="button"
@@ -212,7 +212,7 @@ export const QuoteShareModal: React.FC<QuoteShareModalProps> = ({
                   <Lock size={15} className={accessLevel === 'restricted' ? 'text-amber-500' : 'text-[var(--text-muted)]'} />
                   <span>{isRtl ? 'حصرياً للأشخاص المضافين فقط' : 'Only people with access can view'}</span>
                 </div>
-                {accessLevel === 'restricted' && <Check size={16} className="text-emerald-500 shrink-0" />}
+                {accessLevel === 'restricted' && <Check size={16} className="text-[var(--fg-success)] shrink-0" />}
               </button>
 
               {/* Option 2: Anyone with Link */}
@@ -226,16 +226,16 @@ export const QuoteShareModal: React.FC<QuoteShareModalProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <Globe size={15} className={accessLevel === 'anyone' ? 'text-blue-500' : 'text-[var(--text-muted)]'} />
+                  <Globe size={15} className={accessLevel === 'anyone' ? 'text-[var(--fg-accent)]' : 'text-[var(--text-muted)]'} />
                   <span>{isRtl ? 'أي شخص لديه الرابط يمكنه العرض' : 'Anyone with the link can view'}</span>
                 </div>
-                {accessLevel === 'anyone' && <Check size={16} className="text-emerald-500 shrink-0" />}
+                {accessLevel === 'anyone' && <Check size={16} className="text-[var(--fg-success)] shrink-0" />}
               </button>
             </div>
           </div>
 
           {/* Share Link Box & Copy Button */}
-          <div className="flex items-center justify-between gap-2 p-2 rounded-xl border border-[var(--border-default)] bg-[var(--surface-subtle)]">
+          <div className="flex items-center justify-between gap-2 p-2 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-subtle)]">
             <span className="text-[11px] font-mono text-[var(--text-secondary)] truncate flex-1 px-1">
               {shareUrl}
             </span>
@@ -243,9 +243,9 @@ export const QuoteShareModal: React.FC<QuoteShareModalProps> = ({
             <button
               type="button"
               onClick={handleCopyLink}
-              className="px-3 py-1.5 rounded-lg bg-transparent hover:bg-[var(--surface-card)] border border-transparent hover:border-[var(--border-default)] text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all active:scale-95 cursor-pointer shrink-0 flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-[var(--radius-sm)] bg-transparent hover:bg-[var(--surface-card)] border border-transparent hover:border-[var(--border-default)] text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all active:scale-95 cursor-pointer shrink-0 flex items-center gap-1.5"
             >
-              {copied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+              {copied ? <Check size={13} className="text-[var(--fg-success)]" /> : <Copy size={13} />}
               <span>{copied ? (isRtl ? 'تم النسخ' : 'Copied') : (isRtl ? 'نسخ الرابط' : 'Copy link')}</span>
             </button>
           </div>

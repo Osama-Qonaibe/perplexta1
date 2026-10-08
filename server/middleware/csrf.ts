@@ -5,9 +5,43 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     return next();
   }
 
+  // If the request contains an explicit Authorization header, CSRF is mathematically impossible because
+  // browser cross-origin requests cannot inject custom HTTP headers without CORS preflight and access to the token.
+  if (req.headers.authorization) {
+    return next();
+  }
+
   const origin = (req.headers.origin as string) || (req.headers.referer as string);
 
-  if (process.env.NODE_ENV === 'production' && origin) {
+  // If no origin/referer, block untrusted state-changing request
+  if (!origin) {
+    return res.status(403).json({ error: 'CSRF protection: State-changing requests must include an Origin, Referer, or Authorization header.' });
+  }
+
+  // Allow trusted native mobile wrappers (Capacitor, Ionic)
+  const isNativeScheme = origin.startsWith('capacitor://') || 
+                         origin.startsWith('ionic://');
+
+  if (isNativeScheme) {
+    return next();
+  }
+
+  // Chrome extensions: allow only if explicitly whitelisted in env or accompanied by custom anti-CSRF token
+  if (origin.startsWith('chrome-extension://')) {
+    const allowedExtensions = process.env.ALLOWED_CHROME_EXTENSION_IDS 
+      ? process.env.ALLOWED_CHROME_EXTENSION_IDS.split(',').map(s => s.trim()) 
+      : [];
+    const extensionId = origin.replace('chrome-extension://', '').split('/')[0];
+    if (allowedExtensions.length > 0 && allowedExtensions.includes(extensionId)) {
+      return next();
+    }
+    if (req.headers['x-csrf-token'] || req.headers['authorization']) {
+      return next();
+    }
+    return res.status(403).json({ error: 'CSRF protection: Untrusted browser extension origin blocked.' });
+  }
+
+  if (process.env.NODE_ENV === 'production') {
     try {
       const allowed: string[] = [];
       if (process.env.APP_URL) {
@@ -37,10 +71,6 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     } catch {
       return res.status(403).json({ error: 'CSRF protection: Invalid request origin format.' });
     }
-  }
-
-  if (!origin && !req.headers.authorization) {
-    return res.status(403).json({ error: 'CSRF protection: State-changing requests must include an Origin, Referer, or Authorization header.' });
   }
 
   next();

@@ -177,8 +177,17 @@ export function validatePwa(): { isValid: boolean; results: CheckResult; manifes
       );
 
       if (icon.src && !icon.src.startsWith('/uploads/') && !icon.src.startsWith('/api/')) {
+        if (icon.src.includes('..') || icon.src.includes('\0')) {
+          check(false, '', `  ❌ ${label} contains illegal path traversal sequences: "${icon.src}"`);
+          return;
+        }
         const cleanSrc = icon.src.startsWith('/') ? icon.src.slice(1) : icon.src;
-        const filePath = path.join(rootDir, 'public', cleanSrc);
+        const publicDir = path.resolve(rootDir, 'public');
+        const filePath = path.resolve(publicDir, cleanSrc);
+        if (!filePath.startsWith(publicDir + path.sep)) {
+          check(false, '', `  ❌ ${label} path escapes public directory: "${icon.src}"`);
+          return;
+        }
         check(
           fs.existsSync(filePath),
           `  ✓ ${label} exists on disk at public/${cleanSrc}`,
@@ -205,6 +214,30 @@ export function validatePwa(): { isValid: boolean; results: CheckResult; manifes
       `[Service Worker] sw.js contains hardcoded cross-origin URLs which may cause CORS / fetch interception errors.`,
       true
     );
+  }
+
+  // 8. Brand Alignment validation (Capacitor, index.html, Manifest)
+  const capacitorPath = path.join(rootDir, 'capacitor.config.ts');
+  const indexHtmlPath = path.join(rootDir, 'index.html');
+
+  if (fs.existsSync(capacitorPath) && fs.existsSync(indexHtmlPath)) {
+    const capacitorContent = fs.readFileSync(capacitorPath, 'utf-8');
+    const indexHtmlContent = fs.readFileSync(indexHtmlPath, 'utf-8');
+
+    const capAppNameMatch = capacitorContent.match(/appName:\s*['"]([^'"]+)['"]/);
+    const indexHtmlTitleMatch = indexHtmlContent.match(/<title>([^<]+)<\/title>/);
+
+    if (capAppNameMatch && indexHtmlTitleMatch) {
+      const capAppName = capAppNameMatch[1];
+      const htmlTitle = indexHtmlTitleMatch[1];
+
+      check(
+        capAppName === htmlTitle,
+        `[Brand Alignment] App name matches perfectly: Capacitor ("${capAppName}") aligns with index.html title ("${htmlTitle}")`,
+        `[Brand Alignment] App name mismatch: Capacitor has "${capAppName}" but HTML title has "${htmlTitle}"`,
+        true
+      );
+    }
   }
 
   const isValid = results.errors.length === 0;

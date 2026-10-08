@@ -177,7 +177,7 @@ export function CanvasFileTree() {
     if (path.endsWith('.ts') || path.endsWith('.tsx') || path.endsWith('.js') || path.endsWith('.jsx')) {
       return <FileCode size={13} className="text-yellow-400 shrink-0" />;
     }
-    if (path.endsWith('.svg')) return <FileCode size={13} className="text-emerald-400 shrink-0" />;
+    if (path.endsWith('.svg')) return <FileCode size={13} className="text-[var(--fg-success)] shrink-0" />;
     if (path.endsWith('.md') || path.endsWith('.markdown')) return <FileText size={13} className="text-indigo-400 shrink-0" />;
     return <FileText size={13} className="text-[var(--text-muted)] shrink-0" />;
   };
@@ -264,7 +264,7 @@ export function CanvasFileTree() {
                       onBlur={() => handleRenameSubmit(item.path)}
                       className="w-full bg-[var(--surface-card)] text-[var(--text-primary)] border border-[var(--border-accent)] rounded-shape-xs px-1.5 py-0.5 text-xs focus:outline-none"
                     />
-                    <button type="submit" className="text-emerald-500 hover:text-emerald-600">
+                    <button type="submit" className="text-[var(--fg-success)] hover:text-[var(--fg-success)]">
                       <Check size={12} />
                     </button>
                   </form>
@@ -276,7 +276,7 @@ export function CanvasFileTree() {
 
                 {isEntry && (
                   <span
-                    className="px-1 py-0.2 rounded-shape-xs bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[9px] font-bold shrink-0 flex items-center gap-0.5"
+                    className="px-1 py-0.2 rounded-shape-xs bg-[var(--status-success-subtle)] text-[var(--fg-success)] dark:text-[var(--fg-success)] text-[9px] font-bold shrink-0 flex items-center gap-0.5"
                     title={isAr ? 'ملف المعاينة الرئيسي' : 'Main Entry Point'}
                   >
                     <Star size={9} className="fill-current" />
@@ -338,7 +338,7 @@ export function CanvasFileTree() {
           <span className="text-xs font-bold text-[var(--text-primary)] truncate">
             {isAr ? 'ملفات المشروع' : 'Project Files'}
           </span>
-          <span className="text-[10px] font-mono px-1 py-0.2 rounded-shape-xs bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--text-muted)]">
+          <span className="text-xs font-mono tabular-nums px-1.5 py-0.5 rounded-shape-xs bg-[var(--surface-card)] border border-[var(--border-default)] text-[var(--text-muted)]">
             {fileCount}
           </span>
         </div>
@@ -347,7 +347,7 @@ export function CanvasFileTree() {
           <button
             type="button"
             onClick={() => setIsCreatingFile(true)}
-            className="w-6 h-6 rounded-shape-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)] transition-colors flex items-center justify-center cursor-pointer"
+            className="w-6 h-6 rounded-shape-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)] transition-colors flex items-center justify-center cursor-pointer relative before:absolute before:-inset-2.5 before:content-['']"
             title={isAr ? 'ملف جديد' : 'New File'}
           >
             <Plus size={14} />
@@ -356,7 +356,7 @@ export function CanvasFileTree() {
           <button
             type="button"
             onClick={() => setShowFileTree(false)}
-            className="w-6 h-6 rounded-shape-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)] transition-colors flex items-center justify-center cursor-pointer"
+            className="w-6 h-6 rounded-shape-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)] transition-colors flex items-center justify-center cursor-pointer relative before:absolute before:-inset-2.5 before:content-['']"
             title={isAr ? 'إخفاء الشجرة' : 'Collapse Tree'}
           >
             <PanelLeftClose size={13} className={isAr ? 'rotate-180' : ''} />

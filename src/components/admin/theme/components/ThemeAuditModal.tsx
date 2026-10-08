@@ -36,7 +36,7 @@ export const ThemeAuditModal: React.FC<ThemeAuditModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-[var(--border-default)]">
           <div className="flex items-center gap-2.5">
-            <ShieldCheck className="text-emerald-500" size={22} />
+            <ShieldCheck className="text-[var(--fg-success)]" size={22} />
             <div>
               <h3 className="font-bold text-base text-[var(--text-primary)]">
                 {isAr ? 'تقرير حوكمة نظام التصميم والامتثال (Design System Governance)' : 'Design System Governance & Token Audit'}
@@ -64,8 +64,8 @@ export const ThemeAuditModal: React.FC<ThemeAuditModalProps> = ({
                 {isAr ? 'مؤشر الصحة والتغطية' : 'System Health Score'}
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-2xl font-black text-emerald-500">100%</span>
-                <CheckCircle2 size={18} className="text-emerald-500" />
+                <span className="text-2xl font-black text-[var(--fg-success)]">100%</span>
+                <CheckCircle2 size={18} className="text-[var(--fg-success)]" />
               </div>
               <span className="text-[11px] text-[var(--text-muted)]">
                 {isAr ? 'كافة المتغيرات مسجلة وموجهة' : 'All CSS tokens resolved'}
@@ -126,10 +126,10 @@ export const ThemeAuditModal: React.FC<ThemeAuditModalProps> = ({
                           <div className="text-[10px] text-[var(--text-muted)]">{catKey}</div>
                         </td>
                         <td className="p-3 text-center font-mono font-bold">{count}</td>
-                        <td className="p-3 text-center text-emerald-500 font-bold">✓ Synced</td>
-                        <td className="p-3 text-center text-emerald-500 font-bold">✓ Synced</td>
+                        <td className="p-3 text-center text-[var(--fg-success)] font-bold">✓ Synced</td>
+                        <td className="p-3 text-center text-[var(--fg-success)] font-bold">✓ Synced</td>
                         <td className="p-3 text-end">
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--fg-success)] bg-[var(--status-success-subtle)] px-2 py-0.5 rounded-full">
                             <CheckCircle2 size={12} />
                             {isAr ? 'مكتمل' : 'Certified'}
                           </span>

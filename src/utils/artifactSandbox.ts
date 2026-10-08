@@ -461,7 +461,8 @@ export function buildArtifactSrcDoc(artifact: Artifact, options: BuildArtifactOp
               }
             } catch (err) {
               console.error(err);
-              document.getElementById('root').innerHTML = '<div style="padding: 24px; color: #e11d48; font-family: monospace;"><h3>Rendering Error:</h3><pre>' + err.message + '</pre></div>';
+              const safeErrMsg = String(err && err.message ? err.message : err).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+              document.getElementById('root').innerHTML = '<div style="padding: 24px; color: #e11d48; font-family: monospace;"><h3>Rendering Error:</h3><pre>' + safeErrMsg + '</pre></div>';
             }
           </script>
         </body>

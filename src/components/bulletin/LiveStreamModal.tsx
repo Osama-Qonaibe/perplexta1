@@ -97,14 +97,14 @@ export const LiveStreamModal: React.FC<LiveStreamModalProps> = ({
                 setCurrentFeedIndex(i => i - 1);
               }
             }}
-            className="relative w-full h-full sm:h-[85vh] sm:max-w-4xl sm:rounded-2xl overflow-hidden bg-black shadow-2xl flex flex-col touch-none border border-white/10"
+            className="relative w-full h-full sm:h-[85vh] sm:max-w-4xl sm:rounded-[var(--radius-lg)] overflow-hidden bg-black shadow-2xl flex flex-col touch-none border border-white/10"
           >
             {/* Header */}
             <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-6 pt-12 sm:px-8 sm:pt-8 bg-gradient-to-b from-black/95 via-black/40 to-transparent">
               <div className="flex items-center gap-3 overflow-hidden">
                 <button
                   onClick={onClose}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-600/10 hover:bg-red-600/20 backdrop-blur-md border border-red-500/20 text-white transition-theme group shadow-lg shrink-0 cursor-pointer"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-sm)] bg-[var(--status-danger-subtle)] hover:bg-[var(--status-danger)]/20 backdrop-blur-md border border-[var(--status-danger)]/20 text-white transition-theme group shadow-lg shrink-0 cursor-pointer"
                   title={isRtl ? 'خروج من البث' : 'Exit Stream'}
                 >
                   <ArrowRight size={16} className={isRtl ? '' : 'rotate-180'} />
@@ -139,13 +139,13 @@ export const LiveStreamModal: React.FC<LiveStreamModalProps> = ({
                     setIsMuted(nextMuted);
                     setGlobalMuteState(nextMuted);
                   }}
-                  className="w-9 h-9 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur-md flex items-center justify-center text-white transition-theme border border-white/10 shadow-xl cursor-pointer"
+                  className="w-9 h-9 rounded-[var(--radius-sm)] bg-black/60 hover:bg-black/80 backdrop-blur-md flex items-center justify-center text-white transition-theme border border-white/10 shadow-xl cursor-pointer"
                   title={isMuted ? (isRtl ? 'تفعيل الصوت' : 'Unmute') : (isRtl ? 'كتم الصوت' : 'Mute')}
                 >
                   {isMuted ? <VolumeX size={18} className="text-red-400" /> : <Volume2 size={18} className="text-accent" />}
                 </button>
 
-                <div className="hidden sm:flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 shadow-xl">
+                <div className="hidden sm:flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-[var(--radius-sm)] border border-white/10 shadow-xl">
                   <Wallet size={12} className="text-yellow-400" />
                   <span className="text-[11px] font-black text-white">{walletBalance}</span>
                 </div>
@@ -166,7 +166,7 @@ export const LiveStreamModal: React.FC<LiveStreamModalProps> = ({
                   {!streamRef.current && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-20">
                       <div className="text-center space-y-4">
-                        <div className="w-16 h-16 rounded-xl bg-gray-900 flex items-center justify-center mx-auto border-2 border-dashed border-gray-700 animate-spin-slow">
+                        <div className="w-16 h-16 rounded-[var(--radius-md)] bg-gray-900 flex items-center justify-center mx-auto border-2 border-dashed border-[var(--border-default)] animate-spin-slow">
                           <Camera size={24} className="text-gray-600" />
                         </div>
                         <p className="text-[10px] font-black text-gray-500 tracking-widest uppercase">
@@ -231,7 +231,7 @@ export const LiveStreamModal: React.FC<LiveStreamModalProps> = ({
                         key={`live-comment-${comment.id || idx}-${idx}`}
                         initial={{ opacity: 0, x: -30 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="bg-black/60 backdrop-blur-md rounded-lg p-2.5 inline-block max-w-fit border border-white/10 shadow-2xl"
+                        className="bg-black/60 backdrop-blur-md rounded-[var(--radius-sm)] p-2.5 inline-block max-w-fit border border-white/10 shadow-2xl"
                       >
                         <div className="flex items-center gap-2">
                           <div className="w-4 h-4 rounded-full bg-accent/20 flex items-center justify-center border border-accent/30">
@@ -252,7 +252,7 @@ export const LiveStreamModal: React.FC<LiveStreamModalProps> = ({
                         value={newLiveComment}
                         onChange={e => setNewLiveComment(e.target.value)}
                         placeholder={isRtl ? 'قل شيئاً جميلاً...' : 'Say something nice...'}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-xs text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-accent backdrop-blur-xl transition-theme group-hover:bg-black/60 shadow-inner"
+                        className="w-full bg-black/40 border border-white/10 rounded-[var(--radius-md)] pl-4 pr-10 py-3 text-xs text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-accent backdrop-blur-xl transition-theme group-hover:bg-black/60 shadow-inner"
                       />
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30">
                         <MessageCircle size={16} />
@@ -261,7 +261,7 @@ export const LiveStreamModal: React.FC<LiveStreamModalProps> = ({
                     <button
                       type="submit"
                       disabled={!newLiveComment.trim()}
-                      className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center text-white hover:opacity-90 disabled:opacity-20 disabled:bg-gray-800 transition-theme shrink-0 shadow-lg cursor-pointer"
+                      className="w-10 h-10 rounded-[var(--radius-md)] bg-accent flex items-center justify-center text-white hover:opacity-90 disabled:opacity-20 disabled:bg-[var(--surface-subtle)] transition-theme shrink-0 shadow-lg cursor-pointer"
                     >
                       <Send size={16} className={isRtl ? 'rotate-180 -ml-0.5' : 'ml-0.5'} />
                     </button>
@@ -271,31 +271,31 @@ export const LiveStreamModal: React.FC<LiveStreamModalProps> = ({
                 {/* Right Side: Interaction Buttons */}
                 <div className="flex flex-col items-center gap-4 mb-1 pr-1">
                   <button onClick={() => setIsGiftModalOpen(true)} className="group flex flex-col items-center gap-1 transition-theme cursor-pointer">
-                    <div className="w-10 h-10 rounded-xl bg-yellow-400/10 backdrop-blur-md border border-yellow-400/30 flex items-center justify-center text-yellow-400 group-hover:bg-yellow-400 group-hover:text-black transition-theme shadow-xl">
+                    <div className="w-10 h-10 rounded-[var(--radius-md)] bg-yellow-400/10 backdrop-blur-md border border-yellow-400/30 flex items-center justify-center text-yellow-400 group-hover:bg-yellow-400 group-hover:text-black transition-theme shadow-xl">
                       <Gift size={20} />
                     </div>
                     <span className="text-[9px] text-white font-black uppercase tracking-widest drop-shadow-2xl">{isRtl ? 'هدايا' : 'Gifts'}</span>
                   </button>
 
                   <button onClick={handleLiveLike} className="group flex flex-col items-center gap-1 transition-theme cursor-pointer">
-                    <div className="w-10 h-10 rounded-xl bg-red-500/10 backdrop-blur-md border border-red-500/30 flex items-center justify-center text-white group-hover:bg-red-500 transition-theme shadow-xl">
+                    <div className="w-10 h-10 rounded-[var(--radius-md)] bg-red-500/10 backdrop-blur-md border border-red-500/30 flex items-center justify-center text-white group-hover:bg-red-500 transition-theme shadow-xl">
                       <Heart size={20} className={liveLikes > 0 ? 'fill-current text-red-500 group-hover:text-white' : ''} />
                     </div>
                     <span className="text-[9px] text-white font-black drop-shadow-2xl">{liveLikes > 1000 ? (liveLikes / 1000).toFixed(1) + 'K' : liveLikes}</span>
                   </button>
 
                   <button className="group flex flex-col items-center gap-1 transition-theme cursor-pointer">
-                    <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-accent hover:text-white transition-theme shadow-xl group-hover:border-accent/50">
+                    <div className="w-10 h-10 rounded-[var(--radius-md)] bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-accent hover:text-white transition-theme shadow-xl group-hover:border-accent/50">
                       <Share2 size={20} />
                     </div>
                     <span className="text-[9px] text-white font-black uppercase tracking-widest drop-shadow-2xl">{isRtl ? 'مشاركة' : 'Share'}</span>
                   </button>
 
-                  <div className="w-9 h-9 rounded-xl border-2 border-accent p-0.5 animate-pulse shadow-[0_0_15px_rgba(156,163,175,0.5)] bg-black/20 overflow-hidden">
+                  <div className="w-9 h-9 rounded-[var(--radius-md)] border-2 border-accent p-0.5 animate-pulse shadow-[0_0_15px_rgba(156,163,175,0.5)] bg-black/20 overflow-hidden">
                     <img
                       src={user?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80'}
                       alt="host"
-                      className="w-full h-full rounded-lg object-cover"
+                      className="w-full h-full rounded-[var(--radius-sm)] object-cover"
                     />
                   </div>
                 </div>

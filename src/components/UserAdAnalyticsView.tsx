@@ -75,7 +75,7 @@ export const UserAdAnalyticsView: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-12 text-center text-xs text-gray-400 flex flex-col items-center justify-center gap-3 bg-[var(--surface-card)] border border-[var(--border-default)] rounded-[var(--radius-lg)] min-h-[400px]">
+      <div className="p-12 text-center text-xs text-[var(--text-muted)] flex flex-col items-center justify-center gap-3 bg-[var(--surface-card)] border border-[var(--border-default)] rounded-[var(--radius-lg)] min-h-[400px]">
         <RefreshCw size={28} className="animate-spin text-accent" />
         <span className="font-bold text-sm text-[var(--text-primary)]">
           {isRtl ? 'جاري تحليل نتائج الحملات والإعلانات الخاصة بك...' : 'Analyzing your ad campaigns & audience data...'}
@@ -86,8 +86,8 @@ export const UserAdAnalyticsView: React.FC = () => {
 
   if (!data || !data.summary) {
     return (
-      <div className="p-12 text-center text-xs text-gray-400 flex flex-col items-center justify-center gap-3 bg-[var(--surface-card)] border border-[var(--border-default)] rounded-[var(--radius-lg)] min-h-[300px]">
-        <BarChart2 size={36} className="text-gray-500 opacity-50" />
+      <div className="p-12 text-center text-xs text-[var(--text-muted)] flex flex-col items-center justify-center gap-3 bg-[var(--surface-card)] border border-[var(--border-default)] rounded-[var(--radius-lg)] min-h-[300px]">
+        <BarChart2 size={36} className="text-[var(--text-muted)] opacity-50" />
         <span className="font-bold text-sm text-[var(--text-primary)]">
           {isRtl ? 'لا توجد بيانات إحصائية متاحة حالياً' : 'No ad analytics data available yet.'}
         </span>
@@ -129,18 +129,18 @@ export const UserAdAnalyticsView: React.FC = () => {
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-[var(--surface-card)] border border-[var(--border-default)] p-3.5 rounded-[var(--radius-md)] flex flex-col justify-between">
-          <div className="flex items-center justify-between text-blue-500">
+          <div className="flex items-center justify-between text-[var(--fg-accent)]">
             <span className="text-[10px] font-bold text-[var(--text-muted)]">{isRtl ? 'المشاهدات' : 'Impressions'}</span>
             <Eye size={15} />
           </div>
           <div className="mt-2">
             <div className="text-lg font-bold text-[var(--text-primary)]">{summary.totalImpressions.toLocaleString()}</div>
-            <div className="text-[10px] text-blue-500 font-bold mt-0.5">{summary.activeAds} {isRtl ? 'إعلانات نشطة' : 'Active ads'}</div>
+            <div className="text-[10px] text-[var(--fg-accent)] font-bold mt-0.5">{summary.activeAds} {isRtl ? 'إعلانات نشطة' : 'Active ads'}</div>
           </div>
         </div>
 
         <div className="bg-[var(--surface-card)] border border-[var(--border-default)] p-3.5 rounded-[var(--radius-md)] flex flex-col justify-between">
-          <div className="flex items-center justify-between text-purple-500">
+          <div className="flex items-center justify-between text-accent">
             <span className="text-[10px] font-bold text-[var(--text-muted)]">{isRtl ? 'النقرات' : 'Clicks'}</span>
             <MousePointerClick size={15} />
           </div>
@@ -263,7 +263,7 @@ export const UserAdAnalyticsView: React.FC = () => {
         <div className="bg-[var(--surface-card)] border border-[var(--border-default)] rounded-[var(--radius-lg)] p-5 space-y-4">
           <div className="pb-3 border-b border-[var(--border-default)]">
             <h3 className="font-extrabold text-sm text-[var(--text-primary)] flex items-center gap-2">
-              <MapPin size={18} className="text-blue-500" />
+              <MapPin size={18} className="text-[var(--fg-accent)]" />
               <span>{isRtl ? 'التوزيع الجغرافي للجمهور' : 'Geographic Audience Reach'}</span>
             </h3>
             <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
@@ -334,7 +334,7 @@ export const UserAdAnalyticsView: React.FC = () => {
           <div className="pb-3 border-b border-[var(--border-default)]">
             <h3 className="font-extrabold text-sm text-[var(--text-primary)] flex items-center gap-2">
               <PieIcon size={18} className="text-pink-500" />
-              <span>{isRtl ? 'توزيع الجنس (ذكور / إناث)' : 'Gender Breakdown'}</span>
+              <span>{isRtl ? 'توزيع الجمهور حسب الجنس' : 'Gender Breakdown'}</span>
             </h3>
             <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
               {isRtl ? 'نسبة المتابعين والمهتمين حسب الجنس.' : 'Audience breakdown by gender.'}
@@ -503,11 +503,11 @@ export const UserAdAnalyticsView: React.FC = () => {
                       <div className="text-[10px] text-[var(--fg-accent)] font-medium">{ad.location_city || 'فلسطين'}</div>
                     </td>
 
-                    <td className="p-3 text-center font-bold text-blue-500 font-mono">
+                    <td className="p-3 text-center font-bold text-[var(--fg-accent)] font-mono">
                       {(ad.impressions_count || 0).toLocaleString()}
                     </td>
 
-                    <td className="p-3 text-center font-bold text-purple-500 font-mono">
+                    <td className="p-3 text-center font-bold text-accent font-mono">
                       {(ad.clicks_count || 0).toLocaleString()}
                     </td>
 

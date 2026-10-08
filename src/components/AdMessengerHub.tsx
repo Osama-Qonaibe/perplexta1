@@ -483,7 +483,7 @@ export const AdMessengerHub: React.FC<AdMessengerHubProps> = ({ inquiries, onRef
             </div>
 
             {/* Quick Prompts Bar */}
-            <div className="px-3 py-2 bg-[var(--surface-card)] border-t border-[var(--border-default)] overflow-x-auto no-scrollbar flex items-center gap-1 shrink-0">
+            <div className="px-3 py-2 bg-[var(--surface-card)] border-t border-[var(--border-default)] overflow-x-auto custom-scrollbar flex items-center gap-1 shrink-0">
               {quickPrompts.map((q, idx) => (
                 <button
                   key={`messenger-quick-prompt-${idx}-${q}`}

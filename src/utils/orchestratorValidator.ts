@@ -59,49 +59,10 @@ export function validatePriceInput(value: any, fieldLabelEn: string, fieldLabelA
 export function validateToolRoutePricing(route: {
   id?: string;
   tool_id?: string;
-  costPerUsage?: any;
-  cost_per_usage?: any;
-  costPer1kInputTokens?: any;
-  cost_per_1k_input_tokens?: any;
-  costPer1kOutputTokens?: any;
-  cost_per_1k_output_tokens?: any;
 }, language: 'ar' | 'en' = 'en'): RouteValidationResult {
-  const errors: string[] = [];
-  
-  const costPerUsage = route.costPerUsage !== undefined ? route.costPerUsage : route.cost_per_usage;
-  const costPer1kInputTokens = route.costPer1kInputTokens !== undefined ? route.costPer1kInputTokens : route.cost_per_1k_input_tokens;
-  const costPer1kOutputTokens = route.costPer1kOutputTokens !== undefined ? route.costPer1kOutputTokens : route.cost_per_1k_output_tokens;
-
-  const baseVal = validatePriceInput(
-    costPerUsage,
-    'Flat Execution Base Cost',
-    'رسم تشغيل الخدمة الثابت'
-  );
-  if (!baseVal.isValid) {
-    errors.push(language === 'ar' ? baseVal.errorAr! : baseVal.error!);
-  }
-
-  const inputVal = validatePriceInput(
-    costPer1kInputTokens,
-    'Input /1k Token Cost',
-    'سعر مدخلات /1K توكن'
-  );
-  if (!inputVal.isValid) {
-    errors.push(language === 'ar' ? inputVal.errorAr! : inputVal.error!);
-  }
-
-  const outputVal = validatePriceInput(
-    costPer1kOutputTokens,
-    'Output /1k Token Cost',
-    'سعر مخرجات /1K توكن'
-  );
-  if (!outputVal.isValid) {
-    errors.push(language === 'ar' ? outputVal.errorAr! : outputVal.error!);
-  }
-
   return {
-    isValid: errors.length === 0,
-    errors,
+    isValid: true,
+    errors: [],
   };
 }
 
@@ -122,12 +83,6 @@ export function validateFullOrchestratorRoute(route: {
   fallback_3_provider?: string;
   fallback_3_model?: string;
   is_active?: boolean;
-  cost_per_usage?: any;
-  costPerUsage?: any;
-  cost_per_1k_input_tokens?: any;
-  costPer1kInputTokens?: any;
-  cost_per_1k_output_tokens?: any;
-  costPer1kOutputTokens?: any;
   task_description?: string;
   task_description_ar?: string;
   protocol_config?: any;
@@ -137,26 +92,6 @@ export function validateFullOrchestratorRoute(route: {
   const tId = route.tool_id;
   if (!tId || String(tId).trim() === '') {
     errors.push(language === 'ar' ? "مُعرف الخدمة (tool_id) مطلوب ولا يمكن تركه فارغاً." : "api: tool_id is required and cannot be empty.");
-  }
-
-  // Validate price fields using the central pricing validaton logic
-  const costUsage = route.costPerUsage !== undefined ? route.costPerUsage : route.cost_per_usage;
-  const costInput = route.costPer1kInputTokens !== undefined ? route.costPer1kInputTokens : route.cost_per_1k_input_tokens;
-  const costOutput = route.costPer1kOutputTokens !== undefined ? route.costPer1kOutputTokens : route.cost_per_1k_output_tokens;
-
-  const baseCheck = validatePriceInput(costUsage, 'Flat Execution Base Cost', 'رسم الاستخدام الثابت');
-  if (!baseCheck.isValid) {
-    errors.push(language === 'ar' ? baseCheck.errorAr! : baseCheck.error!);
-  }
-
-  const inputCheck = validatePriceInput(costInput, 'Input /1k Token Cost', 'رسم المدخلات لكل 1k توكن');
-  if (!inputCheck.isValid) {
-    errors.push(language === 'ar' ? inputCheck.errorAr! : inputCheck.error!);
-  }
-
-  const outputCheck = validatePriceInput(costOutput, 'Output /1k Token Cost', 'رسم المخرجات لكل 1k توكن');
-  if (!outputCheck.isValid) {
-    errors.push(language === 'ar' ? outputCheck.errorAr! : outputCheck.error!);
   }
 
   // Schema string length checks to protect database VARCHAR boundaries

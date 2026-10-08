@@ -57,12 +57,10 @@ export const UserMessageBubble: React.FC<UserMessageBubbleProps> = ({
   const isArtifactOpen = Boolean(artifactContext?.isArtifactOpen);
 
   return (
-    <div className={`flex flex-col gap-1.5 w-full my-1 ${dir === 'rtl' ? 'items-start' : 'items-end'}`}>
+    <div className={`flex flex-col gap-1.5 w-full my-1 items-end`}>
       {msg.file && (
         <div
-          className={`mb-1 p-2 rounded-shape-md border flex items-center gap-3 w-fit ${
-            dir === 'rtl' ? 'self-start' : 'self-end'
-          } bg-[var(--surface-subtle)] border-[var(--border-default)]`}
+          className="mb-1 p-2 rounded-shape-md border flex items-center gap-3 w-fit self-end bg-[var(--surface-subtle)] border-[var(--border-default)]"
         >
           {msg.file.type.startsWith('image/') ? (
             <img
@@ -72,7 +70,7 @@ export const UserMessageBubble: React.FC<UserMessageBubbleProps> = ({
               referrerPolicy="no-referrer"
             />
           ) : (
-            <div className="w-9 h-9 rounded-shape-sm bg-[var(--sys-color-primary)]/10 flex items-center justify-center text-[var(--sys-color-primary)]">
+            <div className="w-9 h-9 rounded-shape-sm bg-accent/10 flex items-center justify-center text-accent">
               {getFileIcon(msg.file.type)}
             </div>
           )}
@@ -125,17 +123,17 @@ export const UserMessageBubble: React.FC<UserMessageBubbleProps> = ({
       ) : (
         <div className={`group relative flex items-center gap-2 sm:gap-2.5 ${
           isArtifactOpen ? 'max-w-full' : 'max-w-[92%] sm:max-w-[85%] md:max-w-[78%]'
-        } ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+        } flex-row-reverse`}>
           {/* Action Toolbar (Conforming strictly to Perplexta M3 Button Tokens & 44px Touch Targets) */}
-          <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-150 shrink-0 select-none">
+          <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-fast shrink-0 select-none">
             {/* Pin Message Button */}
             <button
               type="button"
               onClick={() => handlePinMessage(msg.id!, !msg.is_pinned)}
-              className={`w-8 h-8 rounded-shape-sm flex items-center justify-center border border-transparent bg-transparent transition-all duration-150 cursor-pointer relative before:absolute before:-inset-1.5 before:content-[''] active:scale-95 shrink-0 box-border ${
+              className={`w-8 h-8 rounded-shape-sm flex items-center justify-center border transition-colors duration-fast cursor-pointer relative before:absolute before:-inset-1.5 before:content-[''] active:scale-95 shrink-0 box-border ${
                 msg.is_pinned 
-                  ? 'bg-[var(--bg-accent-muted)] border-[var(--border-accent)]/40 text-[var(--fg-accent)]' 
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]/60'
+                  ? 'bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--fg-accent)] shadow-2xs' 
+                  : 'border-transparent hover:border-[var(--border-accent)]/60 bg-transparent hover:bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
               }`}
               title={msg.is_pinned ? (dir === 'rtl' ? 'إلغاء التثبيت' : 'Unpin') : (dir === 'rtl' ? 'تثبيت' : 'Pin')}
             >
@@ -146,15 +144,15 @@ export const UserMessageBubble: React.FC<UserMessageBubbleProps> = ({
             <button
               type="button"
               onClick={() => handleCopyPrompt(msg.content, idx)}
-              className={`w-8 h-8 rounded-shape-sm flex items-center justify-center border border-transparent bg-transparent transition-all duration-150 cursor-pointer relative before:absolute before:-inset-1.5 before:content-[''] active:scale-95 shrink-0 box-border ${
+              className={`w-8 h-8 rounded-shape-sm flex items-center justify-center border transition-colors duration-fast cursor-pointer relative before:absolute before:-inset-1.5 before:content-[''] active:scale-95 shrink-0 box-border ${
                 copiedPromptIndex === idx
-                  ? 'border-emerald-500/40 text-emerald-500 bg-emerald-500/10'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]/60'
+                  ? 'border-[var(--fg-success)]/40 text-[var(--fg-success)] bg-[var(--status-success-subtle)] shadow-2xs'
+                  : 'border-transparent hover:border-[var(--border-accent)]/60 bg-transparent hover:bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
               }`}
               title={dir === 'rtl' ? 'نسخ' : 'Copy'}
             >
               {copiedPromptIndex === idx ? (
-                <Check size={14} className="text-emerald-500" />
+                <Check size={14} className="text-[var(--fg-success)]" />
               ) : (
                 <Copy size={14} />
               )}
@@ -167,7 +165,7 @@ export const UserMessageBubble: React.FC<UserMessageBubbleProps> = ({
                 setEditingMessageIndex(idx);
                 setEditValue(msg.content);
               }}
-              className="w-8 h-8 rounded-shape-sm flex items-center justify-center border border-transparent bg-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]/60 transition-all duration-150 cursor-pointer relative before:absolute before:-inset-1.5 before:content-[''] active:scale-95 shrink-0 box-border"
+              className="w-8 h-8 rounded-shape-sm flex items-center justify-center border border-transparent hover:border-[var(--border-accent)]/60 bg-transparent hover:bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors duration-fast cursor-pointer relative before:absolute before:-inset-1.5 before:content-[''] active:scale-95 shrink-0 box-border"
               title={dir === 'rtl' ? 'تعديل' : 'Edit'}
             >
               <Pencil size={14} />
@@ -176,9 +174,7 @@ export const UserMessageBubble: React.FC<UserMessageBubbleProps> = ({
 
           {/* Clean Compact User Message Bubble */}
           <div 
-            className={`px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl rounded-tr-[2px] border border-[var(--border-default)] bg-[var(--surface-subtle)] dark:bg-slate-900/90 dark:border-slate-800/80 text-[var(--text-primary)] dark:text-slate-100 shadow-2xs transition-all duration-150 min-w-0 ${
-              dir === 'rtl' ? 'text-right' : 'text-left'
-            }`}
+            className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-[var(--radius-md)] rounded-se-[2px] border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)] shadow-2xs transition-all duration-fast min-w-0 text-start"
           >
             <p
               className="text-[13.5px] sm:text-[14.5px] font-medium leading-relaxed tracking-normal font-sans break-words whitespace-pre-wrap"

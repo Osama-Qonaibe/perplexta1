@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { existsSync, mkdirSync, readFileSync } from 'fs';
 import crypto from 'crypto';
-import { pool } from '../db/index.js';
+import { pool, mediaPool } from '../db/index.js';
 import { getCachedSystemSettings, invalidateSystemSettingsCache } from '../db/queries.js';
 
 export interface IconVariantSpec {
@@ -263,23 +263,33 @@ export async function resolveSourceImageBuffer(
       }
     } else {
       // Disk path or relative URL
-      const cleanPath = trimmed.replace(/^\//, '');
-      const candidatePaths = [
-        path.join(process.cwd(), cleanPath),
-        path.join(process.cwd(), 'uploads', path.basename(cleanPath)),
-        path.join(process.cwd(), 'uploads', 'brand', path.basename(cleanPath))
-      ];
+      if (!trimmed.includes('..') && !trimmed.includes('\0')) {
+        const cleanPath = trimmed.replace(/^\//, '');
+        const filename = path.basename(cleanPath);
+        const uploadsDir = path.resolve(process.cwd(), 'uploads');
+        const brandUploadsDir = path.resolve(process.cwd(), 'uploads', 'brand');
+        const publicDir = path.resolve(process.cwd(), 'public');
 
-      for (const p of candidatePaths) {
-        if (existsSync(p)) {
-          try {
-            rawBuffer = await fs.readFile(p);
-            const ext = path.extname(p).replace('.', '').toLowerCase();
-            detectedFormat = ext === 'svg' ? 'svg' : (ext || 'png');
-            resolvedSource = 'logo_url';
-            break;
-          } catch {
-            // continue
+        const candidatePaths = [
+          path.resolve(brandUploadsDir, filename),
+          path.resolve(uploadsDir, filename),
+          path.resolve(publicDir, filename)
+        ];
+
+        for (const p of candidatePaths) {
+          if (
+            (p.startsWith(uploadsDir + path.sep) || p.startsWith(publicDir + path.sep)) &&
+            existsSync(p)
+          ) {
+            try {
+              rawBuffer = await fs.readFile(p);
+              const ext = path.extname(p).replace('.', '').toLowerCase();
+              detectedFormat = ext === 'svg' ? 'svg' : (ext || 'png');
+              resolvedSource = 'logo_url';
+              break;
+            } catch {
+              // continue
+            }
           }
         }
       }
@@ -419,7 +429,7 @@ export async function generateAppIconsFromSource(
           width,
           height,
           channels: 4,
-          background: { r: 24, g: 23, b: 21, alpha: 1 } // #181715 perplexta dark surface
+          background: { r: 0, g: 0, b: 0, alpha: 0 } // Fully transparent background matching brand visual identity
         }
       }).png().toBuffer();
 
@@ -511,22 +521,29 @@ export async function generateAppIconsFromSource(
   }
 
   // 3. Register in media_assets database table if available
-  if (options.registerInMediaAssets !== false && pool) {
+  if (options.registerInMediaAssets !== false && (mediaPool || pool)) {
     try {
+      const targetPool = mediaPool || pool;
       for (const asset of results) {
         const storedPath = `uploads/brand/${asset.filename}`;
-        await pool.query(`
+        const assetBuf = assetMemoryCache.get(asset.filename)?.buffer || null;
+        const shaHash = assetBuf ? crypto.createHash('sha256').update(assetBuf).digest('hex') : crypto.createHash('sha256').update(asset.filename).digest('hex');
+
+        const sysAssetUuid = crypto.randomUUID();
+        await targetPool.query(`
           INSERT INTO media_assets (
-            stored_path, original_filename, context, format, width, height, size_bytes, sha256_hash, is_public, metadata
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, $9)
+            id, stored_path, original_filename, context, format, width, height, size_bytes, sha256_hash, is_public, metadata, file_data
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11)
           ON CONFLICT (stored_path) DO UPDATE SET
             format = EXCLUDED.format,
             width = EXCLUDED.width,
             height = EXCLUDED.height,
             size_bytes = EXCLUDED.size_bytes,
             sha256_hash = EXCLUDED.sha256_hash,
+            file_data = COALESCE(EXCLUDED.file_data, media_assets.file_data),
             updated_at = CURRENT_TIMESTAMP
         `, [
+          sysAssetUuid,
           storedPath,
           asset.filename,
           'pwa_asset',
@@ -534,8 +551,9 @@ export async function generateAppIconsFromSource(
           asset.width,
           asset.height,
           asset.sizeBytes,
-          crypto.createHash('sha256').update(asset.filename).digest('hex'),
-          JSON.stringify({ purpose: asset.purpose, category: asset.category, description: asset.description })
+          shaHash,
+          JSON.stringify({ purpose: asset.purpose, category: asset.category, description: asset.description }),
+          assetBuf
         ]).catch(() => {});
       }
     } catch (dbErr: any) {
@@ -579,8 +597,9 @@ export function getSystemAssetBuffer(filename: string): {
   }
 
   // 2. Check uploads/brand/ directory
-  const brandPath = path.join(process.cwd(), 'uploads', 'brand', cleanName);
-  if (existsSync(brandPath)) {
+  const brandDir = path.resolve(process.cwd(), 'uploads', 'brand');
+  const brandPath = path.resolve(brandDir, cleanName);
+  if (brandPath.startsWith(brandDir + path.sep) && existsSync(brandPath)) {
     try {
       const buffer = readFileSync(brandPath);
       const ext = path.extname(cleanName).toLowerCase();

@@ -96,7 +96,13 @@ export const AuthCard: React.FC<AuthCardProps> = ({
         }
         const result = await signup(email, password, email.split('@')[0], ref);
         if (!result.success) {
-          setError(result.error || 'Signup failed');
+          let errorMsg = result.error || 'Signup failed';
+          if (errorMsg === 'User already exists' || errorMsg.includes('already exists')) {
+            errorMsg = dir === 'rtl' 
+              ? 'البريد الإلكتروني مسجل بالفعل. يرجى تسجيل الدخول أو استعادة كلمة المرور.' 
+              : 'This email is already registered. Please log in or reset your password.';
+          }
+          setError(errorMsg);
         } else {
           if (onSuccess) onSuccess();
           else navigate('/chat');
@@ -104,7 +110,13 @@ export const AuthCard: React.FC<AuthCardProps> = ({
       } else {
         const result = await login(email, password);
         if (!result.success) {
-          setError(result.error || 'Login failed');
+          let errorMsg = result.error || 'Login failed';
+          if (errorMsg === 'Invalid credentials' || errorMsg.includes('credentials') || errorMsg.toLowerCase().includes('invalid email or password')) {
+            errorMsg = dir === 'rtl' 
+              ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة.' 
+              : 'Invalid email or password.';
+          }
+          setError(errorMsg);
         } else {
           if (onSuccess) onSuccess();
           else navigate('/chat');
@@ -139,7 +151,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-3.5 end-3.5 text-[var(--pub-text-muted)] hover:text-[var(--pub-text-primary)] hover:bg-[var(--pub-surface-subtle)] transition-theme p-1.5 rounded-shape-xs z-20 cursor-pointer"
+          className="absolute top-3.5 end-3.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] transition-theme p-1.5 rounded-shape-xs z-20 cursor-pointer"
           aria-label="Close"
         >
           <X size={16} />
@@ -181,7 +193,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
           <div className="relative group">
-            <div className="absolute inset-y-0 start-3 flex items-center pointer-events-none text-[var(--pub-text-muted)] group-focus-within:text-[var(--pub-accent-primary)] transition-colors">
+            <div className="absolute inset-y-0 start-3 flex items-center pointer-events-none text-[var(--text-muted)] group-focus-within:text-[var(--accent)] transition-colors">
               <Mail size={14} />
             </div>
             <input
@@ -199,7 +211,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({
         {mode !== 'forgot-password' && (
           <div>
             <div className="relative group">
-              <div className="absolute inset-y-0 start-3 flex items-center pointer-events-none text-[var(--pub-text-muted)] group-focus-within:text-[var(--pub-accent-primary)] transition-colors">
+              <div className="absolute inset-y-0 start-3 flex items-center pointer-events-none text-[var(--text-muted)] group-focus-within:text-[var(--accent)] transition-colors">
                 <Lock size={14} />
               </div>
               <input
@@ -227,12 +239,12 @@ export const AuthCard: React.FC<AuthCardProps> = ({
                       }}
                     />
                     <div className={themeConfig.auth.checkboxBox}>
-                      <svg className="w-2.5 h-2.5 text-[var(--pub-surface-canvas)] opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                      <svg className="w-2.5 h-2.5 text-[var(--surface-page)] opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     </div>
                   </div>
-                  <span className="text-xs font-medium text-[var(--pub-text-secondary)] group-hover:text-[var(--pub-text-primary)] transition-colors">
+                  <span className="text-xs font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">
                     {t('remember_me')}
                   </span>
                 </label>
@@ -240,7 +252,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({
                 <button
                   type="button"
                   onClick={() => setMode('forgot-password')}
-                  className="text-xs font-bold text-[var(--pub-text-secondary)] hover:text-[var(--pub-accent-primary)] transition-colors cursor-pointer"
+                  className="text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors cursor-pointer"
                 >
                   {t('forgotPassword')}
                 </button>
@@ -252,7 +264,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({
         {mode === 'signup' && (
           <div>
             <div className="relative group">
-              <div className="absolute inset-y-0 start-3 flex items-center pointer-events-none text-[var(--pub-text-muted)] group-focus-within:text-[var(--pub-accent-primary)] transition-colors">
+              <div className="absolute inset-y-0 start-3 flex items-center pointer-events-none text-[var(--text-muted)] group-focus-within:text-[var(--accent)] transition-colors">
                 <Lock size={14} />
               </div>
               <input
@@ -285,18 +297,18 @@ export const AuthCard: React.FC<AuthCardProps> = ({
                     }}
                   />
                   <div className={themeConfig.auth.checkboxBox}>
-                    <svg className="w-2.5 h-2.5 text-[var(--pub-surface-canvas)] opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                    <svg className="w-2.5 h-2.5 text-[var(--surface-page)] opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
                 </div>
               </label>
-              <div className="text-xs leading-normal text-[var(--pub-text-secondary)]">
+              <div className="text-xs leading-normal text-[var(--text-secondary)]">
                 <span>{dir === 'rtl' ? 'أوافق على ' : 'I agree to the '}</span>
                 <button
                   type="button"
                   onClick={() => handleNavigateLegal('/terms')}
-                  className="text-[var(--pub-accent-primary)] hover:underline font-bold transition-colors cursor-pointer"
+                  className="text-[var(--accent)] hover:underline font-bold transition-colors cursor-pointer"
                 >
                   {t('termsOfUse')}
                 </button>
@@ -304,7 +316,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({
                 <button
                   type="button"
                   onClick={() => handleNavigateLegal('/privacy')}
-                  className="text-[var(--pub-accent-primary)] hover:underline font-bold transition-colors cursor-pointer"
+                  className="text-[var(--accent)] hover:underline font-bold transition-colors cursor-pointer"
                 >
                   {t('privacyPolicy')}
                 </button>
@@ -356,7 +368,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({
       </form>
 
       <div className="mt-4 text-center">
-        <p className="text-xs text-[var(--pub-text-secondary)]">
+        <p className="text-xs text-[var(--text-secondary)]">
           {mode === 'login' ? t('noAccount') : mode === 'signup' ? t('haveAccount') : t('rememberedPassword')}
           <button
             type="button"
@@ -365,7 +377,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({
               else setMode(mode === 'login' ? 'signup' : 'login');
               setError(null);
             }}
-            className="mx-1 text-[var(--pub-accent-primary)] hover:underline font-bold transition-colors cursor-pointer"
+            className="mx-1 text-[var(--accent)] hover:underline font-bold transition-colors cursor-pointer"
           >
             {mode === 'login' ? t('signup') : mode === 'signup' ? t('login') : t('login')}
           </button>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Store, User, CheckCircle2 } from 'lucide-react';
 import { getMediaUrl } from '../utils/mediaUtils';
 
@@ -77,6 +77,10 @@ export const BulletinAvatar: React.FC<BulletinAvatarProps> = ({
   const resolvedUrl = src ? getMediaUrl(src) : null;
   const isClickable = Boolean(onClick);
 
+  useEffect(() => {
+    setHasError(false);
+  }, [resolvedUrl]);
+
   const displayInitial = fallbackText
     ? fallbackText.charAt(0).toUpperCase()
     : alt
@@ -90,12 +94,13 @@ export const BulletinAvatar: React.FC<BulletinAvatarProps> = ({
       className={`relative shrink-0 select-none ${isClickable ? 'cursor-pointer' : ''}`}
     >
       <div
-        className={`relative aspect-square object-cover border-accent/40 shadow-sm shrink-0 bg-white dark:bg-gray-800 overflow-hidden flex items-center justify-center transition-theme ${
+        className={`relative aspect-square object-cover border-accent/40 shadow-sm shrink-0 bg-[var(--surface-subtle)] overflow-hidden flex items-center justify-center transition-theme ${
           config.container
-        } ${isClickable ? 'hover:opacity-90 hover:scale-105' : ''} ${className}`}
+        } ${isClickable ? 'hover:opacity-90 active:scale-95' : ''} ${className}`}
       >
         {resolvedUrl && !hasError ? (
           <img
+            key={resolvedUrl}
             src={resolvedUrl}
             alt={alt}
             onError={() => setHasError(true)}

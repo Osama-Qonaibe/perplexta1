@@ -51,6 +51,7 @@ export const TABLE_POOL_REGISTRY: Record<string, DatabasePoolKey> = {
   // Core DB Tables
   users: 'core',
   user_sessions: 'core',
+  admin_theme_customizations: 'core',
   chats: 'core',
   messages: 'core',
   api_keys_vault: 'core',
@@ -84,11 +85,23 @@ export const TABLE_POOL_REGISTRY: Record<string, DatabasePoolKey> = {
   bulletin_page_inquiries: 'core',
   bulletin_ad_likes: 'core',
   bulletin_ad_comments: 'core',
+  bulletin_comment_likes: 'core',
+  bulletin_ad_muted_notifications: 'core',
   bulletin_ad_messages: 'core',
+  bulletin_hashtags: 'core',
   route_seo_settings: 'core',
   route_seo_metadata: 'core',
   seo_metadata: 'core',
   asset_metadata: 'core',
+  og_preview_cache: 'core',
+  platform_categories: 'core',
+  push_tokens: 'core',
+  forms: 'core',
+  form_submissions: 'core',
+  map_providers: 'core',
+  cached_locations: 'core',
+  studio_workspaces: 'core',
+  studio_snapshots: 'core',
   user_recommendation_interactions: 'core',
   user_recommendation_preferences: 'core',
   user_media_preferences: 'core',
@@ -96,7 +109,6 @@ export const TABLE_POOL_REGISTRY: Record<string, DatabasePoolKey> = {
   support_tickets: 'core',
   support_ticket_replies: 'core',
   password_resets: 'core',
-  media_assets: 'core',
   model_cost_audit_logs: 'core',
   admin_approval_queue: 'core',
   ad_pricing_audit: 'core',
@@ -106,6 +118,7 @@ export const TABLE_POOL_REGISTRY: Record<string, DatabasePoolKey> = {
   gpu_provider_models: 'core',
   gpu_execution_jobs: 'core',
   api_performance_logs: 'core',
+  email_logs: 'core',
   migration_history: 'core',
   migration_security_audit: 'core',
 
@@ -124,9 +137,6 @@ export const TABLE_POOL_REGISTRY: Record<string, DatabasePoolKey> = {
   stripe_events: 'ledger',
 
   // External DB Tables (Reserved for isolated third-party integration pipelines)
-  blog_articles: 'external',
-  blog_comments: 'external',
-  blog_ratings: 'external',
 
   // Security DB Tables
   security_alerts: 'security',
@@ -135,8 +145,10 @@ export const TABLE_POOL_REGISTRY: Record<string, DatabasePoolKey> = {
   registered_agents: 'security',
 
   // Media DB Tables
+  media_assets: 'media',
   canvas_sessions: 'media',
-  canvas_history: 'media'
+  canvas_history: 'media',
+  user_audio_library: 'media'
 };
 
 export function hashStringToAdvisoryLockKey(str: string): number {

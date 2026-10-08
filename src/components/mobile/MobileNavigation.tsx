@@ -4,6 +4,7 @@ import {
   MessageSquare, 
   Flame, 
   MessagesSquare,
+  History,
   Sparkles, 
   User, 
   Wallet,
@@ -93,13 +94,53 @@ export const MobileNavigation: React.FC = () => {
     }
   };
 
-  const navItems = [
+  const isViralbookRoute = currentPath.startsWith('/bulletin') || currentPath.startsWith('/viralbook') || currentPath.startsWith('/reels') || currentPath.startsWith('/inquiries');
+
+  const navItems = isViralbookRoute ? [
+    {
+      id: 'inquiries',
+      labelAr: 'الرسائل',
+      labelEn: 'Messages',
+      path: '/viralbook/inquiries',
+      icon: MessagesSquare,
+    },
+    {
+      id: 'discover',
+      labelAr: 'استكشاف',
+      labelEn: 'Explore',
+      path: '/discover',
+      icon: Compass,
+    },
+    {
+      id: 'studio',
+      labelAr: 'إنشاء',
+      labelEn: 'Create',
+      path: '/chat',
+      icon: Sparkles,
+    },
+    {
+      id: 'viralbook',
+      labelAr: 'بيربليكستا بورد',
+      labelEn: 'Perplexta Board',
+      path: '/bulletin',
+      icon: Flame,
+    },
+    {
+      id: 'account',
+      labelAr: 'الحساب',
+      labelEn: 'Account',
+      path: '/settings',
+      isMenuTrigger: true,
+      icon: User,
+      badge: unreadCount > 0 ? unreadCount : undefined,
+    },
+  ] : [
     {
       id: 'chat',
-      labelAr: 'المحادثة',
-      labelEn: 'Chat',
-      path: '/bulletin?tab=inquiries',
-      icon: MessageSquare,
+      labelAr: (currentPath === '/' || currentPath.startsWith('/chat')) ? 'سجل المحادثات' : 'المحادثة',
+      labelEn: (currentPath === '/' || currentPath.startsWith('/chat')) ? 'Chat History' : 'Chat',
+      path: '/chat',
+      icon: (currentPath === '/' || currentPath.startsWith('/chat')) ? History : MessageSquare,
     },
     {
       id: 'discover',
@@ -134,10 +175,11 @@ export const MobileNavigation: React.FC = () => {
   ];
 
   const isTabActive = (id: string, path?: string) => {
-    if (id === 'chat') return currentPath.startsWith('/bulletin') && (location.search.includes('tab=inquiries') || currentPath.includes('/inquiries'));
+    if (id === 'chat') return currentPath === '/' || currentPath.startsWith('/chat');
+    if (id === 'inquiries') return currentPath.includes('/inquiries') || location.search.includes('tab=inquiries');
     if (id === 'discover') return currentPath.startsWith('/discover');
-    if (id === 'studio') return currentPath === '/' || currentPath.startsWith('/chat');
-    if (id === 'viralbook') return currentPath.startsWith('/bulletin') && !location.search.includes('tab=inquiries') && !currentPath.includes('/inquiries');
+    if (id === 'studio') return false;
+    if (id === 'viralbook') return (currentPath.startsWith('/bulletin') || currentPath.startsWith('/viralbook') || currentPath.startsWith('/reels')) && !currentPath.includes('/inquiries') && !location.search.includes('tab=inquiries');
     if (id === 'account') return currentPath.startsWith('/settings');
     return path ? currentPath === path : false;
   };
@@ -149,7 +191,22 @@ export const MobileNavigation: React.FC = () => {
       window.dispatchEvent(new Event('clear-chat'));
       setIsDrawerOpen(false);
     } else if (item.id === 'chat') {
-      navigate('/bulletin?tab=inquiries');
+      if (!(currentPath === '/' || currentPath.startsWith('/chat'))) {
+        navigate('/chat');
+      }
+      setTimeout(() => {
+        window.dispatchEvent(new Event('open-mobile-chat-history'));
+      }, 50);
+      setIsDrawerOpen(false);
+    } else if (item.id === 'inquiries') {
+      navigate('/viralbook/inquiries');
+      window.dispatchEvent(new CustomEvent('open-bulletin-inquiries'));
+      setIsDrawerOpen(false);
+    } else if (item.id === 'viralbook') {
+      navigate('/bulletin');
+      setIsDrawerOpen(false);
+    } else if (item.id === 'discover') {
+      navigate('/discover');
       setIsDrawerOpen(false);
     } else if (item.id === 'account') {
       if (!user) {
@@ -167,6 +224,19 @@ export const MobileNavigation: React.FC = () => {
   };
 
   const drawerNavLinks = [
+    { 
+      icon: <History size={18} />, 
+      label: isRtl ? 'سجل المحادثات' : 'Chat History', 
+      onClick: () => {
+        setIsDrawerOpen(false);
+        if (!(currentPath === '/' || currentPath.startsWith('/chat'))) {
+          navigate('/chat');
+        }
+        setTimeout(() => {
+          window.dispatchEvent(new Event('open-mobile-chat-history'));
+        }, 50);
+      }
+    },
     { icon: <Compass size={18} />, label: t('discover') || (isRtl ? 'اكتشف' : 'Discover'), path: '/discover' },
     { icon: <Sparkles size={18} />, label: t('studio') || (isRtl ? 'الاستوديو' : 'Studio'), path: '/Studio' },
     { icon: <Sparkles size={18} />, label: t('rewards') || (isRtl ? 'المكافآت' : 'Rewards'), path: '/rewards' },
@@ -232,13 +302,13 @@ export const MobileNavigation: React.FC = () => {
                     size={32}
                     className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)]"
                     fallbackIcon={
-                      <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-[var(--bg-accent-muted)] border border-[var(--border-default)] flex items-center justify-center text-accent shadow-2xs">
+                      <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-[var(--bg-accent-muted)] border border-[var(--border-default)] flex items-center justify-center text-[var(--fg-accent)] shadow-2xs">
                         <Sparkles size={16} />
                       </div>
                     }
                   />
                 ) : (
-                  <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-[var(--bg-accent-muted)] border border-[var(--border-default)] flex items-center justify-center text-accent shadow-2xs">
+                  <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-[var(--bg-accent-muted)] border border-[var(--border-default)] flex items-center justify-center text-[var(--fg-accent)] shadow-2xs">
                     <Sparkles size={16} />
                   </div>
                 )}
@@ -267,7 +337,7 @@ export const MobileNavigation: React.FC = () => {
             <div className="p-3 border-b border-[var(--border-default)] shrink-0 bg-[var(--surface-page)]">
               <button
                 onClick={handleNewChat}
-                className="w-full h-10 px-3 rounded-[var(--radius)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-bold text-xs flex items-center justify-center gap-2 shadow-xs active:scale-[0.98] transition-transform cursor-pointer"
+                className="w-full h-10 px-3 rounded-[var(--radius-md)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-bold text-xs flex items-center justify-center gap-2 shadow-xs active:scale-[0.98] transition-transform cursor-pointer"
               >
                 <Plus size={16} />
                 <span>{t('newChat') || (isRtl ? 'محادثة جديدة' : 'New Chat')}</span>
@@ -281,20 +351,34 @@ export const MobileNavigation: React.FC = () => {
                 <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] px-2 mb-1.5">
                   {isRtl ? 'التنقل الرئيسي' : 'Main Navigation'}
                 </div>
-                {drawerNavLinks.map((item) => {
-                  const isActive = currentPath === item.path;
+                {drawerNavLinks.map((item, idx) => {
+                  const isActive = item.path ? currentPath === item.path : false;
+                  if (item.onClick) {
+                    return (
+                      <button
+                        key={`drawer-nav-btn-${idx}`}
+                        onClick={item.onClick}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-sm)] text-xs font-bold transition-all duration-fast border border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] group cursor-pointer"
+                      >
+                        <span className="text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors duration-fast">
+                          {item.icon}
+                        </span>
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  }
                   return (
                     <NavLink
                       key={`drawer-nav-${item.path}`}
-                      to={item.path}
+                      to={item.path!}
                       onClick={() => setIsDrawerOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius)] text-xs font-bold transition-all ${
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-sm)] text-xs font-bold transition-all duration-fast border group ${
                         isActive
-                          ? 'bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border border-[var(--border-accent)]/30'
-                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]'
+                          ? 'bg-[var(--surface-card)] text-[var(--text-primary)] border-[var(--border-default)] border-s-2 border-s-[var(--border-accent)] font-bold shadow-2xs'
+                          : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]'
                       }`}
                     >
-                      <span className={isActive ? 'text-accent' : 'text-[var(--text-muted)]'}>
+                      <span className={`transition-colors duration-fast ${isActive ? 'text-[var(--fg-accent)]' : 'text-[var(--text-muted)] group-hover:text-[var(--text-primary)]'}`}>
                         {item.icon}
                       </span>
                       <span>{item.label}</span>
@@ -327,7 +411,7 @@ export const MobileNavigation: React.FC = () => {
                     }}
                     className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg bg-[var(--surface-subtle)] border border-[var(--border-default)] text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                   >
-                    <Globe size={14} className="text-accent" />
+                    <Globe size={14} className="text-[var(--fg-accent)]" />
                     <span className="text-[11px]">{language === 'ar' ? 'English' : 'العربية'}</span>
                   </button>
                 </div>
@@ -370,7 +454,7 @@ export const MobileNavigation: React.FC = () => {
                     setIsDrawerOpen(false);
                     setIsAuthModalOpen(true);
                   }}
-                  className="w-full h-11 px-4 rounded-[var(--radius)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-transform active:scale-[0.98] cursor-pointer"
+                  className="w-full h-11 px-4 rounded-[var(--radius-md)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-transform active:scale-[0.98] cursor-pointer"
                 >
                   <User size={16} />
                   <span>{isRtl ? 'تسجيل الدخول / إنشاء حساب' : 'Sign In / Register'}</span>
@@ -399,10 +483,10 @@ export const MobileNavigation: React.FC = () => {
                   onClick={() => handleTabPress(item)}
                   aria-label={isRtl ? item.labelAr : item.labelEn}
                   title={isRtl ? item.labelAr : item.labelEn}
-                  className={`relative flex items-center justify-center w-8 h-8 rounded-shape-sm border transition-all duration-150 active:scale-95 cursor-pointer shrink-0 before:absolute before:-inset-1.5 before:content-[''] ${
+                  className={`relative flex items-center justify-center w-8 h-8 rounded-shape-sm border transition-all duration-fast active:scale-95 cursor-pointer shrink-0 before:absolute before:-inset-1.5 before:content-[''] ${
                     isDrawerOpen
-                      ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.08)] font-bold'
-                      : 'bg-transparent border-[var(--border-default)] text-[var(--text-muted)] hover:text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-500/20'
+                      ? 'bg-[var(--bg-accent-muted)] border-[var(--border-accent)]/30 text-[var(--fg-accent)] shadow-xs font-bold'
+                      : 'bg-transparent border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--fg-accent)] hover:bg-[var(--bg-accent-muted)] hover:border-[var(--border-accent)]/20'
                   }`}
                 >
                   <AnimatePresence mode="wait">
@@ -415,7 +499,7 @@ export const MobileNavigation: React.FC = () => {
                         transition={{ duration: 0.15 }}
                         className="flex items-center justify-center"
                       >
-                        <X size={14} className="text-cyan-400 stroke-[2.2]" />
+                        <X size={14} className="text-[var(--fg-accent)] stroke-[2.2]" />
                       </motion.div>
                     ) : (
                       <motion.div
@@ -426,7 +510,7 @@ export const MobileNavigation: React.FC = () => {
                         transition={{ duration: 0.15 }}
                         className="flex items-center justify-center"
                       >
-                        <Icon size={14} className="transition-all duration-150" />
+                        <Icon size={14} className="transition-all duration-fast" />
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -447,18 +531,18 @@ export const MobileNavigation: React.FC = () => {
                 onClick={() => handleTabPress(item)}
                 aria-label={isRtl ? item.labelAr : item.labelEn}
                 title={isRtl ? item.labelAr : item.labelEn}
-                className={`relative flex items-center justify-center w-8 h-8 rounded-shape-sm border transition-all duration-150 active:scale-95 cursor-pointer shrink-0 before:absolute before:-inset-1.5 before:content-[''] ${
+                className={`relative flex items-center justify-center w-8 h-8 rounded-shape-sm border transition-all duration-fast active:scale-95 cursor-pointer shrink-0 before:absolute before:-inset-1.5 before:content-[''] ${
                   active
-                    ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.08)] font-bold'
-                    : 'bg-transparent border-[var(--border-default)] text-[var(--text-muted)] hover:text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-500/20'
+                    ? 'bg-[var(--bg-accent-muted)] border-[var(--border-accent)]/30 text-[var(--fg-accent)] shadow-xs font-bold'
+                    : 'bg-transparent border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--fg-accent)] hover:bg-[var(--bg-accent-muted)] hover:border-[var(--border-accent)]/20'
                 }`}
               >
                 <Icon
                   size={14}
-                  className={`transition-all duration-150 ${
+                  className={`transition-all duration-fast ${
                     active 
-                      ? 'text-cyan-400' 
-                      : 'text-[var(--text-muted)] group-hover:text-cyan-400'
+                      ? 'text-[var(--fg-accent)]' 
+                      : 'text-[var(--text-muted)] group-hover:text-[var(--fg-accent)]'
                   }`}
                 />
 

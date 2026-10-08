@@ -1,5 +1,13 @@
 import React, { createContext, useContext } from 'react';
-import { usePwaInstall, UsePwaInstallReturn } from '../hooks/usePwaInstall';
+import { 
+  usePwaInstall, 
+  UsePwaInstallReturn, 
+  detectStandaloneWebview, 
+  StandaloneWebviewDetection 
+} from '../hooks/usePwaInstall';
+
+export { detectStandaloneWebview };
+export type { StandaloneWebviewDetection };
 
 const PwaContext = createContext<UsePwaInstallReturn | null>(null);
 

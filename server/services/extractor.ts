@@ -192,17 +192,14 @@ export const perplextaMultimodalSense = async (dataBuffer: Buffer, mimeType: str
   const config = await getCachedOrchestratorConfig('perplexta_analysis');
   if (!config) return 'Multimodal extraction unavailable: No orchestrator configuration found.';
 
-  let provider = config.primary_provider;
-  let model = config.primary_model;
-  let apiKey = await getProviderKey(provider);
+  const targets = [
+    { provider: config.primary_provider, model: config.primary_model },
+    { provider: config.fallback_1_provider, model: config.fallback_1_model },
+    { provider: config.fallback_2_provider, model: config.fallback_2_model },
+    { provider: config.fallback_3_provider, model: config.fallback_3_model }
+  ].filter(t => t.provider && t.model);
 
-  if (!apiKey && config.fallback_1_provider) {
-    provider = config.fallback_1_provider;
-    model = config.fallback_1_model;
-    apiKey = await getProviderKey(provider);
-  }
-
-  if (!apiKey) return 'API Key missing for multimodal sense orchestrator provider.';
+  if (targets.length === 0) return 'Multimodal extraction unavailable: No active models configured in orchestrator.';
 
   const fileData = {
     type: mimeType,
@@ -210,21 +207,32 @@ export const perplextaMultimodalSense = async (dataBuffer: Buffer, mimeType: str
     name: fileName
   };
 
-  try {
-    const responseText = await callAIProvider(
-      provider,
-      model,
-      apiKey,
-      `Forensic analysis of ${mimeType} file "${fileName}". Extract all relevant data and metadata text clearly.`,
-      '', // system prompt
-      undefined, // onChunk
-      [], // history
-      { fileData }
-    );
-    return (responseText as string) || 'No extraction result.';
-  } catch (e: any) {
-    return `Extraction failed: ${e.message}`;
+  let lastError = '';
+  for (const target of targets) {
+    try {
+      const apiKey = await getProviderKey(target.provider);
+      if (!apiKey) continue;
+
+      const responseText = await callAIProvider(
+        target.provider,
+        target.model,
+        apiKey,
+        `Forensic analysis of ${mimeType} file "${fileName}". Extract all relevant data and metadata text clearly.`,
+        '', // system prompt
+        undefined, // onChunk
+        [], // history
+        { fileData }
+      );
+      if (responseText) {
+        return (responseText as string);
+      }
+    } catch (e: any) {
+      lastError = e.message;
+      continue;
+    }
   }
+
+  return lastError ? `Extraction failed: ${lastError}` : 'No extraction result.';
 };
 
 const extractExcelText = async (dataBuffer: Buffer, mimeType: string): Promise<string> => {

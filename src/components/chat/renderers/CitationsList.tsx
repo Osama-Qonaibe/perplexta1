@@ -313,7 +313,7 @@ export const MarkdownLink = ({ href, children }: { href?: string; children: Reac
       </a>
 
       {showTooltip && (meta?.title || meta?.description) && (
-        <div className="absolute z-[9999] bottom-full left-1/2 -translate-x-1/2 mb-2 w-[280px] p-3 bg-[var(--surface-card)] rounded-xl shadow-xl border border-[var(--border-default)] flex flex-col gap-2 pointer-events-none transition-theme">
+        <div className="absolute z-[9999] bottom-full left-1/2 -translate-x-1/2 mb-2 w-[280px] p-3 bg-[var(--surface-card)] rounded-[var(--radius-md)] shadow-xl border border-[var(--border-default)] flex flex-col gap-2 pointer-events-none transition-theme">
           <div className="flex items-start gap-2 min-w-0">
             <div className="w-5.5 h-5.5 rounded overflow-hidden bg-[var(--surface-inset)] flex-shrink-0 flex items-center justify-center border border-[var(--border-default)]/40 text-accent">
               {brand ? brand.icon("w-3.5 h-3.5") : <img src={favicon} className="w-3.5 h-3.5 object-contain" alt="" />}
@@ -546,7 +546,7 @@ export const renderChildrenWithCitations = (node: React.ReactNode, msg: any, dep
             return (
               <React.Fragment key={`cit-frag-badge-${i}-${part}`}>
                 {prefix}
-                <span className="inline-flex items-center justify-center px-1.5 py-0.2 rounded text-[10.5px] font-mono font-bold bg-[var(--surface-subtle)] text-[var(--fg-accent)] dark:text-cyan-400 border border-[var(--border-default)] dark:border-slate-800/80 mx-0.5 align-middle select-none">
+                <span className="inline-flex items-center justify-center px-1.5 py-0.2 rounded-shape-xs text-[10.5px] font-mono font-bold bg-[var(--surface-subtle)] text-[var(--fg-accent)] border border-[var(--border-default)] mx-0.5 align-middle select-none">
                   [{index}]
                 </span>
               </React.Fragment>

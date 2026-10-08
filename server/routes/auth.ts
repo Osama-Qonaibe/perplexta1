@@ -2,10 +2,15 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { signupSchema, loginSchema } from '../schemas/user.schemas.js';
+import { AppError } from '../middleware/errorHandler.js';
+import { ERROR_CODES } from '../utils/errorCodes.js';
 import { pool, ledgerPool, getSecurityPool } from '../db/index.js';
 import { getCachedSystemSettings } from '../db/queries.js';
+import { decrypt } from '../utils/crypto.js';
 import { sendSmartEmail } from '../services/email.js';
 import { logSystemActivity, createNotification } from '../services/notifications.js';
+import { getUserProfile } from '../services/users.js';
 import { authLimiter, forgotPasswordLimiter, refreshLimiter } from '../middleware/rateLimit.js';
 import { authenticateToken, addToBlacklistCache } from '../middleware/auth.js';
 import { getOrCreateSigningKeys } from '../utils/keys.js';
@@ -13,12 +18,13 @@ import { deductFromWallet, getEconomySettings } from '../services/wallet.js';
 import { hashToken } from '../utils/tokenHash.js';
 import { issueTokenPair, parseRemember } from '../utils/issueTokenPair.js';
 import { getBaseUrl, getRedirectUri } from '../utils/request.js';
+import { escapeHtml, serializeJsonForScript } from '../utils/security.js';
 
 const router = express.Router();
 
 export const pendingOAuthSessions = new Map<string, { data: any; expiresAt: number }>();
 
-const jwtSecret = process.env.JWT_SECRET || 'perplexta_default_development_secret_key_32chars_min!';
+const jwtSecret = process.env.JWT_SECRET as string;
 
 const logAvatarProcess = (context: string, googleUser: any, url: any, isValid: boolean, error?: any) => {
   if (error) {
@@ -88,20 +94,32 @@ async function generateUniqueReferralCode(): Promise<string> {
   return code;
 }
 
-router.post("/signup", authLimiter, async (req, res) => {
+router.post("/signup", authLimiter, async (req, res, next) => {
   try {
-    const { email, password, name, language = 'ar', theme = 'dark', ref } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
-    if (typeof email !== 'string' || typeof password !== 'string') {
-      return res.status(400).json({ error: 'Email and password must be strings' });
+    const parsed = signupSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(
+        'Validation failed',
+        ERROR_CODES.VALIDATION_FAILED.status,
+        ERROR_CODES.VALIDATION_FAILED.code
+      );
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) return res.status(400).json({ error: 'Invalid email format' });
-    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
 
+    const { email, password, name, language, theme, ref } = parsed.data;
     const lowerEmail = email.toLowerCase();
-    const existingUser = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1::text', [lowerEmail]);
-    if (existingUser.rows.length > 0) return res.status(400).json({ error: 'User already exists' });
+
+    // Check 1: Email already exists
+    const existingUser = await pool.query(
+      'SELECT id FROM users WHERE LOWER(email) = $1::text',
+      [lowerEmail]
+    );
+    if (existingUser.rows.length > 0) {
+      throw new AppError(
+        'User already exists',
+        ERROR_CODES.DB_UNIQUE_VIOLATION.status,
+        ERROR_CODES.DB_UNIQUE_VIOLATION.code
+      );
+    }
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
@@ -112,6 +130,7 @@ router.post("/signup", authLimiter, async (req, res) => {
       const parentUser = await pool.query('SELECT id FROM users WHERE UPPER(referral_code) = $1', [ref.trim().toUpperCase()]);
       if (parentUser.rows.length > 0) {
         referredBy = parentUser.rows[0].id;
+        (req as any).referrerId = parentUser.rows[0].id;
       }
     }
 
@@ -125,6 +144,15 @@ router.post("/signup", authLimiter, async (req, res) => {
     );
 
     const user = result.rows[0];
+
+    // Verify referral fraud (self-referral prevention)
+    if ((req as any).referrerId && (req as any).referrerId === user.id) {
+      throw new AppError(
+        'Cannot refer yourself',
+        ERROR_CODES.AUTH_FORBIDDEN.status,
+        ERROR_CODES.AUTH_FORBIDDEN.code
+      );
+    }
     
     let welcomeBonusPoints = 600;
     try {
@@ -201,27 +229,28 @@ router.post("/signup", authLimiter, async (req, res) => {
     const { accessToken, refreshToken, rememberMe } = issueTokenPair(user, parseRemember(req.body.remember), jwtSecret);
     await createUserSession(user.id, refreshToken, req, rememberMe ? 30 : 1);
 
-    const fullProfile = await pool.query(`
-      SELECT u.id, u.name, u.email, u.role, u.avatar, u.status, u.language, u.theme, u.referral_code,
-             s.plan_id, s.status as sub_status, s.current_period_end, p.name_en as plan_name_en, p.name_ar as plan_name_ar, p.color as plan_color
-      FROM users u
-      LEFT JOIN subscriptions s ON u.id = s.user_id
-      LEFT JOIN plans p ON s.plan_id = p.id
-      WHERE u.id = $1
-    `, [user.id]);
+    // Auto-enroll into Starter Free plan if available
+    try {
+      const freePlanRes = await pool.query(
+        "SELECT id, monthly_credits, limits FROM plans WHERE is_active = true AND monthly_price = 0 ORDER BY id ASC LIMIT 1"
+      );
+      if (freePlanRes.rows.length > 0) {
+        const fp = freePlanRes.rows[0];
+        const periodEnd = new Date();
+        periodEnd.setDate(periodEnd.getDate() + 365);
+        const credits = Number(fp.monthly_credits) || 0;
+        await pool.query(
+          `INSERT INTO subscriptions (user_id, plan_id, status, billing_period, current_period_end, cycle_credits, used_credits, last_reset_at)
+           VALUES ($1, $2, 'active', 'monthly', $3, $4, 0, CURRENT_TIMESTAMP)
+           ON CONFLICT (user_id) DO NOTHING`,
+          [user.id, fp.id, periodEnd, credits]
+        );
+      }
+    } catch (subErr: any) {
+      console.warn('[Auth] Auto-enroll free plan notice:', subErr.message);
+    }
 
-    const profileRow = fullProfile.rows[0];
-    const userPayload = {
-      ...profileRow,
-      subscription: profileRow.plan_id ? {
-        plan_id: profileRow.plan_id,
-        status: profileRow.sub_status,
-        current_period_end: profileRow.current_period_end,
-        plan_name_en: profileRow.plan_name_en,
-        plan_name_ar: profileRow.plan_name_ar,
-        plan_color: profileRow.plan_color
-      } : null
-    };
+    const userPayload = await getUserProfile(user.id);
 
     res.json({ token: accessToken, refreshToken, user: userPayload });
 
@@ -232,36 +261,65 @@ router.post("/signup", authLimiter, async (req, res) => {
       broadcastAdminStats().catch(err => console.error('[Socket] Failed to broadcast admin stats on signup:', err));
     }).catch(err => console.error('[Socket] Failed to load admin service on signup:', err));
   } catch (error) {
-    res.status(500).json({ error: 'Signup failed' });
+    next(error);
   }
 });
 
-router.post("/login", authLimiter, async (req, res) => {
+router.post("/login", authLimiter, async (req, res, next) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
-    if (typeof email !== 'string' || typeof password !== 'string') {
-      return res.status(400).json({ error: 'Email and password must be strings' });
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(
+        'Validation failed',
+        ERROR_CODES.VALIDATION_FAILED.status,
+        ERROR_CODES.VALIDATION_FAILED.code
+      );
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) return res.status(400).json({ error: 'Invalid email format' });
+
+    const { email, password } = parsed.data;
 
     const lowerEmail = email.toLowerCase();
     const result = await pool.query('SELECT * FROM users WHERE LOWER(email) = $1::text', [lowerEmail]);
-    if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
+    if (result.rows.length === 0) {
+      throw new AppError(
+        'Invalid email or password',
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS.status,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS.code
+      );
+    }
 
     const user = result.rows[0];
-    if (user.status === 'suspended') return res.status(403).json({ error: 'Account suspended' });
+    if (user.status === 'suspended') {
+      throw new AppError(
+        'Account suspended',
+        ERROR_CODES.AUTH_FORBIDDEN.status,
+        ERROR_CODES.AUTH_FORBIDDEN.code
+      );
+    }
 
     if (!user.password_hash) {
       if (user.provider === 'google') {
-        return res.status(401).json({ error: 'Please login using Google' });
+        throw new AppError(
+          'Please login using Google',
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS.status,
+          ERROR_CODES.AUTH_INVALID_CREDENTIALS.code
+        );
       }
-      return res.status(401).json({ error: 'Invalid credentials' });
+      throw new AppError(
+        'Invalid email or password',
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS.status,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS.code
+      );
     }
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!isMatch) {
+      throw new AppError(
+        'Invalid email or password',
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS.status,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS.code
+      );
+    }
 
     let userAvatar = user.avatar;
     if (!userAvatar) {
@@ -272,32 +330,12 @@ router.post("/login", authLimiter, async (req, res) => {
     const { accessToken, refreshToken, rememberMe } = issueTokenPair(user, parseRemember(req.body.remember), jwtSecret);
     await createUserSession(user.id, refreshToken, req, rememberMe ? 30 : 1);
 
-    const fullProfile = await pool.query(`
-      SELECT u.id, u.name, u.email, u.role, u.avatar, u.status, u.language, u.theme, u.referral_code,
-             s.plan_id, s.status as sub_status, s.current_period_end, p.name_en as plan_name_en, p.name_ar as plan_name_ar, p.color as plan_color
-      FROM users u
-      LEFT JOIN subscriptions s ON u.id = s.user_id
-      LEFT JOIN plans p ON s.plan_id = p.id
-      WHERE u.id = $1
-    `, [user.id]);
-
-    const profileRow = fullProfile.rows[0];
-    const userPayload = {
-      ...profileRow,
-      subscription: profileRow.plan_id ? {
-        plan_id: profileRow.plan_id,
-        status: profileRow.sub_status,
-        current_period_end: profileRow.current_period_end,
-        plan_name_en: profileRow.plan_name_en,
-        plan_name_ar: profileRow.plan_name_ar,
-        plan_color: profileRow.plan_color
-      } : null
-    };
+    const userPayload = await getUserProfile(user.id);
 
     res.json({ token: accessToken, refreshToken, user: userPayload });
     await logSystemActivity(user.id, 'login', 'User logged in', {}, req);
   } catch (error) {
-    res.status(500).json({ error: 'Login failed' });
+    next(error);
   }
 });
 
@@ -393,6 +431,16 @@ router.post("/refresh-token", refreshLimiter, async (req, res) => {
   }
 });
 
+router.get("/google/client-id", async (req, res) => {
+  try {
+    const settings = await getCachedSystemSettings().catch(() => null);
+    const googleClientId = settings?.google_client_id || process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '';
+    res.json({ clientId: googleClientId, configured: !!googleClientId });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch Google Client ID' });
+  }
+});
+
 router.get("/google/url", async (req, res) => {
   try {
     const { ref, lang, remember, mode, theme, authSessionId } = req.query;
@@ -413,10 +461,10 @@ router.get("/google/url", async (req, res) => {
     );
 
     const settings = await getCachedSystemSettings().catch(() => null);
-    const googleClientId = settings?.google_client_id || process.env.GOOGLE_CLIENT_ID || '';
+    const googleClientId = settings?.google_client_id || process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '';
 
     if (!googleClientId) {
-      return res.status(400).json({ error: 'Google OAuth is not configured in Control Panel.' });
+      return res.status(400).json({ error: 'Google OAuth is not configured in Control Panel or environment variables.' });
     }
 
     const params = new URLSearchParams({
@@ -460,22 +508,39 @@ router.get("/poll", async (req, res) => {
   }
 });
 
-router.post("/logout", authenticateToken, async (req: any, res) => {
+router.post("/logout", async (req: any, res) => {
   try {
-    const token = req.token;
+    const authHeader = req.headers['authorization'];
+    let token = (authHeader && authHeader.split(' ')[1]) || req.body?.token;
     if (token) {
-      const decoded: any = jwt.verify(token, jwtSecret);
-      const expiresAt = decoded?.exp ? new Date(decoded.exp * 1000) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      
-      await getSecurityPool().query(
-        'INSERT INTO token_blacklist (token, expires_at) VALUES ($1, $2) ON CONFLICT (token) DO NOTHING',
-        [hashToken(token), expiresAt]
-      );
-      addToBlacklistCache(token);
+      token = token.trim();
+      if (token.startsWith('"') && token.endsWith('"')) token = token.slice(1, -1);
+    }
+    
+    let userId: any = null;
+    if (token && token !== 'null' && token !== 'undefined' && token !== '') {
+      try {
+        const decoded: any = jwt.verify(token, jwtSecret);
+        userId = decoded?.id;
+        const expiresAt = decoded?.exp ? new Date(decoded.exp * 1000) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        
+        await getSecurityPool().query(
+          'INSERT INTO token_blacklist (token, expires_at) VALUES ($1, $2) ON CONFLICT (token) DO NOTHING',
+          [hashToken(token), expiresAt]
+        );
+        addToBlacklistCache(token);
+      } catch {
+        try {
+          await getSecurityPool().query(
+            'INSERT INTO token_blacklist (token, expires_at) VALUES ($1, $2) ON CONFLICT (token) DO NOTHING',
+            [hashToken(token), new Date(Date.now() + 24 * 60 * 60 * 1000)]
+          );
+        } catch {}
+      }
     }
 
     const { refreshToken } = req.body;
-    if (refreshToken) {
+    if (refreshToken && typeof refreshToken === 'string' && refreshToken !== 'null' && refreshToken !== 'undefined' && refreshToken !== '') {
       try {
         await pool.query(
           "UPDATE user_sessions SET status = 'revoked', last_active_at = CURRENT_TIMESTAMP WHERE session_token = $1",
@@ -483,6 +548,7 @@ router.post("/logout", authenticateToken, async (req: any, res) => {
         );
         try {
           const rfDecoded: any = jwt.verify(refreshToken, jwtSecret);
+          if (!userId) userId = rfDecoded?.id;
           const rfExpiry = rfDecoded?.exp ? new Date(rfDecoded.exp * 1000) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
           await getSecurityPool().query(
             'INSERT INTO token_blacklist (token, expires_at) VALUES ($1, $2) ON CONFLICT (token) DO NOTHING',
@@ -499,11 +565,31 @@ router.post("/logout", authenticateToken, async (req: any, res) => {
       }
     }
     
-    await logSystemActivity(req.user.id, 'logout', 'User logged out', {}, req);
-    res.json({ success: true, message: 'Logged out successfully' });
+    if (userId) {
+      try {
+        await pool.query(
+          "UPDATE user_sessions SET status = 'revoked', last_active_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND status = 'active'",
+          [userId]
+        );
+      } catch (sessionErr) {
+        console.warn('[Session] Failed to revoke active user sessions on logout:', sessionErr);
+      }
+      try {
+        await logSystemActivity(userId, 'logout', 'User logged out and terminated sessions', {}, req);
+      } catch {}
+    }
+
+    try {
+      res.clearCookie('token', { path: '/' });
+      res.clearCookie('refreshToken', { path: '/' });
+      res.clearCookie('jwt', { path: '/' });
+      res.clearCookie('app_token', { path: '/' });
+    } catch {}
+
+    res.json({ success: true, message: 'Logged out and sessions terminated successfully' });
   } catch (error) {
     console.error('[Auth] Logout failed:', error instanceof Error ? error.message : error);
-    res.status(500).json({ error: 'Logout failed' });
+    res.json({ success: true, message: 'Logged out successfully' });
   }
 });
 
@@ -526,8 +612,9 @@ router.get("/google/callback", async (req, res) => {
     await pool.query('DELETE FROM oauth_states WHERE state = $1', [state]);
 
     const settings = await getCachedSystemSettings().catch(() => null);
-    const googleClientId = settings?.google_client_id || process.env.GOOGLE_CLIENT_ID || '';
-    const googleClientSecret = settings?.google_client_secret || process.env.GOOGLE_CLIENT_SECRET || '';
+    const googleClientId = settings?.google_client_id || process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || '';
+    const dbSecret = settings?.google_client_secret ? decrypt(settings.google_client_secret) : '';
+    const googleClientSecret = dbSecret || process.env.GOOGLE_CLIENT_SECRET || process.env.VITE_GOOGLE_CLIENT_SECRET || '';
 
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -715,35 +802,7 @@ router.get("/google/callback", async (req, res) => {
     );
     await createUserSession(user.id, refreshToken, req, rememberMe ? 30 : 1);
 
-    const fullProfile = await pool.query(`
-      SELECT u.id, u.name, u.email, u.role, u.avatar, u.status, u.language, u.theme, u.referral_code,
-             s.plan_id, s.status as sub_status, s.current_period_end, p.name_en as plan_name_en, p.name_ar as plan_name_ar, p.color as plan_color
-      FROM users u
-      LEFT JOIN subscriptions s ON u.id = s.user_id
-      LEFT JOIN plans p ON s.plan_id = p.id
-      WHERE u.id = $1
-    `, [user.id]);
-
-    const row = fullProfile.rows[0];
-    const userPayload = {
-      id: row.id,
-      email: row.email,
-      name: row.name,
-      role: row.role,
-      avatar: row.avatar,
-      status: row.status,
-      language: row.language,
-      theme: row.theme,
-      referral_code: row.referral_code,
-      subscription: row.plan_id ? {
-        plan_id: row.plan_id,
-        status: row.sub_status,
-        current_period_end: row.current_period_end,
-        plan_name_en: row.plan_name_en,
-        plan_name_ar: row.plan_name_ar,
-        plan_color: row.plan_color
-      } : null
-    };
+    const userPayload = await getUserProfile(user.id);
 
     const lang = storedState.lang || user.language || 'en';
     let targetRef = storedState.ref || '/';
@@ -783,23 +842,24 @@ router.get("/google/callback", async (req, res) => {
     }
 
     const isPopupMode = storedState.mode === 'popup';
-    const titleText = lang === 'ar' ? 'جاري التحقق...' : 'Authenticating...';
-    const successText = lang === 'ar' ? 'تم تسجيل الدخول بنجاح' : 'Login Successful';
-    const secureText = lang === 'ar' ? 'اتصال آمن' : 'SECURE SESSION';
-    const closeBtnText = lang === 'ar' ? 'إغلاق ومتابعة' : 'Close and Continue';
-    const direction = lang === 'ar' ? 'rtl' : 'ltr';
-    const allowedOriginJson = JSON.stringify(allowedOrigin);
-    const targetRefJson = JSON.stringify(targetRef);
+    const safeTitleText = escapeHtml(lang === 'ar' ? 'جاري التحقق...' : 'Authenticating...');
+    const safeSuccessText = escapeHtml(lang === 'ar' ? 'تم تسجيل الدخول بنجاح' : 'Login Successful');
+    const safeSecureText = escapeHtml(lang === 'ar' ? 'اتصال آمن' : 'SECURE SESSION');
+    const safeCloseBtnText = escapeHtml(lang === 'ar' ? 'إغلاق ومتابعة' : 'Close and Continue');
+    const safeDirection = lang === 'ar' ? 'rtl' : 'ltr';
+    const allowedOriginJson = serializeJsonForScript(allowedOrigin);
+    const targetRefJson = serializeJsonForScript(targetRef);
+    const safeNonce = escapeHtml(res.locals.nonce || '');
 
-    res.send(`<!DOCTYPE html>
+    res.type('html').send(`<!DOCTYPE html>
       <html>
         <head>
-          <title>${titleText}</title>
+          <title>${safeTitleText}</title>
           <meta name="viewport" content="width=device-width, initial-scale=1">
           <link rel="preconnect" href="https://fonts.googleapis.com">
           <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
           <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
-          <style nonce="${res.locals.nonce}">
+          <style nonce="${safeNonce}">
             :root {
               --radius-xl: 32px;
               --radius-lg: 20px;
@@ -826,7 +886,7 @@ router.get("/google/callback", async (req, res) => {
               margin: 0;
               font-family: 'Tajawal', sans-serif;
               overflow: hidden;
-              direction: ${direction};
+              direction: ${safeDirection};
             }
             .auth-card {
               text-align: center;
@@ -925,16 +985,16 @@ router.get("/google/callback", async (req, res) => {
                 </svg>
               </div>
             </div>
-            <h2 class="title">${successText}</h2>
+            <h2 class="title">${safeSuccessText}</h2>
             <div class="status-badge" style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; color: #334155; font-weight: 700; font-size: 0.75rem; letter-spacing: 0.1em; opacity: 0.8;">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-              <span>${secureText}</span>
+              <span>${safeSecureText}</span>
             </div>
-            <button id="closeBtn" class="btn" style="margin-top: 2rem;">${closeBtnText}</button>
+            <button id="closeBtn" class="btn" style="margin-top: 2rem;">${safeCloseBtnText}</button>
           </div>
 
           <script id="__auth_data__" type="application/base64">${pagePayload}</script>
-          <script nonce="${res.locals.nonce}">
+          <script nonce="${safeNonce}">
             (function() {
               const closeBtn = document.getElementById('closeBtn');
               if (closeBtn) closeBtn.onclick = function() { try { window.close(); } catch(e) {} };
@@ -986,7 +1046,10 @@ router.get("/google/callback", async (req, res) => {
                 }, 150);
               } catch (err) {
                 console.error('Auth processing failed', err);
-                document.body.innerHTML += '<div style="color:red; margin-top:20px;">Error: ' + err.message + '</div>';
+                var errDiv = document.createElement('div');
+                errDiv.style.cssText = 'color:red; margin-top:20px;';
+                errDiv.textContent = 'Error: ' + (err && err.message ? err.message : String(err));
+                document.body.appendChild(errDiv);
                 if (typeof isPopup !== "undefined" && !isPopup) { window.location.href = '/?oauth_error=1'; }
               }
             })();
@@ -1119,19 +1182,7 @@ router.post('/register-agent', async (req, res) => {
     const hashedSecret = await bcrypt.hash(rawSecret, 10);
 
     if (currentUserId) {
-      let keyCreationCost = 5.00;
-      try {
-        const toolRes = await pool.query("SELECT cost_per_usage FROM tool_orchestrator WHERE tool_id = 'x402_api'");
-        if (toolRes.rows.length > 0 && toolRes.rows[0].cost_per_usage) {
-          const settings = await getEconomySettings();
-          const pointsPerDollar = parseFloat(settings.points_per_dollar || '1000');
-          const fetchedRate = parseFloat(toolRes.rows[0].cost_per_usage) / pointsPerDollar;
-          if (!isNaN(fetchedRate) && fetchedRate > 0) {
-            keyCreationCost = fetchedRate;
-          }
-        }
-      } catch (err) {}
-
+      const keyCreationCost = 5.00;
       try {
         await deductFromWallet(
           currentUserId,

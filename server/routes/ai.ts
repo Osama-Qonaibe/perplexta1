@@ -1,11 +1,12 @@
 import express from 'express';
+import { authenticateToken } from '../middleware/auth.js';
 import { callAIProvider, getProviderKey, getProviderUrlKey } from '../services/ai.js';
 import { getCachedOrchestratorConfig } from '../db/queries.js';
 import { generateContextualFollowUpsFallback } from '../utils/helpers.js';
 
 const router = express.Router();
 
-router.post('/generate-followups', async (req, res) => {
+router.post('/generate-followups', authenticateToken, async (req, res) => {
   const { lastMessage, userQuery } = req.body;
   if (!lastMessage) return res.status(400).json({ error: 'Last message is required' });
 
@@ -57,7 +58,7 @@ router.post('/generate-followups', async (req, res) => {
   }
 });
 
-router.post('/suggest-meta', async (req, res) => {
+router.post('/suggest-meta', authenticateToken, async (req, res) => {
   const { content } = req.body;
   if (!content) return res.status(400).json({ error: 'Content is required' });
 

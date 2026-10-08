@@ -5,6 +5,7 @@ import { io } from '../../config/socket.js';
 import { pool } from '../../db/index.js';
 import crypto from 'crypto';
 import fs from 'fs/promises';
+import { existsSync } from 'fs';
 import path from 'path';
 
 function cleanAndPadBase64(input: any): string {
@@ -34,10 +35,30 @@ async function resolveImageToRawBase64(imgUrl: any): Promise<string> {
 
   if (imgUrl.startsWith('/uploads/') || (!imgUrl.startsWith('http://') && !imgUrl.startsWith('https://'))) {
     try {
-      const cleanPath = imgUrl.startsWith('/') ? imgUrl.slice(1) : imgUrl;
-      const fullPath = path.join(process.cwd(), cleanPath);
-      const buf = await fs.readFile(fullPath);
-      return buf.toString('base64');
+      if (imgUrl.includes('..') || imgUrl.includes('\0')) {
+        return '';
+      }
+      const filename = path.basename(imgUrl.split('?')[0]);
+      if (!filename || filename.includes('..')) return '';
+
+      const uploadsDir = path.resolve(process.cwd(), 'uploads');
+      const publicDir = path.resolve(process.cwd(), 'public');
+
+      let candidatePath = path.resolve(uploadsDir, filename);
+      if (!existsSync(candidatePath)) {
+        const publicCandidate = path.resolve(publicDir, filename);
+        if (publicCandidate.startsWith(publicDir + path.sep) && existsSync(publicCandidate)) {
+          candidatePath = publicCandidate;
+        }
+      }
+
+      if (
+        (candidatePath.startsWith(uploadsDir + path.sep) || candidatePath.startsWith(publicDir + path.sep)) &&
+        existsSync(candidatePath)
+      ) {
+        const buf = await fs.readFile(candidatePath);
+        return buf.toString('base64');
+      }
     } catch (e) {
       console.warn('[resolveImageToRawBase64] Could not read local file:', e);
     }
@@ -449,118 +470,59 @@ async function executeImageWorker(
     const seed = request.imageSettings?.seed || Math.floor(Math.random() * 1000000);
     const steps = request.imageSettings?.steps || 25;
 
-    const isFlux = checkpointName.toLowerCase().includes('flux');
+    const comfyWorkflow = buildComfyImageWorkflow(request.prompt, checkpointName, width, height, seed, steps);
 
-    // ComfyUI API workflow object: tailored for Flux (with FluxGuidance and EmptySD3LatentImage) or standard SD models
-    const comfyWorkflow = isFlux ? {
-      "6": {
-        "inputs": { "text": request.prompt, "clip": ["30", 1] },
-        "class_type": "CLIPTextEncode",
-        "_meta": { "title": "CLIP Text Encode (Positive Prompt)" }
-      },
-      "8": {
-        "inputs": { "samples": ["31", 0], "vae": ["30", 2] },
-        "class_type": "VAEDecode",
-        "_meta": { "title": "VAE Decode" }
-      },
-      "9": {
-        "inputs": { "filename_prefix": "ComfyUI", "images": ["8", 0] },
-        "class_type": "SaveImage",
-        "_meta": { "title": "Save Image" }
-      },
-      "27": {
-        "inputs": { "width": width, "height": height, "batch_size": 1 },
-        "class_type": "EmptySD3LatentImage",
-        "_meta": { "title": "EmptySD3LatentImage" }
-      },
-      "30": {
-        "inputs": { "ckpt_name": checkpointName },
-        "class_type": "CheckpointLoaderSimple",
-        "_meta": { "title": "Load Checkpoint" }
-      },
-      "31": {
-        "inputs": {
-          "seed": seed,
-          "steps": Math.max(10, Math.min(steps, 28)),
-          "cfg": 1,
-          "sampler_name": "euler",
-          "scheduler": "simple",
-          "denoise": 1,
-          "model": ["30", 0],
-          "positive": ["35", 0],
-          "negative": ["33", 0],
-          "latent_image": ["27", 0]
-        },
-        "class_type": "KSampler",
-        "_meta": { "title": "KSampler" }
-      },
-      "33": {
-        "inputs": { "text": "", "clip": ["30", 1] },
-        "class_type": "CLIPTextEncode",
-        "_meta": { "title": "CLIP Text Encode (Negative Prompt)" }
-      },
-      "35": {
-        "inputs": { "guidance": 3.5, "conditioning": ["6", 0] },
-        "class_type": "FluxGuidance",
-        "_meta": { "title": "FluxGuidance" }
-      }
-    } : {
-      "3": {
-        "inputs": {
-          "seed": seed,
-          "steps": steps,
-          "cfg": 3.5,
-          "sampler_name": "euler",
-          "scheduler": "simple",
-          "denoise": 1,
-          "model": ["4", 0],
-          "positive": ["6", 0],
-          "negative": ["7", 0],
-          "latent_image": ["5", 0]
-        },
-        "class_type": "KSampler"
-      },
-      "4": {
-        "inputs": { "ckpt_name": checkpointName },
-        "class_type": "CheckpointLoaderSimple"
-      },
-      "5": {
-        "inputs": { "width": width, "height": height, "batch_size": 1 },
-        "class_type": "EmptyLatentImage"
-      },
-      "6": {
-        "inputs": { "text": request.prompt, "clip": ["4", 1] },
-        "class_type": "CLIPTextEncode"
-      },
-      "7": {
-        "inputs": { "text": "", "clip": ["4", 1] },
-        "class_type": "CLIPTextEncode"
-      },
-      "8": {
-        "inputs": { "samples": ["3", 0], "vae": ["4", 2] },
-        "class_type": "VAEDecode"
-      },
-      "9": {
-        "inputs": { "filename_prefix": "Perplexta_AI", "images": ["8", 0] },
-        "class_type": "SaveImage"
-      }
-    };
+    let runpodRes: { imageUrl?: string; videoUrl?: string; raw: any };
+    try {
+      runpodRes = await executeRunPodServerless(runpodUrl, apiKey, {
+        input: {
+          prompt: request.prompt,
+          positive_prompt: request.prompt,
+          text: request.prompt,
+          negative_prompt: "blurry, low quality, distorted, artifacts",
+          width,
+          height,
+          num_inference_steps: steps,
+          seed: seed,
+          workflow: comfyWorkflow,
+          workflow_json: comfyWorkflow,
+          ...(provider.config?.extra_input || {})
+        }
+      }, 'image');
+    } catch (runpodErr: any) {
+      const errMsg = runpodErr.message || '';
+      const detectedCkpt = extractAvailableCheckpointFromError(errMsg);
+      if (detectedCkpt && detectedCkpt !== checkpointName) {
+        console.log(`[GpuDispatcher] Auto-recovering RunPod Image Worker with remote checkpoint: "${detectedCkpt}" (was "${checkpointName}")`);
+        
+        // Auto-save discovered model into database for future zero-latency dispatches
+        pool.query(
+          `INSERT INTO gpu_provider_models (provider_id, model_id, name, task_type, is_active)
+           VALUES ($1, $2, $3, 'image_gen', true)
+           ON CONFLICT DO NOTHING`,
+          [provider.id, detectedCkpt, detectedCkpt.replace(/\.[^.]+$/, '')]
+        ).catch(() => {});
 
-    const runpodRes = await executeRunPodServerless(runpodUrl, apiKey, {
-      input: {
-        prompt: request.prompt,
-        positive_prompt: request.prompt,
-        text: request.prompt,
-        negative_prompt: "blurry, low quality, distorted, artifacts",
-        width,
-        height,
-        num_inference_steps: steps,
-        seed: seed,
-        workflow: comfyWorkflow,
-        workflow_json: comfyWorkflow,
-        ...(provider.config?.extra_input || {})
+        const retryWorkflow = buildComfyImageWorkflow(request.prompt, detectedCkpt, width, height, seed, steps);
+        runpodRes = await executeRunPodServerless(runpodUrl, apiKey, {
+          input: {
+            prompt: request.prompt,
+            positive_prompt: request.prompt,
+            text: request.prompt,
+            negative_prompt: "blurry, low quality, distorted, artifacts",
+            width,
+            height,
+            num_inference_steps: steps,
+            seed: seed,
+            workflow: retryWorkflow,
+            workflow_json: retryWorkflow,
+            ...(provider.config?.extra_input || {})
+          }
+        }, 'image');
+      } else {
+        throw runpodErr;
       }
-    }, 'image');
+    }
 
     if (!runpodRes.imageUrl) {
       throw new Error('RunPod serverless image generation did not return a valid image URL');
@@ -858,9 +820,43 @@ async function executeVideoWorker(
       runpodInput.source_video = request.videoUrl;
     }
 
-    const runpodRes = await executeRunPodServerless(runpodUrl, apiKey, {
-      input: runpodInput
-    }, 'video');
+    let runpodRes: { imageUrl?: string; videoUrl?: string; raw: any };
+    try {
+      runpodRes = await executeRunPodServerless(runpodUrl, apiKey, {
+        input: runpodInput
+      }, 'video');
+    } catch (runpodErr: any) {
+      const errMsg = runpodErr.message || '';
+      const detectedCkpt = extractAvailableCheckpointFromError(errMsg);
+      if (detectedCkpt && detectedCkpt !== checkpointName) {
+        console.log(`[GpuDispatcher] Auto-recovering RunPod Video Worker with remote checkpoint: "${detectedCkpt}" (was "${checkpointName}")`);
+        
+        // Auto-save discovered model into database for future zero-latency dispatches
+        pool.query(
+          `INSERT INTO gpu_provider_models (provider_id, model_id, name, task_type, is_active)
+           VALUES ($1, $2, $3, 'video_gen', true)
+           ON CONFLICT DO NOTHING`,
+          [provider.id, detectedCkpt, detectedCkpt.replace(/\.[^.]+$/, '')]
+        ).catch(() => {});
+
+        const retryInput = { ...runpodInput };
+        retryInput.checkpoint = detectedCkpt;
+        retryInput.ckpt_name = detectedCkpt;
+        retryInput.checkpoint_name = detectedCkpt;
+        if (retryInput.workflow?.['4']?.inputs) {
+          retryInput.workflow['4'].inputs.ckpt_name = detectedCkpt;
+        }
+        if (retryInput.workflow_json?.['4']?.inputs) {
+          retryInput.workflow_json['4'].inputs.ckpt_name = detectedCkpt;
+        }
+
+        runpodRes = await executeRunPodServerless(runpodUrl, apiKey, {
+          input: retryInput
+        }, 'video');
+      } else {
+        throw runpodErr;
+      }
+    }
 
     if (!runpodRes.videoUrl) {
       throw new Error('RunPod serverless video generation did not return a valid video URL');
@@ -1115,14 +1111,20 @@ async function executeRunPodServerless(
   } catch (err) {
     if (remoteId) {
       try {
-        await fetch(`${baseEndpoint}/cancel`, {
+        await fetch(`${baseEndpoint}/cancel/${remoteId}`, {
           method: 'POST',
-          headers,
-          body: JSON.stringify({ job_id: remoteId })
+          headers
         });
         console.log(`[GpuDispatcher] Successfully cancelled orphan RunPod job ${remoteId}`);
       } catch (cancelErr) {
-        // Ignore cancellation error
+        // Fallback to legacy payload format
+        try {
+          await fetch(`${baseEndpoint}/cancel`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ job_id: remoteId })
+          });
+        } catch (_) {}
       }
     }
     throw err;
@@ -1417,15 +1419,173 @@ function findMediaUrlInResponse(obj: any, isVideo: boolean = false): string | un
 }
 
 /**
+ * Helper: Build ComfyUI workflow for Flux or SD/SDXL models
+ */
+function buildComfyImageWorkflow(
+  prompt: string,
+  checkpointName: string,
+  width: number,
+  height: number,
+  seed: number,
+  steps: number
+): Record<string, any> {
+  const isFlux = checkpointName.toLowerCase().includes('flux');
+  if (isFlux) {
+    return {
+      "6": {
+        "inputs": { "text": prompt, "clip": ["30", 1] },
+        "class_type": "CLIPTextEncode",
+        "_meta": { "title": "CLIP Text Encode (Positive Prompt)" }
+      },
+      "8": {
+        "inputs": { "samples": ["31", 0], "vae": ["30", 2] },
+        "class_type": "VAEDecode",
+        "_meta": { "title": "VAE Decode" }
+      },
+      "9": {
+        "inputs": { "filename_prefix": "ComfyUI", "images": ["8", 0] },
+        "class_type": "SaveImage",
+        "_meta": { "title": "Save Image" }
+      },
+      "27": {
+        "inputs": { "width": width, "height": height, "batch_size": 1 },
+        "class_type": "EmptySD3LatentImage",
+        "_meta": { "title": "EmptySD3LatentImage" }
+      },
+      "30": {
+        "inputs": { "ckpt_name": checkpointName },
+        "class_type": "CheckpointLoaderSimple",
+        "_meta": { "title": "Load Checkpoint" }
+      },
+      "31": {
+        "inputs": {
+          "seed": seed,
+          "steps": Math.max(10, Math.min(steps, 28)),
+          "cfg": 1,
+          "sampler_name": "euler",
+          "scheduler": "simple",
+          "denoise": 1,
+          "model": ["30", 0],
+          "positive": ["35", 0],
+          "negative": ["33", 0],
+          "latent_image": ["27", 0]
+        },
+        "class_type": "KSampler",
+        "_meta": { "title": "KSampler" }
+      },
+      "33": {
+        "inputs": { "text": "", "clip": ["30", 1] },
+        "class_type": "CLIPTextEncode",
+        "_meta": { "title": "CLIP Text Encode (Negative Prompt)" }
+      },
+      "35": {
+        "inputs": { "guidance": 3.5, "conditioning": ["6", 0] },
+        "class_type": "FluxGuidance",
+        "_meta": { "title": "FluxGuidance" }
+      }
+    };
+  }
+
+  // Standard SD / SDXL / Custom Checkpoint workflow
+  return {
+    "3": {
+      "inputs": {
+        "seed": seed,
+        "steps": steps,
+        "cfg": 3.5,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1,
+        "model": ["4", 0],
+        "positive": ["6", 0],
+        "negative": ["7", 0],
+        "latent_image": ["5", 0]
+      },
+      "class_type": "KSampler"
+    },
+    "4": {
+      "inputs": { "ckpt_name": checkpointName },
+      "class_type": "CheckpointLoaderSimple"
+    },
+    "5": {
+      "inputs": { "width": width, "height": height, "batch_size": 1 },
+      "class_type": "EmptyLatentImage"
+    },
+    "6": {
+      "inputs": { "text": prompt, "clip": ["4", 1] },
+      "class_type": "CLIPTextEncode"
+    },
+    "7": {
+      "inputs": { "text": "blurry, low quality, distorted, artifacts", "clip": ["4", 1] },
+      "class_type": "CLIPTextEncode"
+    },
+    "8": {
+      "inputs": { "samples": ["3", 0], "vae": ["4", 2] },
+      "class_type": "VAEDecode"
+    },
+    "9": {
+      "inputs": { "filename_prefix": "Perplexta_AI", "images": ["8", 0] },
+      "class_type": "SaveImage"
+    }
+  };
+}
+
+/**
+ * Extracts available checkpoint model name from remote validation error messages
+ */
+function extractAvailableCheckpointFromError(errorMsg: string): string | null {
+  if (!errorMsg || typeof errorMsg !== 'string') return null;
+
+  // Pattern 1: not in ['checkpoint_name.safetensors'] or not in ["..."]
+  const notInMatch = errorMsg.match(/not in\s*\[\s*['"]([^'"]+\.(?:safetensors|ckpt|pt|bin))['"]/i);
+  if (notInMatch && notInMatch[1]) {
+    return notInMatch[1];
+  }
+
+  // Pattern 2: input_config': [['checkpoint_name.safetensors']
+  const inputConfigMatch = errorMsg.match(/input_config['"]?\s*:\s*\[\s*\[\s*['"]([^'"]+\.(?:safetensors|ckpt|pt|bin))['"]/i);
+  if (inputConfigMatch && inputConfigMatch[1]) {
+    return inputConfigMatch[1];
+  }
+
+  // Pattern 3: any safetensors or ckpt mentioned in list: ['...']
+  const generalListMatch = errorMsg.match(/\['([^']+\.(?:safetensors|ckpt|pt|bin))'/i);
+  if (generalListMatch && generalListMatch[1]) {
+    return generalListMatch[1];
+  }
+
+  return null;
+}
+
+/**
  * Robustly resolves checkpoint model filename from database gpu_provider_models or fallback
  */
 async function resolveCheckpointName(provider: any, modelId: string): Promise<string> {
   let checkpointName = "";
-  if (modelId && (modelId.endsWith('.safetensors') || modelId.endsWith('.ckpt'))) {
+  
+  const isValidCkpt = (str?: string) => {
+    if (!str || typeof str !== 'string') return false;
+    const s = str.trim().toLowerCase();
+    return s.endsWith('.safetensors') || s.endsWith('.ckpt') || s.endsWith('.pt') || s.endsWith('.bin');
+  };
+
+  const isEndpointPattern = (str?: string) => {
+    if (!str || typeof str !== 'string') return true;
+    const s = str.trim();
+    if (s === provider.endpoint_id || s === provider.provider_id) return true;
+    if (provider.base_url && provider.base_url.includes(s)) return true;
+    if (/^[a-z0-9]{14}$/i.test(s)) return true; // Standard RunPod endpoint IDs like r965z477l86j86
+    if (/^[a-z0-9]{8}-[a-z0-9]{4}/i.test(s)) return true; // UUID
+    if (['comfyui', 'default', 'flux', 'sdxl', 'runpod', 'image_gen', 'serverless'].includes(s.toLowerCase())) return true;
+    return false;
+  };
+
+  if (isValidCkpt(modelId)) {
     checkpointName = modelId;
-  } else if (modelId && modelId !== provider.endpoint_id && modelId !== provider.provider_id && !['comfyui', 'default', 'flux', 'sdxl'].includes(modelId.toLowerCase())) {
-    checkpointName = modelId.includes('.') ? modelId : `${modelId}.safetensors`;
+  } else if (modelId && !isEndpointPattern(modelId) && modelId.includes('.')) {
+    checkpointName = modelId;
   } else {
+    // 1. Try to find a valid checkpoint in gpu_provider_models for this provider
     try {
       const dbModelRes = await pool.query(
         "SELECT model_id FROM gpu_provider_models WHERE provider_id = $1 AND (model_id LIKE '%.safetensors' OR model_id LIKE '%.ckpt') ORDER BY id DESC LIMIT 1",
@@ -1433,21 +1593,33 @@ async function resolveCheckpointName(provider: any, modelId: string): Promise<st
       );
       if (dbModelRes.rows.length > 0) {
         checkpointName = dbModelRes.rows[0].model_id;
-      } else {
-        const anyModelRes = await pool.query(
-          "SELECT model_id FROM gpu_provider_models WHERE (model_id LIKE '%.safetensors' OR model_id LIKE '%.ckpt') ORDER BY id DESC LIMIT 1"
-        );
-        if (anyModelRes.rows.length > 0) {
-          checkpointName = anyModelRes.rows[0].model_id;
-        }
       }
     } catch (dbErr) {
       console.warn(`[GpuDispatcher] Model lookup warning for provider ${provider.name}:`, dbErr);
     }
+
+    // 2. Check provider config
     if (!checkpointName) {
-      checkpointName = 'flux1-dev-fp8.safetensors';
+      const cfgModel = provider.config?.checkpoint || provider.config?.default_model || provider.config?.checkpoint_name;
+      if (isValidCkpt(cfgModel)) {
+        checkpointName = cfgModel;
+      }
+    }
+
+    // 3. Fallback: if provider has flux in name or endpoint or default, use flux1-dev-fp8.safetensors
+    if (!checkpointName) {
+      const providerDesc = `${provider.name || ''} ${provider.provider_id || ''} ${provider.base_url || ''}`.toLowerCase();
+      if (providerDesc.includes('flux')) {
+        checkpointName = 'flux1-dev-fp8.safetensors';
+      } else if (providerDesc.includes('sdxl') || providerDesc.includes('xl')) {
+        checkpointName = 'sd_xl_base_1.0.safetensors';
+      } else {
+        // Default standard modern checkpoint
+        checkpointName = 'flux1-dev-fp8.safetensors';
+      }
     }
   }
+
   return checkpointName;
 }
 

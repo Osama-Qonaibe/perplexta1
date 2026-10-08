@@ -29,6 +29,11 @@ export function invalidateUserCache(userId: string | number) {
   userLoader.clear(userId);
 }
 
+export function invalidateAllUserCaches() {
+  userStatusCache.clear();
+  userLoader.clearAll();
+}
+
 export function addToBlacklistCache(token: string) {
   tokenBlacklistCache.set(token, {
     isRevoked: true,
@@ -69,7 +74,7 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
         return;
       }
 
-      jwt.verify(token, jwtSecret, async (err: any, user: any) => {
+      jwt.verify(token, jwtSecret, { algorithms: ['HS256'] }, async (err: any, user: any) => {
         if (err) {
           try {
             const { publicKeyPem } = getOrCreateSigningKeys();

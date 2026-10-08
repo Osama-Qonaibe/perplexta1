@@ -19,34 +19,16 @@ export const SessionPurge = {
     const preserveTheme = options.preserveTheme ?? true;
     const preserveLanguage = options.preserveLanguage ?? true;
 
-    let theme: string | null = null;
-    let lang: string | null = null;
-    try {
-      theme = preserveTheme ? secureStorage.getSync('perplexta_theme') : null;
-      lang = preserveLanguage ? secureStorage.getSync('language') : null;
-    } catch (e) {
-      console.warn('SessionPurge: Failed to read theme or language preference', e);
-    }
+    const preservedKeys: string[] = ['last_active_tool', 'last_active_model'];
+    if (preserveTheme) preservedKeys.push('perplexta_theme');
+    if (preserveLanguage) preservedKeys.push('language');
 
     try {
-      secureStorage.remove("ALL_KEYS");
+      secureStorage.clearSync(preservedKeys);
       sessionStorage.clear();
     } catch (e) {
       console.error('SessionPurge: Failed to clear local or session storage', e);
     }
-
-    if (preserveTheme && theme) {
-      try { secureStorage.set('perplexta_theme', theme); } catch (e) {}
-    }
-    if (preserveLanguage && lang) {
-      try { secureStorage.set('language', lang); } catch (e) {}
-    }
-
-    // Default defaults for fresh session
-    try {
-      secureStorage.set('last_active_tool', 'chat_fast');
-      secureStorage.set('last_active_model', 'fast');
-    } catch (e) {}
 
     // Purge browser CacheStorage if available
     if ('caches' in window) {
@@ -66,6 +48,8 @@ export const SessionPurge = {
   purgeQueryCache: (queryClient?: QueryClient | null) => {
     if (!queryClient) return;
     try {
+      queryClient.cancelQueries();
+      queryClient.removeQueries();
       queryClient.clear();
       queryClient.resetQueries();
     } catch (e) {

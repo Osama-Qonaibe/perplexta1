@@ -47,8 +47,16 @@ export async function selectOptimalGpuNodes(
 
     // Check budget limit
     const dailyBudget = parseFloat(String(provider.daily_budget || '0'));
-    const usedToday = parseFloat(String(provider.used_today || '0'));
+    let usedToday = parseFloat(String(provider.used_today || '0'));
+    const todayStr = new Date().toISOString().split('T')[0];
+    const resetDateStr = provider.last_reset_date ? new Date(provider.last_reset_date).toISOString().split('T')[0] : '';
+
+    if (resetDateStr && resetDateStr !== todayStr) {
+      usedToday = 0;
+    }
+
     if (dailyBudget > 0 && usedToday >= dailyBudget) {
+      console.warn(`[GpuLoadBalancer] GPU Provider '${provider.provider_id}' reached daily budget cap ($${usedToday.toFixed(4)} / $${dailyBudget}). Request BLOCKED before server call.`);
       continue;
     }
 

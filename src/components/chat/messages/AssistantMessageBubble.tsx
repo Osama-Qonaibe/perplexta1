@@ -26,6 +26,7 @@ import { MessageActions } from './MessageActions';
 import { MarkdownLink, BlockquoteWithActions } from '../renderers/MarkdownElements';
 import { CodeBlock } from '../renderers/CodeBlock';
 import { Logo } from '../../common/Logo';
+import { CognitiveOrbitRing } from '../common/CognitiveOrbitRing';
 import { useAppContext } from '../../../context/AppContext';
 import { CollapsibleTable } from '../renderers/CollapsibleTable';
 import { ChatResponseRenderer } from '../renderers/ChatResponseRenderer';
@@ -61,6 +62,34 @@ interface AssistantMessageBubbleProps {
   chatMarkdownComponents: any;
   findUserPrompt: (idx: number) => string | undefined;
   ProductionSuite?: React.ComponentType<{ content: string; dir: 'ltr' | 'rtl'; theme: string }>;
+}
+
+function extractImageUrl(content: string): string {
+  if (!content) return '';
+  const trimmed = content.trim();
+  const markdownMatch = trimmed.match(/!\[.*?\]\((.*?)\)/);
+  if (markdownMatch && markdownMatch[1]) {
+    return markdownMatch[1].trim();
+  }
+  const parenMatch = trimmed.match(/\(([^)]+)\)/);
+  if (parenMatch && (parenMatch[1].startsWith('/') || parenMatch[1].startsWith('http') || parenMatch[1].startsWith('data:'))) {
+    return parenMatch[1].trim();
+  }
+  const urlMatch = trimmed.match(/(https?:\/\/[^\s)]+|\/uploads\/[^\s)]+|data:image\/[^\s)]+)/);
+  if (urlMatch && urlMatch[1]) {
+    return urlMatch[1].trim();
+  }
+  return trimmed;
+}
+
+function isValidImageUrl(content: string): boolean {
+  if (!content) return false;
+  const extracted = extractImageUrl(content);
+  return extracted.startsWith('/') || 
+         extracted.startsWith('http://') || 
+         extracted.startsWith('https://') || 
+         extracted.startsWith('data:image/') || 
+         extracted.startsWith('blob:');
 }
 
 export const AssistantMessageBubble: React.FC<AssistantMessageBubbleProps> = ({
@@ -101,6 +130,20 @@ export const AssistantMessageBubble: React.FC<AssistantMessageBubbleProps> = ({
     ? (siteSettings?.siteNameAr || siteSettings?.siteName || 'بيربليكستا') 
     : (siteSettings?.siteName || 'Perplexta');
 
+  // Parse reasoning trace vs clean response
+  const thinkingParsed = extractThinking(msg.content);
+  const rawTrace = thinkingParsed.thinkingContent || (msg.thinking_steps && msg.thinking_steps.find((s: any) => s.is_raw_trace)?.step);
+  const cleanAnswer = thinkingParsed.cleanContent;
+
+  // 1. Thinking Phase: actively generating and currently reasoning or waiting for response stream
+  const isThinkingPhase = isGenerating && isLastMessage && (
+    thinkingParsed.isThinkingActive || 
+    (!cleanAnswer && !msg.is_image_failed && !msg.is_video_failed && !msg.is_quota_error && !msg.is_insufficient_funds && !msg.is_system_inactive)
+  );
+
+  // 2. Writing Phase: actively generating and clean response text has begun streaming
+  const isWritingPhase = isGenerating && isLastMessage && !isThinkingPhase && Boolean(cleanAnswer);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -119,14 +162,22 @@ export const AssistantMessageBubble: React.FC<AssistantMessageBubbleProps> = ({
 
       {/* Seamless Integrated Assistant Response Container */}
       <div 
-        className={`relative ${['image', 'video'].includes(msg.tool || '') ? 'p-0 bg-transparent border-none shadow-none w-full max-w-full sm:max-w-lg' : 'w-full px-0 py-1 sm:py-2 bg-transparent border-none shadow-none'} text-[var(--text-primary)] transition-all duration-150 text-start ${
-          dir === 'rtl' ? 'text-right' : 'text-left'
-        } prose dark:prose-invert max-w-none text-[13.5px] md:text-base leading-relaxed tracking-tight`}
+        className={`relative ${['image', 'video'].includes(msg.tool || '') ? 'p-0 bg-transparent border-none shadow-none w-full max-w-full sm:max-w-lg' : 'w-full px-0 py-1 sm:py-2 bg-transparent border-none shadow-none space-y-6'} text-[var(--text-primary)] transition-all duration-fast text-start max-w-none text-[13.5px] sm:text-[14px] leading-relaxed tracking-tight`}
       >
         {/* Model Badge Header */}
         <div className={`flex items-center justify-between gap-2.5 select-none ${['image', 'video'].includes(msg.tool || '') ? 'mb-2 px-1' : 'mb-3 pb-1.5'}`}>
           <div className="flex items-center gap-2">
-            <Logo size={20} fallbackType="cpu" />
+            <div className="relative flex items-center justify-center shrink-0 w-[26px] h-[26px]">
+              <Logo size={20} fallbackType="cpu" shape="circle" />
+              <CognitiveOrbitRing
+                isSpinning={isWritingPhase || (isGenerating && isLastMessage)}
+                dir={dir}
+                size={28}
+                radius={11.5}
+                strokeWidth={1.5}
+                strokeDasharray="4.5 2.5"
+              />
+            </div>
             <span className="text-xs font-bold text-[var(--text-primary)] font-sans tracking-tight">
               {displayName}
             </span>
@@ -140,44 +191,17 @@ export const AssistantMessageBubble: React.FC<AssistantMessageBubbleProps> = ({
         </div>
 
         {/* Unified Professional Thinking Steps */}
-        {!['image', 'video'].includes(msg.tool || '') && (() => {
-          const thinkingParsed = extractThinking(msg.content);
-          const rawTrace = thinkingParsed.thinkingContent || (msg.thinking_steps && msg.thinking_steps.find((s: any) => s.is_raw_trace)?.step);
-          const cleanAnswer = thinkingParsed.cleanContent;
-
-          // 1. If actively generating:
-          if (isGenerating && isLastMessage) {
-            // Processing while internal reasoning tag is open OR before any clean answer text appears
-            const isProcessing = thinkingParsed.isThinkingActive || !cleanAnswer;
-
-            return (
-              <div className="mb-2.5 select-none" id="assistant-thinking-block">
-                <ThinkingSteps
-                  steps={msg.thinking_steps}
-                  rawThinking={rawTrace}
-                  isProcessing={isProcessing}
-                  thinkingTime={msg.generation_time}
-                  dir={dir}
-                  query={messages.slice(0, idx).reverse().find((m) => m.role === 'user')?.content || ''}
-                />
-              </div>
-            );
-          }
-
-          // 2. Completed / historical message:
-          return (
-            <div className="mb-2.5 select-none" id="assistant-thinking-block">
-              <ThinkingSteps
-                steps={msg.thinking_steps?.map((s) => ({ ...s, status: 'completed' as const }))}
-                rawThinking={rawTrace}
-                isProcessing={false}
-                thinkingTime={msg.generation_time}
-                dir={dir}
-                query={messages.slice(0, idx).reverse().find((m) => m.role === 'user')?.content || ''}
-              />
-            </div>
-          );
-        })()}
+        <div className="mb-2.5 select-none" id="assistant-thinking-block">
+          <ThinkingSteps
+            steps={isGenerating && isLastMessage ? msg.thinking_steps : msg.thinking_steps?.map((s) => ({ ...s, status: 'completed' as const }))}
+            rawThinking={rawTrace}
+            isProcessing={isThinkingPhase || (isGenerating && isLastMessage && ['image', 'video'].includes(msg.tool || ''))}
+            thinkingTime={msg.generation_time}
+            dir={dir}
+            query={messages.slice(0, idx).reverse().find((m) => m.role === 'user')?.content || ''}
+            tool={msg.tool}
+          />
+        </div>
 
       {/* Media & Quota Error Cards */}
       {msg.is_image_failed ? (
@@ -214,19 +238,16 @@ export const AssistantMessageBubble: React.FC<AssistantMessageBubbleProps> = ({
         <>
           {/* Image & Media Direct Rendering */}
           {msg.tool === 'image' ? (
-            isGenerating && isLastMessage && !msg.content ? (
+            isGenerating && isLastMessage && (!msg.content || !isValidImageUrl(msg.content)) ? (
               <SimpleImageLoadingPlaceholder dir={dir} aspectRatio={msg.aspect_ratio || imageSettings?.aspectRatio || '1:1'} />
             ) : (
               <ShareableImageOutput 
-                src={(() => {
-                  const m = msg.content.match(/\(([^)]+)\)/);
-                  return m ? m[1] : msg.content.trim();
-                })()} 
+                src={extractImageUrl(msg.content)} 
                 dir={dir} 
-                alt={msg.content} 
+                alt={dir === 'rtl' ? 'صورة تم إنشاؤها بواسطة بيربليكستا' : 'Generated Image by Perplexta'} 
               />
             )
-          ) : isGenerating && isLastMessage && msg.content === '' && msg.tool === 'video' ? (
+          ) : isGenerating && isLastMessage && (!msg.content || msg.content === '') && msg.tool === 'video' ? (
             <SimpleVideoLoadingPlaceholder dir={dir} aspectRatio={msg.aspect_ratio || videoSettings?.aspectRatio || '9:16'} />
           ) : msg.tool === 'canvas' && ProductionSuite ? (
             <ProductionSuite content={stripProtocolMarkers(msg.content)} dir={dir} theme={theme} />

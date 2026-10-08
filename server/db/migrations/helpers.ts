@@ -77,6 +77,7 @@ export async function safeQueryClient(clientObj: PgPoolClient | null, fallbackCl
   } catch (err: any) {
     const msg = err?.message || String(err);
     if (/not queryable|connection error|terminated unexpectedly|ECONNRESET|ETIMEDOUT|closed/i.test(msg) && target !== fallbackClient) {
+      console.error(`[Migrations SafeQueryClient] Target database client failed (${msg}). Falling back to core client.`);
       return await fallbackClient.query(queryText, params);
     }
     throw err;
@@ -237,6 +238,17 @@ export async function ensureForeignKey(
     console.error(`[Schema] Invalid identifiers for foreign key ${constraintName}`);
     return;
   }
+
+  // Enforce sovereign database segregation: bypass physical foreign key constraints between Media DB and Core DB tables
+  const isCrossDb = (
+    (tableName === 'media_assets' && referencedTable === 'users') ||
+    (referencedTable === 'media_assets' && tableName === 'users')
+  );
+  if (isCrossDb) {
+    console.log(`[Schema] Enforcing sovereign database segregation: Skipping physical cross-database foreign key ${constraintName} between ${tableName} and ${referencedTable}.`);
+    return;
+  }
+
   const validOnDelete = ['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION', 'SET DEFAULT'];
   const safeOnDelete = validOnDelete.includes(onDelete.toUpperCase()) ? onDelete.toUpperCase() : 'CASCADE';
   try {
@@ -257,8 +269,9 @@ export async function ensureForeignKey(
         LEFT JOIN "${referencedTable}" r ON r."${referencedColumn}" = t."${columnName}"
        WHERE t."${columnName}" IS NOT NULL AND r."${referencedColumn}" IS NULL`
     );
-    if (parseInt(violations.rows[0].count, 10) > 0) {
-      console.warn(`[Schema] ${violations.rows[0].count} violations found for foreign key ${constraintName}`);
+    const violationCount = parseInt(violations.rows[0].count, 10);
+    if (violationCount > 0) {
+      console.warn(`[Schema Constraint Warning] ${violationCount} row violations found for foreign key ${constraintName} on ${tableName}.${columnName} -> ${referencedTable}.${referencedColumn}. Cleaning invalid references.`);
       await poolObj.query(
         `UPDATE "${tableName}" SET "${columnName}" = NULL 
           WHERE "${columnName}" IS NOT NULL 

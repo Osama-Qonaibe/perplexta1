@@ -4,6 +4,7 @@ import { useAppContext } from "../../context/AppContext";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Cpu,
+  Brain,
   Settings,
   Save,
   RefreshCw,
@@ -33,6 +34,8 @@ import {
   Palette,
   Image as ImageIcon,
   ShieldCheck,
+  Layers,
+  Server,
 } from "lucide-react";
 import { SystemSettingsViewProps } from "./adminTypes";
 import { 
@@ -43,16 +46,36 @@ import {
 } from "../../utils/sectionVisibility";
 import { resolveImageUrl } from "../../utils/imageResolver";
 import { updateDocumentHeadIcons } from "../../utils/assetManager";
-import { toast as globalToast, useConfirm } from '@/design-system';
+import { toast, useConfirm } from '@/design-system';
+import { SeoCenterView } from "../SeoCenterView";
+import { MemoryCenterView } from "./MemoryCenterView";
 
 export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   theme,
   t,
   dir,
+  initialTab = "general",
+  onTabChange,
+  hideSubTabs = false,
 }) => {
   const confirm = useConfirm();
   const navigate = useNavigate();
   const { siteSettings, setSiteSettings, token, setIsOperationPending, language } = useAppContext();
+
+  const [activeMainTab, setActiveMainTab] = useState<'general' | 'seo' | 'memory'>(initialTab || 'general');
+
+  useEffect(() => {
+    if (initialTab && initialTab !== activeMainTab) {
+      setActiveMainTab(initialTab);
+    }
+  }, [initialTab]);
+
+  const handleMainTabSwitch = (tab: 'general' | 'seo' | 'memory') => {
+    setActiveMainTab(tab);
+    if (onTabChange) {
+      onTabChange(tab);
+    }
+  };
 
   const [siteName, setSiteName] = useState(siteSettings.siteName);
   const [siteNameAr, setSiteNameAr] = useState(siteSettings.siteNameAr || "");
@@ -376,13 +399,12 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
         body: JSON.stringify({ target }),
       });
       if (res.ok) {
-        const data = await res.json();
         showToast(
-          data.message || (language === "ar" ? "تم مسح الذاكرة المؤقتة بنجاح" : "Cache cleared successfully"),
+          language === "ar" ? "تم مسح الذاكرة المؤقتة بنجاح" : "Cache cleared successfully",
           "success"
         );
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         showToast(
           err.error || (language === "ar" ? "فشل مسح الذاكرة المؤقتة" : "Failed to clear cache"),
           "error"
@@ -509,7 +531,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const response = await fetch("/api/admin/settings/upload-asset", {
+      const response = await fetch("/api/admin/settings/upload-asset?assetType=seo_image", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -540,11 +562,15 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
     setIsOperationPending(isSaving);
   }, [isSaving, setIsOperationPending]);
 
-  const showToast = (message: string, type: "success" | "error" = "success") => {
+  const showToast = (message: string, type: "success" | "error" | "warning" | "info" = "success") => {
     if (type === "success") {
-      globalToast.success(message, dir === "rtl" ? "تم بنجاح" : "Success");
+      toast.success(message, dir === "rtl" ? "تم بنجاح" : "Success");
+    } else if (type === "warning") {
+      toast.warning(message, dir === "rtl" ? "تنبيه" : "Warning");
+    } else if (type === "info") {
+      toast.info(message, dir === "rtl" ? "معلومة" : "Info");
     } else {
-      globalToast.error(message, dir === "rtl" ? "حدث خطأ" : "Error");
+      toast.error(message, dir === "rtl" ? "حدث خطأ" : "Error");
     }
   };
 
@@ -781,6 +807,16 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
     }
   };
 
+  useEffect(() => {
+    const handleSaveEvent = () => {
+      handleSaveGeneralSettings();
+    };
+    window.addEventListener("admin-save-settings", handleSaveEvent);
+    return () => {
+      window.removeEventListener("admin-save-settings", handleSaveEvent);
+    };
+  }, [handleSaveGeneralSettings]);
+
   const handleSaveVisualSettings = async () => {
     setIsSaving(true);
     try {
@@ -915,7 +951,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
     const base = [
       { path: "/", labelEn: "Home Gateway Redirect", labelAr: "بوابة التوجيه الرئيسية", type: "public", status: "index", descriptionEn: "Public gateway routing users to default dashboard structure.", descriptionAr: "بوابة توجيه عامة تقوم بتوجيه المستخدمين للواجهة الافتراضية." },
       { path: "/subscription", labelEn: "Subscription Plans Page", labelAr: "صفحة خطط الاشتراكات", type: "public", status: "index", descriptionEn: "Public storefront detailing memberships, tiers, and pricing matrices.", descriptionAr: "صفحة عامة لعرض مزايا وتفاصيل العضوية والخطط السعرية." },
-      { path: "/viralbook", labelEn: "ViralBook & Community Feed", labelAr: "فايرال بوك والمجتمع التفاعلي", type: "public", status: "index", descriptionEn: "Public interactive feed with verified reels, business pages, and campaigns.", descriptionAr: "منصة فايرال بوك التفاعلية لنشر الإعلانات ومقاطع الفيديو والصفحات التجارية." },
+      { path: "/viralbook", labelEn: "ViralBook & Community Feed", labelAr: "فيرال بوك والمجتمع التفاعلي", type: "public", status: "index", descriptionEn: "Public interactive feed with verified reels, business pages, and campaigns.", descriptionAr: "منصة فيرال بوك التفاعلية لنشر الإعلانات ومقاطع الفيديو والصفحات التجارية." },
       { path: "/terms", labelEn: "Terms of Service", labelAr: "شروط الخدمة والاستخدام", type: "public", status: "index", descriptionEn: "Mandatory public legal statement governing platform interactions.", descriptionAr: "اتفاقية قانونية عامة تنظم الاستخدام وحقوق الملكية للمنصة." },
       { path: "/privacy", labelEn: "Privacy Policy Charter", labelAr: "سياسة الخصوصية وحماية البيانات", type: "public", status: "index", descriptionEn: "Mandatory public charter highlighting database handling policies.", descriptionAr: "ميثاق خصوصية عام يوضح سياسات التعامل الآمن مع قواعد البيانات." },
       { path: "/about", labelEn: "About Corporate Pitch", labelAr: "صفحة التعريف والرؤية", type: "public", status: "index", descriptionEn: "Public company presentation showcasing core tech vision.", descriptionAr: "عرض عام للمؤسسة يعزز الثقة ويوضح الرؤية الابتكارية." },
@@ -1049,45 +1085,93 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
   };
 
   return (
-    <div className="space-y-8 max-w-5xl relative">
+    <div className="w-full max-w-full space-y-6 relative px-1 md:px-2">
 
-      {/* Sovereign Theme Studio & Appearance Section */}
-      <div
-        className="p-6 md:p-8 rounded-[var(--radius-lg)] border transition-theme bg-[var(--surface-card)] border-[var(--border-default)]"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-          <div className="flex items-start sm:items-center gap-4">
-            <div className="p-3.5 rounded-[var(--radius-md)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] shadow-sm shrink-0">
-              <Palette size={26} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <h2 className="text-xl font-bold text-[var(--text-primary)]">
-                  {language === "ar" ? "استوديو المظهر وتخصيص الثيمات" : "Theme Studio & Appearance Control"}
-                </h2>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[var(--surface-subtle)] text-[var(--fg-accent)] border border-[var(--border-default)]">
-                  {language === "ar" ? "قسم احترافي" : "PRO MODULE"}
-                </span>
+      {/* Sub-Tabs Navigation Bar */}
+      {!hideSubTabs && (
+        <div className="w-full flex items-center justify-between border-b border-[var(--border-default)] pb-3">
+          <div className="flex items-center gap-1.5 p-1 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] overflow-x-auto max-w-full custom-scrollbar">
+            <button
+              type="button"
+              onClick={() => handleMainTabSwitch('general')}
+              className={`flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-[var(--radius-sm)] text-xs font-bold transition-all cursor-pointer touch-target-44 whitespace-nowrap ${
+                activeMainTab === 'general'
+                  ? "bg-[var(--surface-card)] text-[var(--fg-accent)] shadow-xs border border-[var(--border-accent)]/30 font-black"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)]/50 border border-transparent"
+              }`}
+            >
+              <Settings size={16} className={activeMainTab === 'general' ? "text-[var(--fg-accent)]" : "text-[var(--text-muted)]"} />
+              <span>{language === 'ar' ? 'الإعدادات العامة والهوية' : 'General Configuration'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleMainTabSwitch('seo')}
+              className={`flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-[var(--radius-sm)] text-xs font-bold transition-all cursor-pointer touch-target-44 whitespace-nowrap ${
+                activeMainTab === 'seo'
+                  ? "bg-[var(--surface-card)] text-[var(--fg-accent)] shadow-xs border border-[var(--border-accent)]/30 font-black"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)]/50 border border-transparent"
+              }`}
+            >
+              <Globe size={16} className={activeMainTab === 'seo' ? "text-[var(--fg-accent)]" : "text-[var(--text-muted)]"} />
+              <span>{language === 'ar' ? 'مركز محركات البحث (SEO)' : 'SEO & Metadata Center'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleMainTabSwitch('memory')}
+              className={`flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-[var(--radius-sm)] text-xs font-bold transition-all cursor-pointer touch-target-44 whitespace-nowrap ${
+                activeMainTab === 'memory'
+                  ? "bg-[var(--surface-card)] text-[var(--fg-accent)] shadow-xs border border-[var(--border-accent)]/30 font-black"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)]/50 border border-transparent"
+              }`}
+            >
+              <Brain size={16} className={activeMainTab === 'memory' ? "text-[var(--fg-accent)]" : "text-[var(--text-muted)]"} />
+              <span>{language === 'ar' ? 'إدارة الذاكرة والسياق' : 'Memory Engine'}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeMainTab === 'general' && (
+        <div className="space-y-8">
+          {/* Sovereign Theme Studio & Appearance Section */}
+          <div
+            className="p-5 md:p-6 rounded-[var(--radius-lg)] border transition-theme bg-[var(--surface-card)] border-[var(--border-default)]"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start sm:items-center gap-3.5">
+                <div className="p-3 rounded-[var(--radius-md)] bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] shadow-sm shrink-0">
+                  <Palette size={22} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                    <h2 className="text-base md:text-lg font-bold text-[var(--text-primary)]">
+                      {language === "ar" ? "استوديو المظهر وتخصيص الثيمات" : "Theme Studio & Appearance Control"}
+                    </h2>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[var(--surface-subtle)] text-[var(--fg-accent)] border border-[var(--border-default)]">
+                      {language === "ar" ? "مخصص بالكامل" : "PRO"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-xl">
+                    {language === "ar"
+                      ? "تخصيص لوحة ألوان بيربليكستا، وتوكنز المظهر للوضع الداكن والفاتح مع تطبيق فوري وحفظ بقاعدة البيانات."
+                      : "Sovereign control over design tokens, surface variables, and appearance customization for dark and light modes."}
+                  </p>
+                </div>
               </div>
-              <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-2xl">
-                {language === "ar"
-                  ? "تحكم دقيق وشامل في لوحة ألوان بيربليكستا، وتخصيص متغيرات الثيم للوضع الداكن والفاتح مع تطبيق فوري وتخزين صارم في قاعدة البيانات."
-                  : "Sovereign control over Perplexta design tokens, surface variables, and appearance customization for dark and light modes."}
-              </p>
+              <button
+                type="button"
+                id="admin-open-theme-studio-btn"
+                onClick={() => navigate("/admin/theme")}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-[var(--radius-md)] font-bold text-xs bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] hover:opacity-90 transition-theme shadow-xs cursor-pointer shrink-0 touch-target-44"
+              >
+                <Palette size={15} />
+                <span>{language === "ar" ? "فتح استوديو الثيمات" : "Open Theme Studio"}</span>
+                <ArrowRight size={14} className={language === "ar" ? "rotate-180" : ""} />
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            id="admin-open-theme-studio-btn"
-            onClick={() => navigate("/admin/theme")}
-            className="flex items-center justify-center gap-2.5 px-5 py-3 rounded-[var(--radius)] font-bold text-sm bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] hover:opacity-90 transition-theme shadow-sm cursor-pointer shrink-0 active:scale-95"
-          >
-            <Palette size={18} />
-            <span>{language === "ar" ? "فتح استوديو المظهر والثيمات" : "Open Theme Studio"}</span>
-            <ArrowRight size={16} className={language === "ar" ? "rotate-180" : ""} />
-          </button>
-        </div>
-      </div>
 
       {/* General Settings */}
       <div
@@ -1172,46 +1256,41 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       >
         <div className="flex items-center justify-between gap-3 mb-6">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-md bg-purple-500/10 text-purple-500">
+            <div className="p-3 rounded-shape-sm bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)]">
               <ImageIcon size={24} />
             </div>
-            <h2 className="text-xl font-bold">{t("visualIdentity")}</h2>
+            <div>
+              <h2 className="text-xl font-bold">{t("visualIdentity")}</h2>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                {language === "ar" ? "الشعارات المعتمدة للثيمات وتوليد حزمة أيقونات التطبيق والـ PWA" : "Theme brand logos and multi-platform PWA icon suite"}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handleSyncSeoMetadata}
-              disabled={isSyncingMetadata}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs rounded-md bg-[var(--status-success-subtle)] hover:opacity-90 text-[var(--fg-success)] font-medium transition-colors border border-[var(--fg-success)]/20"
-              title={language === "ar" ? "مزامنة العناوين والكلمات المفتاحية والوصف المفقود لإعلانات ومنشورات المجتمع" : "Sync missing SEO titles, descriptions, and keywords for bulletin items"}
-            >
-              <RefreshCw size={14} className={isSyncingMetadata ? "animate-spin" : ""} />
-              <span>{language === "ar" ? "مزامنة SEO للمحتوى" : "Sync Content SEO"}</span>
-            </button>
-            <button
-              type="button"
               onClick={checkSystemAssetsDiagnostic}
               disabled={isCheckingAssets}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs rounded-md bg-[var(--surface-subtle)] hover:bg-[var(--surface-card)] text-[var(--text-secondary)] border border-[var(--border-default)] transition-colors"
+              className="flex items-center gap-2 px-3.5 py-2 text-xs rounded-shape-md bg-[var(--surface-subtle)] hover:bg-[var(--surface-card)] text-[var(--text-secondary)] border border-[var(--border-default)] transition-theme font-medium cursor-pointer shadow-2xs"
               title={language === "ar" ? "فحص سلامة ملفات الشعار والهوية" : "Scan system logo & asset files"}
             >
               <RefreshCw size={14} className={isCheckingAssets ? "animate-spin" : ""} />
-              <span>{language === "ar" ? "فحص السلامة" : "Scan Assets"}</span>
+              <span>{language === "ar" ? "فحص سلامة الأصول" : "Scan Assets"}</span>
             </button>
           </div>
         </div>
 
         {/* Orphaned Assets Warning Banner */}
         {orphanedAssetsState?.hasOrphanedAssets && (
-          <div className="mb-6 p-4 rounded-lg border border-amber-500/50 bg-amber-500/10 text-[var(--text-primary)] flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm animate-fade-in">
+          <div className="mb-6 p-4 rounded-shape-md border border-[var(--fg-warning)]/50 bg-[var(--status-warning-subtle)] text-[var(--text-primary)] flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm animate-fade-in">
             <div className="flex items-start gap-3">
-              <div className="p-2 rounded-md bg-amber-500/20 text-amber-500 shrink-0 mt-0.5">
+              <div className="p-2 rounded-shape-sm bg-[var(--fg-warning)]/20 text-[var(--fg-warning)] shrink-0 mt-0.5">
                 <AlertTriangle size={20} />
               </div>
               <div>
                 <h4 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-2 flex-wrap">
                   <span>{language === "ar" ? "تحذير: ملف الهوية مفقود من السيرفر (Orphaned Asset Detected)" : "Warning: Orphaned Asset Detected"}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 font-mono text-amber-500">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--fg-warning)]/20 font-mono text-[var(--fg-warning)]">
                     {orphanedAssetsState.orphanedKeys.join(", ")}
                   </span>
                 </h4>
@@ -1222,7 +1301,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 </p>
                 <div className="mt-2 space-y-1">
                   {orphanedAssetsState.assets.filter(a => a.isOrphaned).map(a => (
-                    <div key={a.key} className="text-xs font-mono text-amber-500 flex items-center gap-2">
+                    <div key={a.key} className="text-xs font-mono text-[var(--fg-warning)] flex items-center gap-2">
                       <span className="font-semibold text-[var(--text-primary)]">• {a.label}:</span>
                       <span className="underline opacity-90">{a.url}</span>
                     </div>
@@ -1235,7 +1314,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 type="button"
                 onClick={handleRepairOrphanedAssets}
                 disabled={isRepairingAssets}
-                className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-md font-semibold text-xs transition-colors shadow-sm disabled:opacity-50"
+                className="flex items-center gap-2 bg-[var(--fg-warning)] hover:opacity-90 text-white px-4 py-2 rounded-shape-sm font-semibold text-xs transition-colors shadow-sm disabled:opacity-50"
               >
                 {isRepairingAssets ? (
                   <RefreshCw className="animate-spin" size={14} />
@@ -1249,10 +1328,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
         )}
 
         {/* Missing Asset Report Section */}
-        <div className="mb-8 p-5 rounded-xl border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
+        <div className="mb-8 p-5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-subtle)] shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-lg bg-red-500/10 text-red-500">
+              <div className="p-2.5 rounded-shape-md bg-[var(--status-danger-subtle)] text-[var(--fg-danger)]">
                 <AlertTriangle size={20} />
               </div>
               <div>
@@ -1271,7 +1350,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 type="button"
                 onClick={fetchMissingAssetReport}
                 disabled={isScanningMissingAssets}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent text-xs font-bold transition-colors border border-accent/20"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-shape-md bg-accent/10 hover:bg-accent/20 text-accent text-xs font-bold transition-colors border border-accent/20"
               >
                 <RefreshCw size={14} className={isScanningMissingAssets ? "animate-spin" : ""} />
                 <span>{language === "ar" ? "تشخيص وفحص المفقودات" : "Scan Missing Assets"}</span>
@@ -1281,7 +1360,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                   type="button"
                   onClick={() => handlePurgeMissingAssets()}
                   disabled={isPurgingMissingAssets}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors shadow-sm"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-shape-md bg-[var(--fg-danger)] hover:bg-[var(--fg-danger)] text-white text-xs font-bold transition-colors shadow-sm"
                 >
                   <Trash2 size={14} />
                   <span>{language === "ar" ? `تطهير الكل (${missingAssetReport.missingCount})` : `Purge All (${missingAssetReport.missingCount})`}</span>
@@ -1293,22 +1372,22 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           {missingAssetReport ? (
             <div className="space-y-4">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div className="p-3 rounded-lg bg-[var(--surface-page)] border border-[var(--border-default)]">
+                <div className="p-3 rounded-shape-md bg-[var(--surface-page)] border border-[var(--border-default)]">
                   <div className="text-[var(--text-muted)] text-[10px]">{language === "ar" ? "إجمالي الملفات المفحوصة" : "Total Checked"}</div>
                   <div className="font-bold text-base text-[var(--text-primary)] mt-1">{missingAssetReport.totalChecked}</div>
                 </div>
-                <div className="p-3 rounded-lg bg-[var(--surface-page)] border border-[var(--border-default)]">
+                <div className="p-3 rounded-shape-md bg-[var(--surface-page)] border border-[var(--border-default)]">
                   <div className="text-[var(--text-muted)] text-[10px]">{language === "ar" ? "الملفات الموجودة سليمة" : "Existing on Disk"}</div>
                   <div className="font-bold text-base text-[var(--fg-success)] mt-1">{missingAssetReport.existingCount}</div>
                 </div>
-                <div className={`col-span-2 p-3 rounded-lg border ${missingAssetReport.missingCount > 0 ? 'bg-red-500/10 border-red-500/30 text-red-500' : 'bg-[var(--status-success-subtle)] border-[var(--fg-success)]/30 text-[var(--fg-success)]'}`}>
+                <div className={`col-span-2 p-3 rounded-shape-md border ${missingAssetReport.missingCount > 0 ? 'bg-[var(--status-danger-subtle)] border-[var(--fg-danger)]/30 text-[var(--fg-danger)]' : 'bg-[var(--status-success-subtle)] border-[var(--fg-success)]/30 text-[var(--fg-success)]'}`}>
                   <div className="text-[10px] opacity-80">{language === "ar" ? "الملفات المفقودة (متطابقة بالسجل ومغيبة عن القرص)" : "Missing Assets Detected"}</div>
                   <div className="font-bold text-base mt-1">{missingAssetReport.missingCount}</div>
                 </div>
               </div>
 
               {missingAssetReport.missingAssets && missingAssetReport.missingAssets.length > 0 ? (
-                <div className="border border-[var(--border-default)] rounded-lg overflow-hidden bg-[var(--surface-page)]">
+                <div className="border border-[var(--border-default)] rounded-shape-md overflow-hidden bg-[var(--surface-page)]">
                   <table className="w-full text-start text-xs border-collapse">
                     <thead>
                       <tr className="bg-[var(--surface-subtle)] border-b border-[var(--border-default)] text-[var(--text-muted)] font-bold">
@@ -1322,10 +1401,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                     </thead>
                     <tbody className="divide-y divide-[var(--border-default)]">
                       {missingAssetReport.missingAssets.map((item: any) => (
-                        <tr key={item.id} className="hover:bg-red-500/5 transition-colors">
+                        <tr key={item.id} className="hover:bg-[var(--status-danger-subtle)] transition-colors">
                           <td className="p-3 font-mono text-[var(--text-secondary)]">#{item.id}</td>
                           <td className="p-3 font-medium text-[var(--text-primary)]">{item.file_name || 'N/A'}</td>
-                          <td className="p-3 font-mono text-xs text-red-500 truncate max-w-[200px]" title={item.file_url}>{item.file_url}</td>
+                          <td className="p-3 font-mono text-xs text-[var(--fg-danger)] truncate max-w-[200px]" title={item.file_url}>{item.file_url}</td>
                           <td className="p-3 text-center font-mono text-[var(--text-secondary)]">{item.user_id || 'N/A'}</td>
                           <td className="p-3 text-center text-[var(--text-muted)]">{new Date(item.created_at).toLocaleString()}</td>
                           <td className="p-3 text-center">
@@ -1333,7 +1412,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                               type="button"
                               onClick={() => handlePurgeMissingAssets([item.id])}
                               disabled={isPurgingMissingAssets}
-                              className="px-2.5 py-1 rounded bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white text-[10px] font-bold transition-colors"
+                              className="px-2.5 py-1 rounded bg-[var(--fg-danger)]/10 hover:bg-[var(--fg-danger)] text-[var(--fg-danger)] hover:text-white text-[10px] font-bold transition-colors"
                             >
                               {language === "ar" ? "حذف السجل" : "Purge Record"}
                             </button>
@@ -1344,7 +1423,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                   </table>
                 </div>
               ) : (
-                <div className="p-6 text-center text-xs text-[var(--fg-success)] font-medium bg-[var(--status-success-subtle)] rounded-lg border border-[var(--fg-success)]/20">
+                <div className="p-6 text-center text-xs text-[var(--fg-success)] font-medium bg-[var(--status-success-subtle)] rounded-shape-md border border-[var(--fg-success)]/20">
                   {language === "ar" ? "✅ جميع الملفات المسجلة في قاعدة البيانات متوفرة وموجودة على القرص بسلام." : "✅ All database file records are fully synchronized and present on disk storage."}
                 </div>
               )}
@@ -1359,7 +1438,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Logo Upload (Dark theme) */}
           <div
-            className="p-6 rounded-[var(--radius)] border border-dashed border-[var(--border-default)] bg-[var(--surface-subtle)] flex flex-col items-center justify-center text-center relative overflow-hidden group"
+            className="p-6 rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--surface-subtle)] flex flex-col items-center justify-center text-center relative overflow-hidden group"
           >
             {logoBase64 && (
               <button
@@ -1369,7 +1448,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                   e.preventDefault();
                   setLogoBase64(null);
                 }}
-                className="absolute top-2.5 right-2.5 p-1.5 bg-red-500/80 hover:bg-red-600 text-white rounded-full z-20 transition-colors shadow-md"
+                className="absolute top-2.5 right-2.5 p-1.5 bg-[var(--status-danger-subtle)] hover:bg-[var(--fg-danger)] text-white rounded-full z-20 transition-colors shadow-md"
                 title={language === "ar" ? "حذف الشعار" : "Remove Logo"}
               >
                 <Trash2 size={13} />
@@ -1386,10 +1465,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 <img
                   src={resolveImageUrl(logoBase64, 'general')}
                   alt="Dark Logo"
-                  className="w-8 h-8 rounded-md object-contain"
+                  className="w-8 h-8 rounded-shape-sm object-contain"
                 />
               ) : (
-                <div className="bg-pink-600 p-1.5 rounded-sm text-white flex items-center justify-center w-8 h-8">
+                <div className="bg-pink-600 p-1.5 rounded-shape-xs text-white flex items-center justify-center w-8 h-8">
                   <svg
                     width="20"
                     height="20"
@@ -1430,7 +1509,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
           {/* Logo Upload (Light theme) */}
           <div
-            className="p-6 rounded-[var(--radius)] border border-dashed border-[var(--border-default)] bg-[var(--surface-subtle)] flex flex-col items-center justify-center text-center relative overflow-hidden group"
+            className="p-6 rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--surface-subtle)] flex flex-col items-center justify-center text-center relative overflow-hidden group"
           >
             {logoLightBase64 && (
               <button
@@ -1440,7 +1519,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                   e.preventDefault();
                   setLogoLightBase64(null);
                 }}
-                className="absolute top-2.5 right-2.5 p-1.5 bg-red-500/80 hover:bg-red-600 text-white rounded-full z-20 transition-colors shadow-md"
+                className="absolute top-2.5 right-2.5 p-1.5 bg-[var(--status-danger-subtle)] hover:bg-[var(--fg-danger)] text-white rounded-full z-20 transition-colors shadow-md"
                 title={language === "ar" ? "حذف الشعار الفاتح" : "Remove Light Logo"}
               >
                 <Trash2 size={13} />
@@ -1457,10 +1536,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 <img
                   src={resolveImageUrl(logoLightBase64, 'general')}
                   alt="Light Logo"
-                  className="w-8 h-8 rounded-md object-contain"
+                  className="w-8 h-8 rounded-shape-sm object-contain"
                 />
               ) : (
-                <div className="bg-sky-500 p-1.5 rounded-sm text-white flex items-center justify-center w-8 h-8">
+                <div className="bg-sky-500 p-1.5 rounded-shape-xs text-white flex items-center justify-center w-8 h-8">
                   <svg
                     width="20"
                     height="20"
@@ -1501,7 +1580,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
           {/* Favicon Upload */}
           <div
-            className="p-6 rounded-lg border border-dashed border-[var(--border-default)] bg-[var(--surface-subtle)] flex flex-col items-center justify-center text-center relative overflow-hidden group"
+            className="p-6 rounded-shape-md border border-dashed border-[var(--border-default)] bg-[var(--surface-subtle)] flex flex-col items-center justify-center text-center relative overflow-hidden group"
           >
             {faviconBase64 && (
               <button
@@ -1511,7 +1590,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                   e.preventDefault();
                   setFaviconBase64(null);
                 }}
-                className="absolute top-2.5 right-2.5 p-1.5 bg-red-500/80 hover:bg-red-600 text-white rounded-full z-20 transition-colors shadow-md"
+                className="absolute top-2.5 right-2.5 p-1.5 bg-[var(--status-danger-subtle)] hover:bg-[var(--fg-danger)] text-white rounded-full z-20 transition-colors shadow-md"
                 title={language === "ar" ? "حذف أيقونة المفضلة" : "Remove Favicon"}
               >
                 <Trash2 size={13} />
@@ -1523,7 +1602,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               onChange={(e) => handleImageUpload(e, "favicon")}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
             />
-            <div className="mb-4 w-8 h-8 rounded-md bg-[var(--surface-subtle)] flex items-center justify-center overflow-hidden border border-[var(--border-default)]">
+            <div className="mb-4 w-8 h-8 rounded-shape-sm bg-[var(--surface-subtle)] flex items-center justify-center overflow-hidden border border-[var(--border-default)]">
               {faviconBase64 ? (
                 <img
                   src={resolveImageUrl(faviconBase64, 'general')}
@@ -1545,13 +1624,13 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
         <div className="mt-8 pt-8 border-t border-[var(--border-default)]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-500">
+              <div className="p-2.5 rounded-shape-md bg-[var(--status-success-subtle)] text-[var(--fg-success)]">
                 <Smartphone size={22} />
               </div>
               <div>
                 <h3 className="font-bold text-base text-[var(--text-primary)] flex items-center gap-2">
                   <span>{language === "ar" ? "حزمة أيقونات التطبيق والـ PWA النظامية" : "Systematic Multi-Platform & PWA Icon Suite"}</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-mono font-bold border border-emerald-500/30">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--status-success-subtle)] text-[var(--fg-success)] dark:text-[var(--fg-success)] font-mono font-bold border border-[var(--fg-success)]/30">
                     {brandAssetsStatus?.assets?.length || 10} {language === "ar" ? "أيقونات معتمدة" : "Active Icons"}
                   </span>
                 </h3>
@@ -1573,7 +1652,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 type="button"
                 onClick={handleGenerateBrandAssets}
                 disabled={isGeneratingBrandAssets || isLoadingBrandAssets}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 rounded-shape-md bg-[var(--fg-success)] hover:bg-[var(--fg-success)]/90 text-white text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
                 title={language === "ar" ? "إعادة توليد أيقونات التطبيق" : "Regenerate App Icons"}
               >
                 <RefreshCw size={14} className={isGeneratingBrandAssets ? "animate-spin" : ""} />
@@ -1590,16 +1669,16 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               { id: 'apple-touch-icon', filename: 'apple-touch-icon.png', width: 180, height: 180, category: 'apple', description: 'iOS Safari home screen (180x180)' },
               { id: 'pwa-192', filename: 'pwa-192x192.png', width: 192, height: 192, purpose: 'any', category: 'pwa', description: 'Android PWA launcher (192x192)' },
               { id: 'pwa-512', filename: 'pwa-512x512.png', width: 512, height: 512, purpose: 'any', category: 'pwa', description: 'PWA splash screen (512x512)' },
-              { id: 'pwa-maskable-192', filename: 'pwa-maskable-192x192.png', width: 192, height: 192, purpose: 'maskable', category: 'pwa', description: 'Android adaptive safe-zone (192x192)' },
               { id: 'pwa-maskable-512', filename: 'pwa-maskable-512x512.png', width: 512, height: 512, purpose: 'maskable', category: 'pwa', description: 'Android adaptive safe-zone (512x512)' },
-              { id: 'apple-touch-167', filename: 'apple-touch-icon-167x167.png', width: 167, height: 167, category: 'apple', description: 'iPad Pro touch icon (167x167)' },
-              { id: 'mstile-150', filename: 'mstile-150x150.png', width: 150, height: 150, category: 'tile', description: 'Windows Modern UI tile (150x150)' }
+              { id: 'assistant-icon-32', filename: 'assistant-icon-32x32.png', width: 32, height: 32, category: 'favicon', description: 'Sovereign AI Assistant compact icon (32x32)' },
+              { id: 'assistant-icon-64', filename: 'assistant-icon-64x64.png', width: 64, height: 64, category: 'favicon', description: 'Sovereign AI Assistant medium icon (64x64)' },
+              { id: 'assistant-icon-128', filename: 'assistant-icon-128x128.png', width: 128, height: 128, category: 'favicon', description: 'Sovereign AI Assistant high-res icon (128x128)' }
             ]).map((asset: any) => {
               const categoryBadgeColor = 
-                asset.category === 'apple' ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' :
-                asset.category === 'pwa' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
-                asset.category === 'tile' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
-                'bg-amber-500/10 text-amber-500 border-amber-500/20';
+                asset.category === 'apple' ? 'bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)] border-[var(--border-accent)]/20' :
+                asset.category === 'pwa' ? 'bg-[var(--status-success-subtle)] text-[var(--fg-success)] border-[var(--fg-success)]/20' :
+                asset.category === 'tile' ? 'bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)] border-[var(--border-accent)]/20' :
+                'bg-[var(--status-warning-subtle)] text-[var(--fg-warning)] border-[var(--fg-warning)]/20';
 
               const categoryLabel = 
                 asset.category === 'apple' ? 'Apple iOS' :
@@ -1611,7 +1690,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               return (
                 <div
                   key={asset.id || asset.filename}
-                  className="p-3.5 rounded-xl border border-[var(--border-default)] bg-[var(--surface-subtle)] flex flex-col justify-between hover:border-accent/40 transition-all group relative"
+                  className="p-3.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-subtle)] flex flex-col justify-between hover:border-accent/40 transition-all group relative"
                 >
                   <div>
                     <div className="flex items-center justify-between gap-1 mb-2.5">
@@ -1623,18 +1702,18 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                       </span>
                     </div>
 
-                    <div className="w-full aspect-square rounded-lg bg-[var(--surface-card)] border border-[var(--border-default)] flex items-center justify-center p-2 mb-2.5 overflow-hidden relative shadow-inner">
+                    <div className="w-full aspect-square rounded-shape-md bg-[var(--surface-card)] border border-[var(--border-default)] flex items-center justify-center p-2 mb-2.5 overflow-hidden relative shadow-inner">
                       {asset.dataUri ? (
                         <img
                           src={asset.dataUri}
                           alt={asset.filename}
-                          className="max-w-full max-h-full object-contain transition-transform group-hover:scale-105"
+                          className="max-w-full max-h-full object-contain transition-opacity"
                         />
                       ) : (
                         <img
                           src={`${assetUrl}?t=${brandAssetsStatus?.timestamp || Date.now()}`}
                           alt={asset.filename}
-                          className="max-w-full max-h-full object-contain transition-transform group-hover:scale-105"
+                          className="max-w-full max-h-full object-contain transition-opacity"
                           onError={(e) => {
                             (e.target as HTMLElement).style.display = 'none';
                           }}
@@ -1642,7 +1721,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                       )}
                       {asset.purpose === 'maskable' && (
                         <div
-                          className="absolute inset-2 rounded-full border border-dashed border-emerald-500/40 pointer-events-none"
+                          className="absolute inset-2 rounded-full border border-dashed border-[var(--fg-success)]/40 pointer-events-none"
                           title="Adaptive Icon Safe-Zone"
                         />
                       )}
@@ -1667,7 +1746,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                       <ArrowRight size={10} className={dir === "rtl" ? "rotate-180" : ""} />
                     </a>
                     {asset.exists === false ? (
-                      <span className="text-amber-500 font-bold text-[9px]">
+                      <span className="text-[var(--fg-warning)] font-bold text-[9px]">
                         {language === "ar" ? "غير مولد" : "Pending"}
                       </span>
                     ) : asset.sizeBytes ? (
@@ -1705,11 +1784,11 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
 
       {/* Page, Section & Google Auth Visibility Control Panel */}
       <div
-        className="p-6 md:p-8 rounded-lg border mb-8 bg-[var(--surface-card)] border-[var(--border-default)]"
+        className="p-6 md:p-8 rounded-shape-md border mb-8 bg-[var(--surface-card)] border-[var(--border-default)]"
       >
         <div className="flex items-center justify-between pb-4 border-b border-[var(--border-subtle)] mb-6">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-md bg-purple-500/10 text-purple-500">
+            <div className="p-3 rounded-shape-sm bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)]">
               <EyeOff size={24} />
             </div>
             <div>
@@ -1750,20 +1829,20 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 title: dir === "rtl" ? "استوديو المطورين" : "Developer Studio",
                 subtitle: dir === "rtl" ? "مسار /studio" : "Route /studio",
                 description: dir === "rtl" ? "إخفاء زر وقسم استوديو الإنشاء من الهيدر والشريط الجانبي." : "Hide Developer Studio button from header and sidebar navigation.",
-                icon: <Cpu size={18} className="text-blue-500" />
+                icon: <Cpu size={18} className="text-[var(--fg-accent)]" />
               },
               {
                 key: "/google-hub",
                 title: dir === "rtl" ? "مركز خدمات قوقل (Google Hub)" : "Google Hub Section",
                 subtitle: dir === "rtl" ? "مسار /google-hub" : "Route /google-hub",
                 description: dir === "rtl" ? "إخفاء قسم منتجات قوقل لتفادي أي تعارض مع سياسات المتجر." : "Hide Google products section to ensure store compliance.",
-                icon: <Globe size={18} className="text-amber-500" />
+                icon: <Globe size={18} className="text-[var(--fg-warning)]" />
               },
               {
                 key: "/viralbook",
-                title: dir === "rtl" ? "فايرال بوك والنشر (ViralBook Ads)" : "ViralBook Ads & Feed",
+                title: dir === "rtl" ? "فيرال بوك والنشر (ViralBook Ads)" : "ViralBook Ads & Feed",
                 subtitle: dir === "rtl" ? "مسار /viralbook" : "Route /viralbook",
-                description: dir === "rtl" ? "إخفاء قسم فايرال بوك والمنشورات التفاعلية من الهيدر." : "Hide interactive ViralBook section from header.",
+                description: dir === "rtl" ? "إخفاء قسم فيرال بوك والمنشورات التفاعلية من الهيدر." : "Hide interactive ViralBook section from header.",
                 icon: <Megaphone size={18} className="text-pink-500" />
               },
               {
@@ -1771,21 +1850,21 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 title: dir === "rtl" ? "برنامج المكافآت" : "Rewards Program",
                 subtitle: dir === "rtl" ? "مسار /rewards" : "Route /rewards",
                 description: dir === "rtl" ? "إخفاء صفحة ونظام المكافآت من القائمة الجانبية." : "Hide rewards page and system from navigation sidebar.",
-                icon: <Gift size={18} className="text-purple-500" />
+                icon: <Gift size={18} className="text-[var(--fg-accent)]" />
               },
               {
                 key: "/explore",
                 title: dir === "rtl" ? "قسم استكشف (Explore)" : "Explore Section",
                 subtitle: dir === "rtl" ? "مسار /explore" : "Route /explore",
                 description: dir === "rtl" ? "إخفاء قسم استكشف والنماذج الشائعة من الشريط الجانبي." : "Hide explore section and trending prompts from sidebar.",
-                icon: <Compass size={18} className="text-indigo-500" />
+                icon: <Compass size={18} className="text-[var(--fg-accent)]" />
               },
               {
                 key: "hide_google_auth",
                 title: dir === "rtl" ? "زر تسجيل الدخول بواسطة قوقل" : "Google Sign-In Button",
                 subtitle: dir === "rtl" ? "زر Google في نافذة الدخول" : "Google Login in Auth Modal",
                 description: dir === "rtl" ? "إخفاء زر المصادقة عبر قوقل للالتزام بشرط Apple Sign-In." : "Hide Google login button from auth modal for Apple Store rules.",
-                icon: <Key size={18} className="text-red-500" />
+                icon: <Key size={18} className="text-[var(--fg-danger)]" />
               }
             ].map((item) => {
               const isHidden = item.key === 'hide_google_auth' 
@@ -1795,16 +1874,16 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               return (
                 <div
                   key={item.key}
-                  className={`p-4 rounded-lg border transition-all duration-200 flex flex-col justify-between ${
+                  className={`p-4 rounded-shape-md border transition-all duration-base flex flex-col justify-between ${
                     isHidden
-                      ? "bg-red-500/10 border-red-500/30 text-[var(--text-primary)]"
+                      ? "bg-[var(--status-danger-subtle)] border-[var(--fg-danger)]/30 text-[var(--text-primary)]"
                       : "bg-[var(--surface-subtle)] border-[var(--border-default)] hover:border-accent/40"
                   }`}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <div className="p-2 rounded-md bg-accent/10 shrink-0">
+                        <div className="p-2 rounded-shape-sm bg-accent/10 shrink-0">
                           {item.icon}
                         </div>
                         <div>
@@ -1821,7 +1900,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                       <span
                         className={`px-2 py-0.5 text-[10px] font-bold rounded-full border shrink-0 ${
                           isHidden
-                            ? "bg-red-500/15 text-red-500 border-red-500/30"
+                            ? "bg-[var(--status-danger-subtle)] text-[var(--fg-danger)] border-[var(--fg-danger)]/30"
                             : "bg-[var(--status-success-subtle)] text-[var(--fg-success)] border-[var(--fg-success)]/30"
                         }`}
                       >
@@ -1840,10 +1919,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => handleToggleSection(item.key)}
-                    className={`w-full py-2 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-2 border shadow-sm active:scale-98 ${
+                    className={`w-full py-2.5 px-3 rounded-[var(--radius-sm)] text-xs font-bold transition-theme flex items-center justify-center gap-2 border shadow-xs min-h-[40px] cursor-pointer touch-target-44 ${
                       isHidden
                         ? "bg-[var(--bg-accent-emphasis)] hover:opacity-90 text-[var(--fg-on-emphasis)] border-[var(--border-accent)]"
-                        : "bg-red-600 hover:bg-red-500 text-white border-red-500/40"
+                        : "bg-[var(--fg-danger)] hover:bg-[var(--fg-danger)] text-white border-[var(--fg-danger)]/40"
                     }`}
                   >
                     {isHidden ? (
@@ -1868,9 +1947,9 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
         <div className="mb-6 pt-6 border-t border-[var(--border-subtle)]">
           <div className="mb-4">
             <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <Smartphone size={16} className="text-cyan-500" />
+              <Smartphone size={16} className="text-[var(--accent)]" />
               <span>{dir === "rtl" ? "2. نموذج التحكم المخصص لنسخة الموبايل والتطبيق (Mobile Version Only)" : "2. Mobile Version Specific Visibility Controls"}</span>
-              <span className="px-2 py-0.5 text-[9px] font-bold rounded bg-cyan-500/10 text-cyan-500 border border-cyan-500/20">
+              <span className="px-2 py-0.5 text-[9px] font-bold rounded-[var(--radius-xs)] bg-[var(--bg-accent-muted)] text-[var(--accent)] border border-[var(--border-accent)]">
                 {dir === "rtl" ? "نسخة الهواتف" : "Mobile Only"}
               </span>
             </h3>
@@ -1888,14 +1967,14 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 title: dir === "rtl" ? "شريط تثبيت التطبيق للموبايل" : "Mobile PWA Install Banner",
                 subtitle: dir === "rtl" ? "شريط الحث PWA Banner" : "Mobile Banner PWA",
                 description: dir === "rtl" ? "إخفاء شريط وشاشة تثبيت وحث تنزيل تطبيق PWA على الهواتف الذكية." : "Hide install invitation banner on mobile web browser.",
-                icon: <Smartphone size={18} className="text-cyan-500" />
+                icon: <Smartphone size={18} className="text-[var(--accent)]" />
               },
               {
                 key: "hide_mobile_google_auth",
                 title: dir === "rtl" ? "تسجيل دخول قوقل على الهواتف" : "Google Sign-In on Mobile",
                 subtitle: dir === "rtl" ? "زر Google في نافذة الدخول للموبايل" : "Google Auth in Mobile Modal",
                 description: dir === "rtl" ? "إخفاء زر تسجيل الدخول بقوقل على هواتف الموبايل فقط (شرط متجر أبل)." : "Hide Google login button strictly on mobile version.",
-                icon: <Key size={18} className="text-red-500" />
+                icon: <Key size={18} className="text-[var(--fg-danger)]" />
               },
               {
                 key: "hide_mobile_subscription",
@@ -1909,7 +1988,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 title: dir === "rtl" ? "استوديو المطورين على الموبايل" : "Developer Studio on Mobile",
                 subtitle: dir === "rtl" ? "مسار /studio على الموبايل" : "Route /studio on Mobile",
                 description: dir === "rtl" ? "إخفاء زر وقسم استوديو المطورين في الهيدر والSidebar للهواتف." : "Hide Developer Studio button and page on mobile viewport.",
-                icon: <Cpu size={18} className="text-blue-500" />
+                icon: <Cpu size={18} className="text-[var(--fg-accent)]" />
               },
               {
                 key: "hide_mobile_bulletin",
@@ -1923,14 +2002,14 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 title: dir === "rtl" ? "برنامج المكافآت على الموبايل" : "Rewards on Mobile",
                 subtitle: dir === "rtl" ? "مسار /rewards على الموبايل" : "Route /rewards on Mobile",
                 description: dir === "rtl" ? "إخفاء صفحة ونظام المكافآت والنقاط في القائمة على الهواتف." : "Hide rewards section on mobile navigation menu.",
-                icon: <Gift size={18} className="text-purple-500" />
+                icon: <Gift size={18} className="text-[var(--fg-accent)]" />
               },
               {
                 key: "hide_mobile_explore",
                 title: dir === "rtl" ? "قسم استكشف على الموبايل" : "Explore section on Mobile",
                 subtitle: dir === "rtl" ? "مسار /explore على الموبايل" : "Route /explore on Mobile",
                 description: dir === "rtl" ? "إخفاء قسم استكشف في شريط القائمة السفلي/الجانبي للموبايل." : "Hide explore section on mobile navigation.",
-                icon: <Compass size={18} className="text-indigo-500" />
+                icon: <Compass size={18} className="text-[var(--fg-accent)]" />
               }
             ].map((item) => {
               let isHidden = false;
@@ -1947,16 +2026,16 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               return (
                 <div
                   key={item.key}
-                  className={`p-4 rounded-lg border transition-all duration-200 flex flex-col justify-between ${
+                  className={`p-4 rounded-shape-md border transition-all duration-base flex flex-col justify-between ${
                     isHidden
-                      ? "bg-amber-500/10 border-amber-500/30 text-[var(--text-primary)]"
+                      ? "bg-[var(--status-warning-subtle)] border-[var(--fg-warning)]/30 text-[var(--text-primary)]"
                       : "bg-[var(--surface-subtle)] border-[var(--border-default)] hover:border-accent/40"
                   }`}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <div className="p-2 rounded-md bg-cyan-500/10 shrink-0">
+                        <div className="p-2 rounded-[var(--radius-xs)] bg-[var(--bg-accent-muted)] shrink-0">
                           {item.icon}
                         </div>
                         <div>
@@ -1973,7 +2052,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                       <span
                         className={`px-2 py-0.5 text-[10px] font-bold rounded-full border shrink-0 ${
                           isHidden
-                            ? "bg-amber-500/15 text-amber-500 border-amber-500/30"
+                            ? "bg-[var(--fg-warning)]/15 text-[var(--fg-warning)] border-[var(--fg-warning)]/30"
                             : "bg-[var(--status-success-subtle)] text-[var(--fg-success)] border-[var(--fg-success)]/30"
                         }`}
                       >
@@ -1992,10 +2071,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => handleToggleSection(item.key)}
-                    className={`w-full py-2 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-2 border shadow-sm active:scale-98 ${
+                    className={`w-full py-2.5 px-3 rounded-[var(--radius-sm)] text-xs font-bold transition-theme flex items-center justify-center gap-2 border shadow-xs min-h-[40px] cursor-pointer touch-target-44 ${
                       isHidden
                         ? "bg-[var(--bg-accent-emphasis)] hover:opacity-90 text-[var(--fg-on-emphasis)] border-[var(--border-accent)]"
-                        : "bg-amber-600 hover:bg-amber-500 text-white border-amber-500/40"
+                        : "bg-[var(--fg-warning)] hover:bg-[var(--fg-warning)] text-white border-[var(--fg-warning)]/40"
                     }`}
                   >
                     {isHidden ? (
@@ -2029,55 +2108,42 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           <button
             onClick={handleSaveVisibilitySettings}
             disabled={isSaving}
-            className="flex items-center gap-2 bg-accent hover:bg-accent text-white px-5 py-2 rounded-[var(--radius)] transition-theme text-xs font-bold shadow-sm disabled:opacity-50"
+            className="flex items-center gap-2 bg-accent hover:bg-accent text-white px-5 py-2 rounded-[var(--radius-md)] transition-theme text-xs font-bold shadow-sm disabled:opacity-50"
           >
             {isSaving ? <RefreshCw className="animate-spin" size={14} /> : <Save size={14} />}
-            <span>{dir === "rtl" ? "حفظ التغييرات الآن" : "Save Visibility Settings"}</span>
+            <span>{dir === "rtl" ? "حفظ الإعدادات" : "Save Settings"}</span>
           </button>
         </div>
       </div>
+      </div>
+      )}
+
+      {activeMainTab === 'seo' && (
+        <div className="space-y-8">
+          {/* Comprehensive Content SEO Audit & AI Metadata Generator */}
+          <div className="p-1 rounded-[var(--radius-lg)]">
+            <SeoCenterView
+              theme={theme}
+              t={t}
+              dir={dir}
+              language={language}
+              showToast={showToast}
+            />
+          </div>
 
       {/* SEO & Meta Tags */}
       <div
-        className="p-6 md:p-8 rounded-lg border mb-8 bg-[var(--surface-card)] border-[var(--border-default)]"
+        className="p-6 md:p-8 rounded-shape-md border mb-8 bg-[var(--surface-card)] border-[var(--border-default)]"
       >
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-3 rounded-md bg-blue-500/10 text-blue-500">
+          <div className="p-3 rounded-shape-sm bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)]">
             <Search size={24} />
           </div>
           <h2 className="text-xl font-bold text-[var(--text-primary)]">{t("seoFields")}</h2>
         </div>
 
         <div className="space-y-5">
-          {/* Site Identity Name Fields (SEO integrated) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-[var(--border-subtle)] pb-5">
-            <div>
-              <label className="block text-xs font-black uppercase tracking-wider text-accent mb-1.5">
-                {dir === "rtl" ? "اسم الموقع والمنصة (بالإنجليزية)" : "Site Name (English)"}
-              </label>
-              <input
-                type="text"
-                value={siteName || ""}
-                onChange={(e) => setSiteName(e.target.value)}
-                className="w-full px-4 py-3 rounded-md border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
-                placeholder="e.g. Perplexta Platform"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-black uppercase tracking-wider text-accent mb-1.5">
-                {dir === "rtl" ? "اسم الموقع والمنصة (بالعربية)" : "Site Name (Arabic)"}
-              </label>
-              <input
-                type="text"
-                value={siteNameAr || ""}
-                onChange={(e) => setSiteNameAr(e.target.value)}
-                className="w-full px-4 py-3 rounded-md border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
-                placeholder="مثال: منصة بيربليكستا"
-              />
-            </div>
-          </div>
-
-          {/* SEO Site Name Fields */}
+          {/* SEO Site Title Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-[var(--border-subtle)] pb-5">
             <div>
               <label className="block text-xs font-black uppercase tracking-wider text-accent mb-1.5">
@@ -2087,11 +2153,11 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 type="text"
                 value={seoSiteNameEn || ""}
                 onChange={(e) => setSeoSiteNameEn(e.target.value)}
-                className="w-full px-4 py-3 rounded-md border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+                className="w-full px-4 py-3 rounded-shape-sm border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
                 placeholder="e.g. Perplexta | Premium Financial Analytics"
               />
               <p className="text-[10px] text-[var(--text-muted)] mt-1">
-                {dir === "rtl" ? "العنوان المحدد لمحركات البحث الإنجليزية وعلامات تبويب المتصفح." : "Optimized English title displayed in Google search listings and browser tabs."}
+                {dir === "rtl" ? "العنوان المحدد لمحركات البحث وعلامات تبويب المتصفح." : "Optimized English title displayed in Google search listings and browser tabs."}
               </p>
             </div>
             <div>
@@ -2102,7 +2168,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 type="text"
                 value={seoSiteNameAr || ""}
                 onChange={(e) => setSeoSiteNameAr(e.target.value)}
-                className="w-full px-4 py-3 rounded-md border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+                className="w-full px-4 py-3 rounded-shape-sm border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
                 placeholder="مثال: منصة بيربليكستا | الاختيار الاحترافي للتحليل"
               />
               <p className="text-[10px] text-[var(--text-muted)] mt-1">
@@ -2111,35 +2177,8 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             </div>
           </div>
 
-          {/* Site Identity Description Fields (SEO integrated) */}
+          {/* SEO Meta Descriptions */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-[var(--border-subtle)] pb-5">
-            <div>
-              <label className="block text-xs font-black uppercase tracking-wider text-accent mb-1.5">
-                {dir === "rtl" ? "الوصف التعريفي العام (بالإنجليزية)" : "General Description (English)"}
-              </label>
-              <textarea
-                rows={2}
-                value={siteDescription || ""}
-                onChange={(e) => setSiteDescription(e.target.value)}
-                className="w-full px-4 py-3 rounded-md border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
-                placeholder="Enter general tagline description..."
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-black uppercase tracking-wider text-accent mb-1.5">
-                {dir === "rtl" ? "الوصف التعريفي العام (بالعربية)" : "General Description (Arabic)"}
-              </label>
-              <textarea
-                rows={2}
-                value={siteDescriptionAr || ""}
-                onChange={(e) => setSiteDescriptionAr(e.target.value)}
-                className="w-full px-4 py-3 rounded-md border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
-                placeholder="اكتب نبذة تعريفية عامة هنا..."
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                 {t("seoDescriptionEn")}
@@ -2148,7 +2187,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 rows={3}
                 value={seoDescriptionEn || ""}
                 onChange={(e) => setSeoDescriptionEn(e.target.value)}
-                className="w-full px-4 py-3 rounded-md border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
+                className="w-full px-4 py-3 rounded-shape-sm border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
               />
             </div>
             <div>
@@ -2159,7 +2198,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 rows={3}
                 value={seoDescriptionAr || ""}
                 onChange={(e) => setSeoDescriptionAr(e.target.value)}
-                className="w-full px-4 py-3 rounded-md border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
+                className="w-full px-4 py-3 rounded-shape-sm border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
               />
             </div>
           </div>
@@ -2172,7 +2211,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 type="text"
                 value={keywordsEn || ""}
                 onChange={(e) => setKeywordsEn(e.target.value)}
-                className="w-full px-4 py-3 rounded-[var(--radius)] border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
+                className="w-full px-4 py-3 rounded-[var(--radius-md)] border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
               />
             </div>
             <div>
@@ -2183,7 +2222,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 type="text"
                 value={keywordsAr || ""}
                 onChange={(e) => setKeywordsAr(e.target.value)}
-                className="w-full px-4 py-3 rounded-[var(--radius)] border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
+                className="w-full px-4 py-3 rounded-[var(--radius-md)] border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
               />
             </div>
           </div>
@@ -2196,7 +2235,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               placeholder={t("googleAnalyticsDesc")}
               value={googleAnalyticsId || ""}
               onChange={(e) => setGoogleAnalyticsId(e.target.value)}
-              className="w-full px-4 py-3 rounded-md border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
+              className="w-full px-4 py-3 rounded-shape-sm border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
             />
             <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
               {dir === "rtl" 
@@ -2214,7 +2253,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               placeholder="e.g. google-site-verification=..."
               value={googleSiteVerification || ""}
               onChange={(e) => setGoogleSiteVerification(e.target.value)}
-              className="w-full px-4 py-3 rounded-md border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
+              className="w-full px-4 py-3 rounded-shape-sm border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
             />
             <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
               {dir === "rtl" 
@@ -2232,7 +2271,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               placeholder={dir === "rtl" ? "مثال: /api/auth, /confidential-page (مفصولة بفاصلة)" : "e.g. /api/auth, /confidential-page, /custom-dashboard (comma-separated)"}
               value={blockedPaths || ""}
               onChange={(e) => setBlockedPaths(e.target.value)}
-              className="w-full px-4 py-3 rounded-md border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
+              className="w-full px-4 py-3 rounded-shape-sm border focus:outline-none focus:ring-2 focus:ring-accent-500/50 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)]"
             />
             <p className="text-[11px] text-[var(--text-muted)] mt-1.5 leading-relaxed">
               {dir === "rtl"
@@ -2251,13 +2290,13 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             <div className="max-w-2xl mx-auto">
               {dir === "rtl" ? (
                 /* Arabic Search Snippet Card - displayed strictly when Arabic interface is loaded */
-                <div className="p-5 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] flex flex-col justify-between text-right" dir="rtl">
+                <div className="p-5 rounded-shape-sm border bg-[var(--surface-subtle)] border-[var(--border-default)] flex flex-col justify-between text-right" dir="rtl">
                   <div>
                     <div className="flex items-center gap-2 mb-1.5 justify-start flex-row-reverse text-right">
                       {faviconBase64 ? (
                         <img src={faviconBase64} alt="Favicon" className="w-[18px] h-[18px] rounded-full object-contain" referrerPolicy="no-referrer" />
                       ) : (
-                        <div className="w-[18px] h-[18px] rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 text-[10px]">G</div>
+                        <div className="w-[18px] h-[18px] rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[var(--fg-accent)] text-[10px]">G</div>
                       )}
                       <div className="flex flex-col leading-none items-end">
                         <span className="text-[11px] font-sans text-[var(--text-primary)] font-medium">
@@ -2269,7 +2308,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                       </div>
                     </div>
                     
-                    <h4 className="text-[16px] leading-[1.3] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-medium mb-1 truncate font-sans text-right">
+                    <h4 className="text-[16px] leading-[1.3] text-[var(--fg-accent)] dark:text-[var(--fg-accent)] hover:underline cursor-pointer font-medium mb-1 truncate font-sans text-right">
                       {seoSiteNameAr || seoSiteNameEn || siteNameAr || siteName || "بيربليكستا"} | منصة التحليل التقني
                     </h4>
                     
@@ -2292,8 +2331,8 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         seoDescriptionAr.length >= 120 && seoDescriptionAr.length <= 160
                           ? "text-accent font-bold"
                           : seoDescriptionAr.length > 160 
-                          ? "text-red-500" 
-                          : "text-amber-500"
+                          ? "text-[var(--fg-danger)]" 
+                          : "text-[var(--fg-warning)]"
                       }>
                         {seoDescriptionAr.length} حرف
                       </span>
@@ -2304,8 +2343,8 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                           seoDescriptionAr.length >= 120 && seoDescriptionAr.length <= 160
                             ? "bg-accent"
                             : seoDescriptionAr.length > 160
-                            ? "bg-red-500"
-                            : "bg-amber-500"
+                            ? "bg-[var(--fg-danger)]"
+                            : "bg-[var(--fg-warning)]"
                         }`}
                         style={{ width: `${Math.min(100, (seoDescriptionAr.length / 160) * 100)}%` }}
                       />
@@ -2314,13 +2353,13 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 </div>
               ) : (
                 /* English Search Snippet Card - displayed strictly when English interface is loaded */
-                <div className="p-5 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] flex flex-col justify-between">
+                <div className="p-5 rounded-shape-sm border bg-[var(--surface-subtle)] border-[var(--border-default)] flex flex-col justify-between">
                   <div>
                     <div className="flex items-center gap-2 mb-1.5">
                       {faviconBase64 ? (
                         <img src={faviconBase64} alt="Favicon" className="w-[18px] h-[18px] rounded-full object-contain" referrerPolicy="no-referrer" />
                       ) : (
-                        <div className="w-[18px] h-[18px] rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-500 text-[10px]">G</div>
+                        <div className="w-[18px] h-[18px] rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[var(--fg-accent)] text-[10px]">G</div>
                       )}
                       <div className="flex flex-col leading-none">
                         <span className="text-[11px] font-sans text-[var(--text-primary)] font-medium">
@@ -2332,7 +2371,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                       </div>
                     </div>
                     
-                    <h4 className="text-[16px] leading-[1.3] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-medium mb-1 truncate font-sans">
+                    <h4 className="text-[16px] leading-[1.3] text-[var(--fg-accent)] dark:text-[var(--fg-accent)] hover:underline cursor-pointer font-medium mb-1 truncate font-sans">
                       {seoSiteNameEn || seoSiteNameAr || siteName || "Perplexta Platform"} | Best Technical Analysis
                     </h4>
                     
@@ -2355,8 +2394,8 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         seoDescriptionEn.length >= 120 && seoDescriptionEn.length <= 160
                           ? "text-accent font-bold"
                           : seoDescriptionEn.length > 160 
-                          ? "text-red-500" 
-                          : "text-amber-500"
+                          ? "text-[var(--fg-danger)]" 
+                          : "text-[var(--fg-warning)]"
                       }>
                         {seoDescriptionEn.length} chars
                       </span>
@@ -2367,8 +2406,8 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                           seoDescriptionEn.length >= 120 && seoDescriptionEn.length <= 160
                             ? "bg-accent"
                             : seoDescriptionEn.length > 160
-                            ? "bg-red-500"
-                            : "bg-amber-500"
+                            ? "bg-[var(--fg-danger)]"
+                            : "bg-[var(--fg-warning)]"
                         }`}
                         style={{ width: `${Math.min(100, (seoDescriptionEn.length / 160) * 100)}%` }}
                       />
@@ -2390,7 +2429,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               {/* Image Uploader */}
               <div className="space-y-4">
                 <div
-                  className="p-6 rounded-[var(--radius)] border border-dashed border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-accent/50 transition-theme flex flex-col items-center justify-center text-center relative overflow-hidden min-h-[220px] group"
+                  className="p-6 rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--surface-subtle)] hover:border-accent/50 transition-theme flex flex-col items-center justify-center text-center relative overflow-hidden min-h-[220px] group"
                 >
                   <input
                     type="file"
@@ -2412,7 +2451,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                       <img
                         src={resolveImageUrl(seoImageUrl, 'general')}
                         alt="SEO Preview"
-                        className="max-h-[160px] rounded-md object-contain aspect-[1.91/1] shadow-md border border-[var(--border-default)]"
+                        className="max-h-[160px] rounded-shape-sm object-contain aspect-[1.91/1] shadow-md border border-[var(--border-default)]"
                         referrerPolicy="no-referrer"
                       />
                       <button
@@ -2421,7 +2460,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                           e.stopPropagation();
                           setSeoImageUrl(null);
                         }}
-                        className="mt-3 text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-full flex items-center gap-1 transition-theme z-20"
+                        className="mt-3 text-xs bg-[var(--fg-danger)] hover:bg-[var(--fg-danger)] text-white px-3 py-1.5 rounded-full flex items-center gap-1 transition-theme z-20"
                       >
                         <Trash2 size={12} />
                         {t("seoRemoveImage")}
@@ -2429,7 +2468,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                     </div>
                   ) : (
                     <div className="flex flex-col items-center p-4">
-                      <div className="mb-3 p-3 rounded-full bg-accent/10 text-accent group-hover:scale-110 transition-transform duration-300">
+                      <div className="mb-3 p-3 rounded-full bg-accent/10 text-accent transition-colors">
                         <Upload size={24} />
                       </div>
                       <p className="text-xs font-semibold text-[var(--text-primary)]">
@@ -2443,7 +2482,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 </div>
 
                 {/* Google and Meta specifications card */}
-                <div className="p-4 rounded-md border text-xs leading-relaxed space-y-2 bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-secondary)]">
+                <div className="p-4 rounded-shape-sm border text-xs leading-relaxed space-y-2 bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-secondary)]">
                   <p className="font-semibold text-accent">
                     💡 {t("seoBestPracticesTitle")}
                   </p>
@@ -2467,7 +2506,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                   ⚡ {t("seoSocialPreviewTitle")}
                 </div>
 
-                <div className="rounded-lg overflow-hidden border shadow-sm flex flex-col bg-[var(--surface-card)] border-[var(--border-default)]">
+                <div className="rounded-shape-md overflow-hidden border shadow-sm flex flex-col bg-[var(--surface-card)] border-[var(--border-default)]">
                   {/* Image Section */}
                   <div className="relative aspect-[1.91/1] w-full overflow-hidden bg-[var(--surface-subtle)] border-b border-[var(--border-default)] flex items-center justify-center">
                     {seoImageUrl ? (
@@ -2485,7 +2524,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         </span>
                       </div>
                     )}
-                    <div className={`absolute top-2 ${language === "ar" ? "right-2" : "left-2"} bg-black/60 rounded-md px-2 py-0.5 text-[8px] tracking-wide text-white uppercase font-mono z-20`}>
+                    <div className={`absolute top-2 ${language === "ar" ? "right-2" : "left-2"} bg-black/60 rounded-shape-sm px-2 py-0.5 text-[8px] tracking-wide text-white uppercase font-mono z-20`}>
                       {language === "ar" ? "معاينة 1200x630" : "Preview Image 1200x630"}
                     </div>
                   </div>
@@ -2517,7 +2556,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           <button
             onClick={handleSaveSeoSettings}
             disabled={isSaving}
-            className="flex items-center gap-2 bg-accent hover:bg-accent text-white px-6 py-2.5 rounded-md transition-theme font-medium shadow-sm disabled:opacity-50"
+            className="flex items-center gap-2 bg-accent hover:bg-accent text-white px-6 py-2.5 rounded-shape-sm transition-theme font-medium shadow-sm disabled:opacity-50"
           >
             {isSaving ? (
               <RefreshCw className="animate-spin" size={18} />
@@ -2536,10 +2575,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-[var(--radius-sm)] bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border border-[var(--border-accent)]/20 shadow-xs">
-              <Globe size={24} className="text-accent " />
+              <Globe size={24} className="text-accent" />
             </div>
             <div>
-              <h2 className="text-xl font-bold tracking-tight">
+              <h2 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
                 {dir === "rtl" ? "أداة إدارة بيانات SEO للمسارات الديناميكية" : "Dynamic Route SEO Meta Manager"}
               </h2>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
@@ -2554,36 +2593,45 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             <button
               onClick={fetchRouteSeoList}
               disabled={loadingRouteSeo}
-              className="p-2.5 rounded-md border border-[var(--border-default)] hover:bg-[var(--surface-subtle)] text-[var(--text-secondary)] transition-theme"
+              className="p-2.5 min-h-[38px] min-w-[38px] flex items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border-default)] hover:bg-[var(--surface-subtle)] text-[var(--text-secondary)] transition-colors cursor-pointer"
               title={dir === "rtl" ? "تحديث القائمة" : "Refresh List"}
             >
               <RefreshCw size={16} className={loadingRouteSeo ? "animate-spin" : ""} />
             </button>
             <button
+              onClick={() => handleClearCache('route_seo')}
+              disabled={clearingCache !== null}
+              className="flex items-center gap-2 bg-[var(--fg-danger)]/10 hover:bg-[var(--fg-danger)]/20 text-[var(--fg-danger)] border border-[var(--fg-danger)]/20 px-4 py-2 min-h-[38px] rounded-[var(--radius-sm)] font-bold text-xs transition-colors cursor-pointer"
+              title={dir === "rtl" ? "تطهير كاش الـ SEO" : "Purge SEO Cache"}
+            >
+              <RefreshCw size={14} className={clearingCache === 'route_seo' ? "animate-spin" : ""} />
+              <span>{dir === "rtl" ? "تطهير كاش الـ SEO" : "Purge SEO Cache"}</span>
+            </button>
+            <button
               onClick={handleOpenAddRouteModal}
-              className="flex items-center gap-2 bg-accent hover:bg-accent text-[var(--fg-on-emphasis)] px-4 py-2 rounded-md font-medium text-xs transition-theme shadow-sm"
+              className="flex items-center gap-2 bg-accent hover:opacity-90 text-[var(--fg-on-emphasis)] px-4 py-2 min-h-[38px] rounded-[var(--radius-sm)] font-bold text-xs transition-opacity shadow-xs cursor-pointer"
             >
               <Plus size={16} />
-              {dir === "rtl" ? "إضافة مسار جديد" : "Add Route SEO"}
+              <span>{dir === "rtl" ? "إضافة مسار جديد" : "Add Route SEO"}</span>
             </button>
           </div>
         </div>
 
         {/* Search & Counter Filter */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-6 bg-[var(--surface-subtle)] p-3 rounded-md border border-[var(--border-default)]">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-6 bg-[var(--surface-subtle)] p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)]">
           <div className="relative w-full sm:w-80">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+            <Search size={16} className="absolute ltr:left-3 rtl:right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
             <input
               type="text"
               value={routeSearchQuery}
               onChange={(e) => setRouteSearchQuery(e.target.value)}
               placeholder={dir === "rtl" ? "بحث عن مسار أو عنوان..." : "Filter routes or titles..."}
-              className="w-full text-xs pl-9 pr-3 py-2 rounded-md border bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)]"
+              className="w-full text-xs ltr:pl-9 ltr:pr-3 rtl:pr-9 rtl:pl-3 py-2.5 rounded-[var(--radius-sm)] border bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-colors"
             />
           </div>
           <div className="text-xs text-[var(--text-muted)] font-mono flex items-center gap-2">
             <span>{dir === "rtl" ? "إجمالي المسارات المسجلة:" : "Configured Routes:"}</span>
-            <span className="px-2 py-0.5 rounded bg-accent/10 text-accent font-bold">
+            <span className="px-2.5 py-0.5 rounded bg-accent/10 text-accent font-bold">
               {routeSeoList.length}
             </span>
           </div>
@@ -2596,29 +2644,29 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             <span>{dir === "rtl" ? "جاري تحميل إعدادات SEO للمسارات..." : "Loading route SEO configurations..."}</span>
           </div>
         ) : routeSeoList.length === 0 ? (
-          <div className="py-12 text-center border border-dashed rounded-md border-[var(--border-default)] text-[var(--text-muted)]">
+          <div className="py-12 text-center border border-dashed rounded-[var(--radius-sm)] border-[var(--border-default)] text-[var(--text-muted)]">
             <Globe size={32} className="mx-auto mb-2 text-[var(--text-muted)] opacity-60" />
             <p className="text-sm font-medium">
               {dir === "rtl" ? "لا توجد مسارات مخصصة مسجلة حالياً" : "No custom route SEO configurations found."}
             </p>
             <button
               onClick={handleOpenAddRouteModal}
-              className="mt-3 text-xs text-accent underline hover:text-accent"
+              className="mt-3 text-xs text-accent underline hover:opacity-80 cursor-pointer"
             >
               {dir === "rtl" ? "+ إضافة أول مسار الآن" : "+ Create your first route SEO entry"}
             </button>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="text-[10px] uppercase font-mono border-b border-[var(--border-default)] text-[var(--text-secondary)] bg-[var(--surface-subtle)]">
+            <table className="w-full text-start text-xs border-collapse">
+              <thead className="text-[11px] uppercase font-mono border-b border-[var(--border-default)] text-[var(--text-secondary)] bg-[var(--surface-subtle)]">
                 <tr>
-                  <th className="p-3">{dir === "rtl" ? "المسار (Route)" : "Route Path"}</th>
-                  <th className="p-3">{dir === "rtl" ? "عنوان SEO (العربية / English)" : "SEO Title (Ar / En)"}</th>
-                  <th className="p-3">{dir === "rtl" ? "الوصف" : "Description"}</th>
-                  <th className="p-3">{dir === "rtl" ? "صورة OG" : "OG Image"}</th>
-                  <th className="p-3">{dir === "rtl" ? "الحالة" : "Status"}</th>
-                  <th className="p-3 text-right">{dir === "rtl" ? "الإجراءات" : "Actions"}</th>
+                  <th className="p-3 text-start font-bold">{dir === "rtl" ? "المسار (Route)" : "Route Path"}</th>
+                  <th className="p-3 text-start font-bold">{dir === "rtl" ? "عنوان SEO (العربية / English)" : "SEO Title (Ar / En)"}</th>
+                  <th className="p-3 text-start font-bold">{dir === "rtl" ? "الوصف" : "Description"}</th>
+                  <th className="p-3 text-start font-bold">{dir === "rtl" ? "صورة OG" : "OG Image"}</th>
+                  <th className="p-3 text-start font-bold">{dir === "rtl" ? "الحالة" : "Status"}</th>
+                  <th className="p-3 text-end font-bold">{dir === "rtl" ? "الإجراءات" : "Actions"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-subtle)]">
@@ -2641,10 +2689,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         !item.is_active ? "opacity-50" : ""
                       }`}
                     >
-                      <td className="p-3 font-mono font-bold text-accent">
+                      <td className="p-3 font-mono font-bold text-accent text-start">
                         {item.route}
                       </td>
-                      <td className="p-3 max-w-[200px]">
+                      <td className="p-3 max-w-[200px] text-start">
                         <div className="font-semibold text-[var(--text-primary)] truncate">
                           {dir === "rtl" ? (item.title_ar || item.title_en) : (item.title_en || item.title_ar)}
                         </div>
@@ -2652,26 +2700,31 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                           {item.title_en}
                         </div>
                       </td>
-                      <td className="p-3 max-w-[260px]">
+                      <td className="p-3 max-w-[260px] text-start">
                         <p className="line-clamp-2 text-[var(--text-secondary)] text-[11px] leading-relaxed">
                           {dir === "rtl" ? (item.description_ar || item.description_en) : (item.description_en || item.description_ar)}
                         </p>
                       </td>
-                      <td className="p-3">
+                      <td className="p-3 text-start">
                         {item.og_image_url ? (
-                          <img
-                            src={item.og_image_url}
-                            alt={item.route}
-                            className="w-12 h-7 object-cover rounded border border-[var(--border-default)]"
-                            referrerPolicy="no-referrer"
-                          />
+                          <div className="relative inline-block">
+                            <img
+                              src={item.og_image_url}
+                              alt={item.route}
+                              className="w-16 h-9 object-cover rounded-[var(--radius-xs)] border border-[var(--border-default)] shadow-2xs transition-opacity hover:opacity-90 bg-[var(--surface-subtle)]"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="absolute inset-0 rounded-[var(--radius-xs)] ring-1 ring-inset ring-black/10 pointer-events-none" />
+                          </div>
                         ) : (
-                          <span className="text-[10px] text-[var(--text-muted)] italic">Default</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] text-[var(--text-muted)] bg-[var(--surface-subtle)] border border-[var(--border-subtle)]">
+                            {dir === "rtl" ? "الافتراضي" : "Default"}
+                          </span>
                         )}
                       </td>
-                      <td className="p-3">
+                      <td className="p-3 text-start">
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
                             item.is_active
                               ? "bg-accent/10 text-accent border border-accent/20"
                               : "bg-[var(--surface-subtle)] text-[var(--text-muted)] border border-[var(--border-subtle)]"
@@ -2680,21 +2733,21 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                           {item.is_active ? (dir === "rtl" ? "نشط" : "Active") : (dir === "rtl" ? "معطل" : "Disabled")}
                         </span>
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="p-3 text-end">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => handleOpenEditRouteModal(item)}
-                            className="p-1.5 rounded hover:bg-[var(--surface-subtle)] text-[var(--text-secondary)] transition-colors"
+                            className="p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-[var(--radius-xs)] hover:bg-[var(--surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
                             title={dir === "rtl" ? "تعديل" : "Edit"}
                           >
-                            <Settings2 size={15} />
+                            <Settings2 size={16} />
                           </button>
                           <button
                             onClick={() => handleDeleteRouteSeo(item.id)}
-                            className="p-1.5 rounded hover:bg-rose-500/10 text-rose-500 transition-colors"
+                            className="p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-[var(--radius-xs)] hover:bg-[var(--status-danger-subtle)] text-[var(--fg-danger)] transition-colors cursor-pointer"
                             title={dir === "rtl" ? "حذف" : "Delete"}
                           >
-                            <Trash2 size={15} />
+                            <Trash2 size={16} />
                           </button>
                         </div>
                       </td>
@@ -2711,10 +2764,11 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
         {isRouteModalOpen && editingRouteItem && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--surface-overlay)] backdrop-blur-sm">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border p-6 shadow-2xl bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--text-primary)]"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ duration: 0.15 }}
+              className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-shape-md border p-6 shadow-2xl bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--text-primary)]"
             >
               <div className="flex items-center justify-between pb-4 border-b border-[var(--border-default)] mb-5">
                 <div className="flex items-center gap-2 font-bold text-lg">
@@ -2727,7 +2781,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 </div>
                 <button
                   onClick={() => setIsRouteModalOpen(false)}
-                  className="p-1.5 rounded-full hover:bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  className="p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-full hover:bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
                 >
                   <X size={18} />
                 </button>
@@ -2745,7 +2799,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                     value={editingRouteItem.route || ""}
                     onChange={(e) => setEditingRouteItem({ ...editingRouteItem, route: e.target.value })}
                     placeholder="/bulletin"
-                    className="w-full text-xs p-2.5 rounded-md border font-mono bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)]"
+                    className="w-full text-xs p-2.5 rounded-[var(--radius-sm)] border font-mono bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-colors"
                   />
                   <p className="text-[10px] text-[var(--text-muted)] mt-1">
                     {dir === "rtl" ? "المسار النسبي للصفحة، مثل: /bulletin أو /subscription أو /custom-page" : "Relative route path starting with /, e.g., /bulletin or /subscription"}
@@ -2763,7 +2817,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                       value={editingRouteItem.title_ar || ""}
                       onChange={(e) => setEditingRouteItem({ ...editingRouteItem, title_ar: e.target.value })}
                       placeholder="عنوان الصفحة بالعربية..."
-                      className="w-full text-xs p-2.5 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)]"
+                      className="w-full text-xs p-2.5 rounded-[var(--radius-sm)] border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-colors"
                     />
                   </div>
                   <div>
@@ -2775,7 +2829,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                       value={editingRouteItem.title_en || ""}
                       onChange={(e) => setEditingRouteItem({ ...editingRouteItem, title_en: e.target.value })}
                       placeholder="Page title in English..."
-                      className="w-full text-xs p-2.5 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)]"
+                      className="w-full text-xs p-2.5 rounded-[var(--radius-sm)] border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-colors"
                     />
                   </div>
                 </div>
@@ -2791,7 +2845,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                       value={editingRouteItem.description_ar || ""}
                       onChange={(e) => setEditingRouteItem({ ...editingRouteItem, description_ar: e.target.value })}
                       placeholder="وصف مختصر ومحسّن لمحركات البحث..."
-                      className="w-full text-xs p-2.5 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)]"
+                      className="w-full text-xs p-2.5 rounded-[var(--radius-sm)] border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-colors"
                     />
                   </div>
                   <div>
@@ -2803,7 +2857,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                       value={editingRouteItem.description_en || ""}
                       onChange={(e) => setEditingRouteItem({ ...editingRouteItem, description_en: e.target.value })}
                       placeholder="Search optimized page description..."
-                      className="w-full text-xs p-2.5 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)]"
+                      className="w-full text-xs p-2.5 rounded-[var(--radius-sm)] border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-colors"
                     />
                   </div>
                 </div>
@@ -2819,7 +2873,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                       value={editingRouteItem.keywords_ar || ""}
                       onChange={(e) => setEditingRouteItem({ ...editingRouteItem, keywords_ar: e.target.value })}
                       placeholder="كلمات, مفتاحية, مفصولة, بفاصلة"
-                      className="w-full text-xs p-2.5 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)]"
+                      className="w-full text-xs p-2.5 rounded-[var(--radius-sm)] border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-colors"
                     />
                   </div>
                   <div>
@@ -2831,46 +2885,104 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                       value={editingRouteItem.keywords_en || ""}
                       onChange={(e) => setEditingRouteItem({ ...editingRouteItem, keywords_en: e.target.value })}
                       placeholder="keywords, separated, by, comma"
-                      className="w-full text-xs p-2.5 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)]"
+                      className="w-full text-xs p-2.5 rounded-[var(--radius-sm)] border bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)] transition-colors"
                     />
                   </div>
                 </div>
 
-                {/* OG Image URL / Upload */}
-                <div>
-                  <label className="block text-xs font-semibold mb-1">
-                    {dir === "rtl" ? "صورة مشاركة التواصل الاجتماعي (Open Graph Image)" : "Open Graph Image (OG Image URL)"}
-                  </label>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={editingRouteItem.og_image_url || ""}
-                      onChange={(e) => setEditingRouteItem({ ...editingRouteItem, og_image_url: e.target.value })}
-                      placeholder="https://... or /uploads/..."
-                      className="flex-1 text-xs p-2.5 rounded-md border font-mono bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-accent)]"
-                    />
-                    <label className="cursor-pointer flex items-center gap-1.5 bg-[var(--surface-subtle)] hover:bg-[var(--surface-card)] text-[var(--text-secondary)] px-3 py-2 rounded-md text-xs font-medium border border-[var(--border-default)]">
-                      <Upload size={14} />
-                      <span>{routeUploadingImg ? "..." : (dir === "rtl" ? "رفع" : "Upload")}</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleRouteImageUpload}
-                        disabled={routeUploadingImg}
-                      />
+                {/* OG Image URL / Professional Widescreen Uploader */}
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-[var(--text-primary)]">
+                      {dir === "rtl" ? "صورة معاينة ومشاركة المسار (Open Graph Image)" : "Social Share Preview Image (OG Image)"}
                     </label>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-accent/10 text-accent font-semibold border border-accent/20">
+                      1200×630 HD (1.91:1)
+                    </span>
                   </div>
-                  {editingRouteItem.og_image_url && (
-                    <div className="mt-2">
-                      <img
-                        src={editingRouteItem.og_image_url}
-                        alt="Preview"
-                        className="h-20 rounded border object-cover border-[var(--border-default)]"
-                        referrerPolicy="no-referrer"
+
+                  <div className="relative rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--surface-subtle)] p-4 hover:border-accent/50 transition-colors">
+                    {editingRouteItem.og_image_url ? (
+                      <div className="space-y-3">
+                        <div className="relative aspect-[1.91/1] w-full max-h-48 rounded-[var(--radius-sm)] overflow-hidden border border-[var(--border-default)] bg-[var(--surface-card)] shadow-2xs group">
+                          <img
+                            src={editingRouteItem.og_image_url}
+                            alt="Route OG Preview"
+                            className="w-full h-full object-cover transition-opacity"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3 justify-between">
+                            <span className="text-white text-[11px] font-mono truncate max-w-[70%]">
+                              {editingRouteItem.og_image_url}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setEditingRouteItem({ ...editingRouteItem, og_image_url: "" })}
+                              className="px-2.5 py-1 rounded bg-[var(--fg-danger)] hover:bg-[var(--fg-danger)] text-white text-[11px] font-medium shadow-sm transition-colors cursor-pointer"
+                            >
+                              {dir === "rtl" ? "إزالة الصورة" : "Remove"}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <label className="cursor-pointer flex-1 flex items-center justify-center gap-2 bg-[var(--surface-card)] hover:bg-[var(--surface-subtle)] text-[var(--text-primary)] px-3 py-2 rounded-[var(--radius-sm)] text-xs font-semibold border border-[var(--border-default)] shadow-2xs transition-colors">
+                            <Upload size={14} className="text-accent" />
+                            <span>{routeUploadingImg ? (dir === "rtl" ? "جارٍ الرفع..." : "Uploading...") : (dir === "rtl" ? "استبدال بصورة جديدة" : "Replace Image")}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleRouteImageUpload}
+                              disabled={routeUploadingImg}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setEditingRouteItem({ ...editingRouteItem, og_image_url: "" })}
+                            className="px-3 py-2 rounded-[var(--radius-sm)] text-xs font-medium text-[var(--fg-danger)] hover:bg-[var(--status-danger-subtle)] border border-[var(--fg-danger)]/20 transition-colors cursor-pointer"
+                          >
+                            {dir === "rtl" ? "العودة للافتراضي" : "Reset to Default"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-4 text-center space-y-2">
+                        <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center text-accent">
+                          <ImageIcon size={22} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-[var(--text-primary)]">
+                            {dir === "rtl" ? "رفع صورة مخصصة عالية الدقة لمشاركة هذا المسار" : "Upload HD Custom Social Share Image"}
+                          </p>
+                          <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                            {dir === "rtl" ? "المقاس الموصى به: 1200×630 بكسل بصيغة WebP أو PNG أو JPG" : "Recommended: 1200×630px WebP, PNG or JPG (Max 2MB)"}
+                          </p>
+                        </div>
+                        <label className="cursor-pointer flex items-center gap-2 bg-accent hover:opacity-90 text-white px-4 py-2 rounded-[var(--radius-sm)] text-xs font-bold shadow-2xs transition-opacity mt-1">
+                          <Upload size={14} />
+                          <span>{routeUploadingImg ? (dir === "rtl" ? "جارٍ الرفع..." : "Uploading...") : (dir === "rtl" ? "اختيار صورة من الجهاز" : "Select Image")}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleRouteImageUpload}
+                            disabled={routeUploadingImg}
+                          />
+                        </label>
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t border-[var(--border-subtle)] mt-2">
+                      <input
+                        type="text"
+                        value={editingRouteItem.og_image_url || ""}
+                        onChange={(e) => setEditingRouteItem({ ...editingRouteItem, og_image_url: e.target.value })}
+                        placeholder={dir === "rtl" ? "أو أدخل رابط الصورة المباشر (https://... أو /uploads/...)" : "Or enter direct image URL (https://... or /uploads/...)"}
+                        className="w-full text-[11px] p-2 rounded-[var(--radius-xs)] border font-mono bg-[var(--surface-card)] border-[var(--border-default)] text-[var(--text-secondary)] focus:outline-none focus:border-accent transition-colors"
                       />
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 {/* Is Active Toggle */}
@@ -2880,7 +2992,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                     id="route_is_active"
                     checked={editingRouteItem.is_active !== false}
                     onChange={(e) => setEditingRouteItem({ ...editingRouteItem, is_active: e.target.checked })}
-                    className="w-4 h-4 text-accent accent-accent rounded border-[var(--border-default)] focus:ring-[var(--border-accent)]"
+                    className="w-4 h-4 text-accent accent-accent rounded border-[var(--border-default)] focus:ring-[var(--border-accent)] cursor-pointer"
                   />
                   <label htmlFor="route_is_active" className="text-xs font-medium cursor-pointer">
                     {dir === "rtl" ? "تفعيل إعدادات SEO لهذا المسار" : "Enable dynamic SEO meta tags for this route"}
@@ -2892,13 +3004,13 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsRouteModalOpen(false)}
-                    className="px-4 py-2 rounded-md text-xs font-medium border border-[var(--border-default)] hover:bg-[var(--surface-subtle)] text-[var(--text-secondary)]"
+                    className="px-4 py-2 min-h-[38px] rounded-[var(--radius-sm)] text-xs font-medium border border-[var(--border-default)] hover:bg-[var(--surface-subtle)] text-[var(--text-secondary)] cursor-pointer transition-colors"
                   >
                     {dir === "rtl" ? "إلغاء" : "Cancel"}
                   </button>
                   <button
                     type="submit"
-                    className="flex items-center gap-2 bg-accent hover:bg-accent text-[var(--fg-on-emphasis)] px-5 py-2 rounded-md text-xs font-medium shadow-sm transition-theme"
+                    className="flex items-center gap-2 bg-accent hover:opacity-90 text-[var(--fg-on-emphasis)] px-5 py-2 min-h-[38px] rounded-[var(--radius-sm)] text-xs font-bold shadow-xs transition-opacity cursor-pointer"
                   >
                     <Save size={14} />
                     {dir === "rtl" ? "حفظ التغييرات" : "Save Settings"}
@@ -2911,14 +3023,14 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
       </AnimatePresence>
 
       {/* Search Engine Indexing & Route Security Verification (Crawlability Audit) */}
-      <div className="p-6 md:p-8 rounded-lg border bg-[var(--surface-card)] border-[var(--border-default)] font-sans">
+      <div className="p-6 md:p-8 rounded-[var(--radius-md)] border bg-[var(--surface-card)] border-[var(--border-default)] font-sans shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-[var(--radius-sm)] bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border border-[var(--border-accent)]/20 shadow-xs">
-              <ShieldCheck size={24} className="text-accent " />
+              <ShieldCheck size={24} className="text-accent" />
             </div>
             <div>
-              <h2 className="text-xl font-bold tracking-tight">
+              <h2 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
                 {language === "ar" ? "تقرير تدقيق أرشفة وقابلية زحف المسارات" : "Search Engine Indexing & Crawlability Audit"}
               </h2>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
@@ -2933,54 +3045,54 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             <button
               onClick={runCrawlAuditScan}
               disabled={crawlScanning}
-              className="flex items-center gap-2 text-xs bg-accent hover:bg-accent text-[var(--fg-on-emphasis)] px-4 py-2 rounded-[var(--radius-sm)] transition-theme font-medium shadow-sm disabled:opacity-50"
+              className="flex items-center gap-2 text-xs bg-accent hover:opacity-90 text-[var(--fg-on-emphasis)] px-4 py-2 min-h-[38px] rounded-[var(--radius-sm)] transition-opacity font-bold shadow-xs disabled:opacity-50 cursor-pointer"
             >
               <RefreshCw className={crawlScanning ? "animate-spin" : ""} size={14} />
-              {language === "ar" ? "تشغيل تدقيق الفهرسة" : "Execute Crawl Audit"}
+              <span>{language === "ar" ? "تشغيل تدقيق الفهرسة" : "Execute Crawl Audit"}</span>
             </button>
             
             <button
               onClick={downloadCrawlAuditReport}
-              className="flex items-center gap-2 text-xs border border-[var(--border-default)] hover:bg-[var(--surface-subtle)] text-[var(--text-secondary)] px-4 py-2 rounded-[var(--radius-sm)] transition-theme font-medium"
+              className="flex items-center gap-2 text-xs border border-[var(--border-default)] hover:bg-[var(--surface-subtle)] text-[var(--text-secondary)] px-4 py-2 min-h-[38px] rounded-[var(--radius-sm)] transition-colors font-bold cursor-pointer"
             >
               <Download size={14} />
-              {language === "ar" ? "تصدير التقرير الفني" : "Download JSON Report"}
+              <span>{language === "ar" ? "تصدير التقرير الفني" : "Download JSON Report"}</span>
             </button>
           </div>
         </div>
 
         {/* Audit Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="p-4 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)]">
+          <div className="p-4 rounded-[var(--radius-sm)] border bg-[var(--surface-subtle)] border-[var(--border-default)]">
             <span className="text-xs text-[var(--text-muted)]">{language === "ar" ? "إجمالي المسارات" : "Total Routes Indexed"}</span>
-            <div className="text-2xl font-bold mt-1 text-sky-500">
+            <div className="text-2xl font-bold mt-1 text-sky-500 font-mono">
               {routesSchema.length} <span className="text-xs font-normal text-[var(--text-muted)]">URI</span>
             </div>
           </div>
 
-          <div className="p-4 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)]">
+          <div className="p-4 rounded-[var(--radius-sm)] border bg-[var(--surface-subtle)] border-[var(--border-default)]">
             <span className="text-xs text-[var(--text-muted)]">{language === "ar" ? "مسارات محمية (No-Index)" : "Shielded Secret Routes (No-Index)"}</span>
-            <div className="text-2xl font-bold mt-1 text-accent flex items-center gap-1.5">
+            <div className="text-2xl font-bold mt-1 text-accent flex items-center gap-1.5 font-mono">
               {routesSchema.filter((r: any) => r.status === "noindex").length}
               <ShieldCheck size={16} className="text-accent" />
             </div>
           </div>
 
-          <div className="p-4 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)]">
+          <div className="p-4 rounded-[var(--radius-sm)] border bg-[var(--surface-subtle)] border-[var(--border-default)]">
             <span className="text-xs text-[var(--text-muted)]">{language === "ar" ? "مسارات عامة (مؤرشفة)" : "Approved Public Domains"}</span>
-            <div className="text-2xl font-bold mt-1 text-amber-500">
+            <div className="text-2xl font-bold mt-1 text-[var(--fg-warning)] font-mono">
               {routesSchema.filter((r: any) => r.status === "index").length}
             </div>
           </div>
 
-          <div className="p-4 rounded-md border bg-[var(--surface-subtle)] border-[var(--border-default)]">
+          <div className="p-4 rounded-[var(--radius-sm)] border bg-[var(--surface-subtle)] border-[var(--border-default)]">
             <span className="text-xs text-[var(--text-muted)]">{language === "ar" ? "معدل سلامة الامتثال والأرشفة" : "Compliance & Indexing Rating"}</span>
             <div className={`text-xl font-bold mt-1.5 uppercase tracking-tight flex items-center gap-1.5 ${
               crawlComplianceRate.includes("SECURE") 
-                ? "text-accent " 
+                ? "text-accent" 
                 : crawlComplianceRate === "PENDING" || crawlComplianceRate === "معلق"
-                ? "text-amber-500 animate-pulse"
-                : "text-rose-500"
+                ? "text-[var(--fg-warning)]"
+                : "text-[var(--fg-danger)]"
             }`}>
               <span>{crawlComplianceRate}</span>
               {crawlComplianceRate.includes("SECURE") && <CheckCircle size={14} className="text-accent" />}
@@ -2992,18 +3104,18 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
         {(crawlScanning || crawlAuditLogs.length > 0) && (
           <div className="mb-6">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-2 font-mono flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-accent" />
               {language === "ar" ? "شاشة التدقيق الفوري والمطابقة" : "Real-time Verification Console"}
             </h3>
-            <div className="p-4 rounded-md bg-[var(--surface-inset)] border border-[var(--border-default)] text-xs font-mono text-accent/90 leading-relaxed max-h-[180px] overflow-y-auto space-y-1.5">
+            <div className="p-4 rounded-[var(--radius-sm)] bg-[var(--surface-inset)] border border-[var(--border-default)] text-xs font-mono text-accent/90 leading-relaxed max-h-[180px] overflow-y-auto space-y-1.5">
               {crawlAuditLogs.map((log, index) => (
-                <div key={`crawl-log-${index}`} className="flex items-start gap-2 animate-in fade-in duration-300">
+                <div key={`crawl-log-${index}`} className="flex items-start gap-2">
                   <span className="text-[var(--text-muted)]">[{new Date().toLocaleTimeString()}]</span>
                   <span>{log}</span>
                 </div>
               ))}
               {crawlScanning && (
-                <div className="flex items-center gap-1 text-accent/80 italic font-medium animate-pulse ml-4">
+                <div className="flex items-center gap-1 text-accent/80 italic font-medium ml-4">
                   <span>●</span> <span>{language === "ar" ? "جاري تحليل الاستجابة..." : "Analyzing header packets..."}</span>
                 </div>
               )}
@@ -3016,7 +3128,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           <span className="text-xs font-semibold text-[var(--text-muted)]">
             {language === "ar" ? "سجل توثيق حماية المسارات" : "Path Protection Registry Ledger"}
           </span>
-          <div className="flex bg-[var(--surface-subtle)] p-0.5 rounded-[4px] border border-[var(--border-default)]">
+          <div className="flex bg-[var(--surface-subtle)] p-0.5 rounded-[var(--radius-xs)] border border-[var(--border-default)]">
             {[
               { id: "all", label: language === "ar" ? "الكل" : "All" },
               { id: "index", label: language === "ar" ? "مؤرشفة" : "Public Only" },
@@ -3026,9 +3138,9 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                 key={f.id}
                 onClick={() => setCrawlAuditFilter(f.id as any)}
                 type="button"
-                className={`text-[10px] uppercase font-bold px-3 py-1 transition-theme rounded-[3px] ${
+                className={`text-[10px] uppercase font-bold px-3 py-1 transition-colors rounded-[var(--radius-xs)] cursor-pointer ${
                   crawlAuditFilter === f.id
-                    ? "bg-[var(--surface-card)] text-accent font-extrabold shadow-sm"
+                    ? "bg-[var(--surface-card)] text-accent font-extrabold shadow-xs"
                     : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                 }`}
               >
@@ -3042,11 +3154,11 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-[13px] border-collapse">
             <thead>
-              <tr className="border-b border-[var(--border-default)] text-[var(--text-muted)] text-xs text-left">
-                <th className={`pb-3 font-semibold ${language === "ar" ? "text-right" : "text-left"}`}>{language === "ar" ? "المسار" : "Path / Location"}</th>
-                <th className={`pb-3 font-semibold ${language === "ar" ? "text-right" : "text-left"}`}>{language === "ar" ? "النوع" : "Category"}</th>
-                <th className={`pb-3 font-semibold ${language === "ar" ? "text-right" : "text-left"}`}>{language === "ar" ? "وسم محركات البحث" : "Crawler Directive"}</th>
-                <th className={`pb-3 font-semibold ${language === "ar" ? "text-right" : "text-left"}`}>{language === "ar" ? "حالة الأمان" : "Security Certification"}</th>
+              <tr className="border-b border-[var(--border-default)] text-[var(--text-muted)] text-xs bg-[var(--surface-subtle)]">
+                <th className="p-3 font-semibold text-start">{language === "ar" ? "المسار" : "Path / Location"}</th>
+                <th className="p-3 font-semibold text-start">{language === "ar" ? "النوع" : "Category"}</th>
+                <th className="p-3 font-semibold text-start">{language === "ar" ? "وسم محركات البحث" : "Crawler Directive"}</th>
+                <th className="p-3 font-semibold text-start">{language === "ar" ? "حالة الأمان" : "Security Certification"}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">
@@ -3056,50 +3168,50 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                   return r.status === crawlAuditFilter;
                 })
                 .map((route: any, idx: number) => (
-                  <tr key={`crawl-route-${route.path || idx}-${idx}`} className="hover:bg-[var(--surface-subtle)] transition-theme">
-                    <td className={`py-3.5 font-mono text-xs ${language === "ar" ? "text-right" : "text-left"}`}>
+                  <tr key={`crawl-route-${route.path || idx}-${idx}`} className="hover:bg-[var(--surface-subtle)] transition-colors">
+                    <td className="p-3 font-mono text-xs text-start">
                       <span className="text-[var(--text-primary)] font-semibold">{route.path}</span>
                     </td>
-                    <td className={`py-3.5 ${language === "ar" ? "text-right" : "text-left"}`}>
+                    <td className="p-3 text-start">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                         route.type === "admin" 
-                          ? "bg-red-500/10 text-red-500" 
+                          ? "bg-[var(--status-danger-subtle)] text-[var(--fg-danger)]" 
                           : route.type === "private" 
                           ? "bg-accent/10 text-accent" 
                           : route.type === "custom"
-                          ? "bg-purple-500/10 text-purple-500"
+                          ? "bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)]"
                           : "bg-sky-500/10 text-sky-500"
                       }`}>
                         {route.type.toUpperCase()}
                       </span>
                     </td>
-                    <td className={`py-3.5 font-mono text-[11px] ${language === "ar" ? "text-right" : "text-left"}`}>
+                    <td className="p-3 font-mono text-[11px] text-start">
                       {route.status === "noindex" ? (
                         <span className="text-[var(--text-muted)] font-medium flex items-center gap-1">
                           <EyeOff size={12} className="text-[var(--text-muted)]" />
-                          noindex, nofollow
+                          <span>noindex, nofollow</span>
                         </span>
                       ) : (
-                        <span className="text-accent font-bold flex items-center gap-1 ">
-                          <Eye size={12} className="text-accent animate-pulse" />
-                          index, follow
+                        <span className="text-accent font-bold flex items-center gap-1">
+                          <Eye size={12} className="text-accent" />
+                          <span>index, follow</span>
                         </span>
                       )}
                     </td>
-                    <td className={`py-3.5 ${language === "ar" ? "text-right" : "text-left"}`}>
+                    <td className="p-3 text-start">
                       <div className="flex flex-col">
                         <div className="flex items-center gap-1.5">
                           {route.status === "noindex" ? (
                             <>
-                              <ShieldCheck size={14} className="text-accent " />
+                              <ShieldCheck size={14} className="text-accent" />
                               <span className="font-bold text-accent text-xs">
                                 {language === "ar" ? "محجوب دستورياً" : "SECURED AND ISOLATED"}
                               </span>
                             </>
                           ) : (
                             <>
-                              <CheckCircle size={14} className="text-amber-500" />
-                              <span className="font-bold text-amber-500 text-xs">
+                              <CheckCircle size={14} className="text-[var(--fg-warning)]" />
+                              <span className="font-bold text-[var(--fg-warning)] text-xs">
                                 {language === "ar" ? "مؤرشف عام" : "APPROVED PUBLIC PAGE"}
                               </span>
                             </>
@@ -3116,9 +3228,22 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           </table>
         </div>
       </div>
+      </div>
+      )}
+
+      {activeMainTab === 'memory' && (
+        <div className="w-full">
+          <MemoryCenterView
+            theme={theme}
+            t={t}
+            dir={dir}
+            language={language}
+          />
+        </div>
+      )}
 
       {/* Cache Management Utility Center */}
-      <div className="p-6 md:p-8 rounded-lg border bg-[var(--surface-card)] border-[var(--border-default)] font-sans">
+      <div className="p-6 md:p-8 rounded-shape-md border bg-[var(--surface-card)] border-[var(--border-default)] font-sans">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-3 rounded-[var(--radius-sm)] bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border border-[var(--border-accent)]/20 shadow-xs">
             <Cpu size={24} className="text-accent " />
@@ -3135,9 +3260,9 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           {/* File Permission Cache */}
-          <div className="p-4 rounded-md border flex flex-col justify-between bg-[var(--surface-subtle)] border-[var(--border-default)]">
+          <div className="p-4 rounded-shape-sm border flex flex-col justify-between bg-[var(--surface-subtle)] border-[var(--border-default)]">
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold font-mono text-accent">FILE PERMISSIONS</span>
@@ -3145,21 +3270,21 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               </div>
               <p className="text-xs font-bold mb-1">{dir === "rtl" ? "صلاحيات الملفات" : "File Permission Cache"}</p>
               <p className="text-[11px] text-[var(--text-muted)] mb-4">
-                {dir === "rtl" ? "مسح ذاكرة التحقق من الأمان وصلاحيات الوصول للملفات المرفوعة." : "Invalidates cached authorization checks for secure file access."}
+                {dir === "rtl" ? "مسح ذاكرة التحقق من الأمان وصلاحيات الوصول للملفات المرفوعة وإصداراتها." : "Invalidates cached authorization checks and version hashes for secure file access."}
               </p>
             </div>
             <button
               onClick={() => handleClearCache('file_permission')}
               disabled={clearingCache !== null}
-              className="w-full py-2 px-3 bg-accent/10 hover:bg-accent/20 text-accent rounded text-xs font-medium transition-theme flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-2 px-3 bg-accent/10 hover:bg-accent/20 text-accent rounded text-xs font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
             >
-              {clearingCache === 'file_permission' ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              {dir === "rtl" ? "مسح ذاكرة الملفات" : "Clear File Cache"}
+              <RefreshCw size={14} className={clearingCache === 'file_permission' ? "animate-spin shrink-0" : "shrink-0"} />
+              <span>{dir === "rtl" ? "مسح ذاكرة الملفات" : "Clear File Cache"}</span>
             </button>
           </div>
 
           {/* Route SEO Cache */}
-          <div className="p-4 rounded-md border flex flex-col justify-between bg-[var(--surface-subtle)] border-[var(--border-default)]">
+          <div className="p-4 rounded-shape-sm border flex flex-col justify-between bg-[var(--surface-subtle)] border-[var(--border-default)]">
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold font-mono text-accent">ROUTE SEO</span>
@@ -3173,37 +3298,81 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
             <button
               onClick={() => handleClearCache('route_seo')}
               disabled={clearingCache !== null}
-              className="w-full py-2 px-3 bg-accent/10 hover:bg-accent/20 text-accent rounded text-xs font-medium transition-theme flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-2 px-3 bg-accent/10 hover:bg-accent/20 text-accent rounded text-xs font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
             >
-              {clearingCache === 'route_seo' ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              {dir === "rtl" ? "مسح ذاكرة SEO" : "Clear SEO Cache"}
+              <RefreshCw size={14} className={clearingCache === 'route_seo' ? "animate-spin shrink-0" : "shrink-0"} />
+              <span>{dir === "rtl" ? "مسح ذاكرة SEO" : "Clear SEO Cache"}</span>
             </button>
           </div>
 
-          {/* System Settings Cache */}
-          <div className="p-4 rounded-md border flex flex-col justify-between bg-[var(--surface-subtle)] border-[var(--border-default)]">
+          {/* System Settings & Assets Cache */}
+          <div className="p-4 rounded-shape-sm border flex flex-col justify-between bg-[var(--surface-subtle)] border-[var(--border-default)]">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold font-mono text-accent">SYSTEM CONFIG</span>
+                <span className="text-xs font-semibold font-mono text-accent">SYSTEM & ASSETS</span>
                 <Settings size={16} className="text-[var(--text-muted)]" />
               </div>
-              <p className="text-xs font-bold mb-1">{dir === "rtl" ? "إعدادات النظام" : "System Settings Cache"}</p>
+              <p className="text-xs font-bold mb-1">{dir === "rtl" ? "إعدادات النظام والأصول" : "System & Asset Cache"}</p>
               <p className="text-[11px] text-[var(--text-muted)] mb-4">
-                {dir === "rtl" ? "مسح ذاكرة إعدادات المنصة العامة (الشعارات، العناوين، الثيمات)." : "Refreshes global platform parameters and site branding configs."}
+                {dir === "rtl" ? "تفريغ إعدادات المنصة العامة والأيقونات وقوالب الشعار المحفوظة بالذاكرة." : "Refreshes global platform settings, brand icons, and in-memory asset buffers."}
               </p>
             </div>
             <button
               onClick={() => handleClearCache('system_settings')}
               disabled={clearingCache !== null}
-              className="w-full py-2 px-3 bg-accent/10 hover:bg-accent/20 text-accent rounded text-xs font-medium transition-theme flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-2 px-3 bg-accent/10 hover:bg-accent/20 text-accent rounded text-xs font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
             >
-              {clearingCache === 'system_settings' ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              {dir === "rtl" ? "مسح إعدادات النظام" : "Clear Settings Cache"}
+              <RefreshCw size={14} className={clearingCache === 'system_settings' ? "animate-spin shrink-0" : "shrink-0"} />
+              <span>{dir === "rtl" ? "مسح إعدادات النظام" : "Clear Settings Cache"}</span>
+            </button>
+          </div>
+
+          {/* Orchestrator & AI Keys Cache */}
+          <div className="p-4 rounded-shape-sm border flex flex-col justify-between bg-[var(--surface-subtle)] border-[var(--border-default)]">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold font-mono text-accent">AI & ORCHESTRATOR</span>
+                <Server size={16} className="text-[var(--text-muted)]" />
+              </div>
+              <p className="text-xs font-bold mb-1">{dir === "rtl" ? "الأوركسترا والمفاتيح" : "AI & Orchestrator Cache"}</p>
+              <p className="text-[11px] text-[var(--text-muted)] mb-4">
+                {dir === "rtl" ? "مسح ذاكرة توجيه النماذج وخزينة مفاتيح الـ AI وخوادم الـ GPU المعزولة." : "Flushes cached tool orchestrator routing, API keys vault, and GPU servers."}
+              </p>
+            </div>
+            <button
+              onClick={() => handleClearCache('orchestrator')}
+              disabled={clearingCache !== null}
+              className="w-full py-2 px-3 bg-accent/10 hover:bg-accent/20 text-accent rounded text-xs font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+            >
+              <RefreshCw size={14} className={clearingCache === 'orchestrator' ? "animate-spin shrink-0" : "shrink-0"} />
+              <span>{dir === "rtl" ? "مسح ذاكرة الموديلات" : "Clear AI Cache"}</span>
+            </button>
+          </div>
+
+          {/* Economy & Subscriptions Cache */}
+          <div className="p-4 rounded-shape-sm border flex flex-col justify-between bg-[var(--surface-subtle)] border-[var(--border-default)]">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold font-mono text-accent">ECONOMY & PLANS</span>
+                <Layers size={16} className="text-[var(--text-muted)]" />
+              </div>
+              <p className="text-xs font-bold mb-1">{dir === "rtl" ? "الاقتصاد والاشتراكات" : "Economy & Plans Cache"}</p>
+              <p className="text-[11px] text-[var(--text-muted)] mb-4">
+                {dir === "rtl" ? "مسح ذاكرة خطط الاشتراك، أسعار الرصيد، وتهيئة بوابات الدفع." : "Clears subscription plan quotas, economy credit multipliers, and pricing configs."}
+              </p>
+            </div>
+            <button
+              onClick={() => handleClearCache('economy')}
+              disabled={clearingCache !== null}
+              className="w-full py-2 px-3 bg-accent/10 hover:bg-accent/20 text-accent rounded text-xs font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+            >
+              <RefreshCw size={14} className={clearingCache === 'economy' ? "animate-spin shrink-0" : "shrink-0"} />
+              <span>{dir === "rtl" ? "مسح ذاكرة الخطط" : "Clear Economy Cache"}</span>
             </button>
           </div>
 
           {/* Global All Caches */}
-          <div className="p-4 rounded-md border flex flex-col justify-between bg-[var(--surface-subtle)] border-accent/30">
+          <div className="p-4 rounded-shape-sm border flex flex-col justify-between bg-[var(--surface-subtle)] border-accent/30">
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold font-mono text-accent">GLOBAL PURGE</span>
@@ -3211,16 +3380,16 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               </div>
               <p className="text-xs font-bold mb-1">{dir === "rtl" ? "مسح شامل (Global)" : "Global Cache Purge"}</p>
               <p className="text-[11px] text-[var(--text-muted)] mb-4">
-                {dir === "rtl" ? "مسح جميع الذاكرات (الاقتصاد، الخطط، الموديلات والمفاتيح) دفعة واحدة." : "Clears all system, SEO, file permission, economy, and orchestrator caches."}
+                {dir === "rtl" ? "مسح جميع الذاكرات (الأصول، الاقتصاد، الخطط، الموديلات، الصلاحيات) دفعة واحدة." : "Clears all system, SEO, file permission, economy, orchestrator, and GPU caches."}
               </p>
             </div>
             <button
               onClick={() => handleClearCache('global')}
               disabled={clearingCache !== null}
-              className="w-full py-2 px-3 bg-accent hover:bg-accent text-[var(--fg-on-emphasis)] rounded text-xs font-medium transition-theme flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+              className="w-full py-2 px-3 bg-accent hover:opacity-90 text-[var(--fg-on-emphasis)] rounded text-xs font-medium transition-opacity flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 cursor-pointer"
             >
-              {clearingCache === 'global' ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
-              {dir === "rtl" ? "مسح جميع الذاكرات" : "Purge All Caches"}
+              <RefreshCw size={14} className={clearingCache === 'global' ? "animate-spin shrink-0" : "shrink-0"} />
+              <span>{dir === "rtl" ? "مسح جميع الذاكرات" : "Purge All Caches"}</span>
             </button>
           </div>
         </div>

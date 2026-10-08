@@ -45,6 +45,14 @@ const allowedMimeTypes: Record<string, string[]> = {
   '.avi': ['video/x-msvideo', 'video/avi', 'application/x-troff-msvideo', 'application/octet-stream', 'video/vnd.avi'],
   '.m4v': ['video/x-m4v', 'video/mp4', 'application/octet-stream'],
   '.3gp': ['video/3gpp', 'audio/3gpp', 'video/3gpp2', 'application/octet-stream'],
+  '.3g2': ['video/3gpp2', 'application/octet-stream'],
+  '.wmv': ['video/x-ms-wmv', 'video/wmv', 'application/octet-stream'],
+  '.flv': ['video/x-flv', 'video/flv', 'application/octet-stream'],
+  '.ogv': ['video/ogg', 'application/ogg', 'application/octet-stream'],
+  '.ts': ['video/mp2t', 'video/ts', 'application/octet-stream'],
+  '.mts': ['video/mp2t', 'video/mts', 'application/octet-stream'],
+  '.m2ts': ['video/mp2t', 'video/m2ts', 'application/octet-stream'],
+  '.vob': ['video/dvd', 'video/mpeg', 'application/octet-stream'],
   '.mp3': ['audio/mpeg', 'audio/mp3', 'audio/x-mpeg', 'audio/mp4'],
   '.wav': ['audio/wav', 'audio/x-wav', 'audio/wave']
 };

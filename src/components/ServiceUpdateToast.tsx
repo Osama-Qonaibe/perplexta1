@@ -83,28 +83,28 @@ export const ServiceUpdateToast: React.FC = () => {
       {visible && (
         <motion.div
           id="service-update-toast"
-          initial={{ opacity: 0, y: 12, scale: 0.96 }}
+          initial={{ opacity: 0, y: -12, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 12, scale: 0.96 }}
-          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className={`fixed bottom-5 z-[1300] flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-shape-sm bg-[var(--pub-surface-container)] border border-[var(--pub-border-default)] backdrop-blur-md shadow-2xl text-[var(--pub-text-primary)] pointer-events-auto max-w-[320px] max-sm:bottom-20 max-sm:left-1/2 max-sm:-translate-x-1/2 ${
-            isRtl ? 'left-5 right-auto' : 'right-5 left-auto'
+          exit={{ opacity: 0, y: -12, scale: 0.96 }}
+          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          className={`fixed top-[calc(54px+env(safe-area-inset-top,0px))] z-[99999] flex items-center gap-2 px-2.5 py-1.5 min-h-[36px] rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-main)] backdrop-blur-xl shadow-xl text-[var(--text-primary)] pointer-events-auto w-auto max-w-[calc(100vw-32px)] sm:max-w-[320px] left-1/2 -translate-x-1/2 sm:translate-x-0 ${
+            isRtl ? 'sm:left-5 sm:right-auto' : 'sm:right-5 sm:left-auto'
           }`}
           style={{ direction: isRtl ? 'rtl' : 'ltr' }}
         >
           {/* Green Status Light Icon Badge */}
-          <div className="relative w-6 h-6 rounded-shape-xs bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
-            <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          <div className="relative w-5.5 h-5.5 rounded-shape-xs bg-[var(--status-success-subtle)] border border-[var(--fg-success)]/30 text-[var(--fg-success)] dark:text-[var(--fg-success)] flex items-center justify-center shrink-0">
+            <span className="absolute -top-0.5 -right-0.5 flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--fg-success)] opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[var(--fg-success)]"></span>
             </span>
-            <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${isUpdating ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3 h-3 shrink-0 ${isUpdating ? 'animate-spin' : ''}`} />
           </div>
 
-          {/* Typography */}
+          {/* Concise Typography */}
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold leading-none truncate text-[var(--pub-text-primary)]">
-              {isAr ? 'تحديث جديد متاح' : 'New update available'}
+            <p className="text-[11px] font-bold text-[var(--text-primary)] whitespace-nowrap leading-none">
+              {isAr ? 'تحديث جديد' : 'New update'}
             </p>
           </div>
 
@@ -115,7 +115,7 @@ export const ServiceUpdateToast: React.FC = () => {
               type="button"
               onClick={handleUpdate}
               disabled={isUpdating}
-              className="h-6 px-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] rounded-shape-xs active:scale-95 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center shadow-xs shadow-emerald-500/20"
+              className="h-6 px-2.5 bg-[var(--fg-success)] hover:bg-[var(--fg-success)] text-slate-950 font-bold text-[11px] rounded-shape-xs active:scale-95 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center shadow-xs shadow-emerald-500/20 whitespace-nowrap"
             >
               <span>{isAr ? 'تحديث' : 'Update'}</span>
             </button>
@@ -123,7 +123,7 @@ export const ServiceUpdateToast: React.FC = () => {
               id="service-update-dismiss-btn"
               type="button"
               onClick={close}
-              className="w-5 h-5 rounded-shape-xs flex items-center justify-center text-[var(--pub-text-muted)] hover:text-[var(--pub-text-primary)] hover:bg-[var(--pub-surface-subtle)] transition-colors cursor-pointer"
+              className="w-5 h-5 rounded-shape-xs flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] transition-colors cursor-pointer shrink-0"
               aria-label={isAr ? 'إغلاق' : 'Dismiss'}
             >
               <X size={12} />

@@ -35,7 +35,7 @@ export async function dispatchNotification(
 
     // 2. Dispatch notifications and emails
     for (const user of users) {
-      await createNotification(user.id, type, titleEn, titleAr, messageEn, messageAr, metadata);
+      const createdNotif = await createNotification(user.id, type, titleEn, titleAr, messageEn, messageAr, metadata);
 
       if (options?.sendEmail && user.email_notifications && user.user_status === 'active') {
         const { sendEmail } = await import('./email.js');
@@ -59,10 +59,35 @@ export async function dispatchNotification(
             sender_email: user.sender_email
           };
           if (!emailSettings.smtp_host) {
-            console.warn('[Email] Outgoing email skipped (SMTP is not configured in DB).');
+            console.info('[Email] Outgoing email skipped (SMTP is not configured in DB).');
+            if (createdNotif?.id) {
+              await pool.query('UPDATE notifications SET last_error = $1 WHERE id = $2', ['SMTP not configured', createdNotif.id]).catch(() => {});
+            }
             continue;
           }
-          await sendEmail(user.email, subject, body, options.adminId, emailSettings);
+
+          const res = await sendEmail(
+            user.email, 
+            subject, 
+            body, 
+            options.adminId, 
+            emailSettings, 
+            { templateName: type, userId: user.id }
+          );
+
+          if (createdNotif?.id) {
+            if (res.success) {
+              await pool.query(
+                'UPDATE notifications SET is_sent = true, sent_at = CURRENT_TIMESTAMP, last_error = NULL WHERE id = $1',
+                [createdNotif.id]
+              ).catch(() => {});
+            } else {
+              await pool.query(
+                'UPDATE notifications SET is_sent = false, retry_count = COALESCE(retry_count, 0) + 1, last_error = $1 WHERE id = $2',
+                [res.error || 'Email dispatch failed', createdNotif.id]
+              ).catch(() => {});
+            }
+          }
         }
       }
     }

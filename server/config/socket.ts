@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 
 export let io: Server;
 
-const jwtSecret = process.env.JWT_SECRET || 'perplexta_default_development_secret_key_32chars_min!';
+const jwtSecret = process.env.JWT_SECRET as string;
 
 const APP_URL = process.env.APP_URL || process.env.VITE_APP_URL || 'http://localhost:3000';
 
@@ -14,6 +14,10 @@ const AD_CHAT_PREFIX = 'ad_chat_';
 const ADMIN_STATS_INTERVAL = 30000;
 const MAX_BUFFER_SIZE = 1e6;
 const MIN_TOKEN_LENGTH = 20;
+const MAX_CONNECTIONS_PER_IP = 15;
+const MAX_CONNECTIONS_PER_USER = 5;
+const activeConnectionsPerIp = new Map<string, number>();
+const activeConnectionsPerUser = new Map<number, number>();
 
 interface DecodedToken {
   id: number;
@@ -48,13 +52,32 @@ export function initSocket(httpServer: HttpServer): Server {
     cors: {
       origin: (origin, callback) => {
         if (!origin) return callback(null, true);
-        if (process.env.NODE_ENV !== 'production' || allowedOrigins.includes(origin)) {
+        if (allowedOrigins.includes(origin)) {
           return callback(null, true);
         }
-        if (origin.endsWith('.run.app') || origin.endsWith('.aistudio.google') || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+
+        try {
+          const parsedUrl = new URL(origin);
+          const hostname = parsedUrl.hostname;
+
+          // Strict match to prevent localhost.attacker.com bypasses
+          if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return callback(null, true);
+          }
+
+          // Strict suffix match on subdomains
+          if (hostname.endsWith('.run.app') || hostname.endsWith('.aistudio.google')) {
+            return callback(null, true);
+          }
+        } catch (err) {
+          // Ignore invalid URLs
+        }
+
+        if (process.env.NODE_ENV !== 'production') {
           return callback(null, true);
         }
-        return callback(null, true);
+
+        return callback(new Error('Not allowed by CORS'), false);
       },
       methods: ["GET", "POST"],
       credentials: true
@@ -71,15 +94,29 @@ export function initSocket(httpServer: HttpServer): Server {
   io.use((socket: Socket, next) => {
     try {
       const authSocket = socket as AuthenticatedSocket;
+      const ip = authSocket.handshake.address || 'unknown';
+
+      // Pre-check IP connection limit
+      const ipCount = activeConnectionsPerIp.get(ip) || 0;
+      if (ipCount >= MAX_CONNECTIONS_PER_IP) {
+        return next(new Error('Too many active socket connections from this IP address'));
+      }
+
       const token = authSocket.handshake.auth.token || 
                     authSocket.handshake.headers['authorization']?.split(' ')[1];
+      const isProduction = process.env.NODE_ENV === 'production';
       
       if (!token) {
-        // Allow connection; action-level authentication will handle messages with embedded tokens
+        if (isProduction) {
+          return next(new Error('Authentication token is required'));
+        }
         return next();
       }
 
       if (typeof token !== 'string' || token.length < MIN_TOKEN_LENGTH) {
+        if (isProduction) {
+          return next(new Error('Invalid token format'));
+        }
         return next();
       }
 
@@ -87,9 +124,23 @@ export function initSocket(httpServer: HttpServer): Server {
         algorithms: ['HS256'],
         maxAge: '24h'
       }, (err: any, decoded: any) => {
-        if (!err && decoded && typeof decoded === 'object' && decoded.id) {
+        if (err) {
+          if (isProduction) {
+            return next(new Error('Authentication failed: Invalid token'));
+          }
+          return next();
+        }
+
+        if (decoded && typeof decoded === 'object' && decoded.id) {
+          const userId = decoded.id;
+          // Pre-check User connection limit
+          const userCount = activeConnectionsPerUser.get(userId) || 0;
+          if (userCount >= MAX_CONNECTIONS_PER_USER) {
+            return next(new Error('Too many active socket connections for this user account'));
+          }
+
           authSocket.user = {
-            id: decoded.id,
+            id: userId,
             role: decoded.role || 'user',
             ...decoded
           };
@@ -103,7 +154,18 @@ export function initSocket(httpServer: HttpServer): Server {
 
   io.on("connection", (socket: Socket) => {
     const authSocket = socket as AuthenticatedSocket;
+    const ip = authSocket.handshake.address || 'unknown';
+
+    // Increment IP count
+    const currentIpCount = activeConnectionsPerIp.get(ip) || 0;
+    activeConnectionsPerIp.set(ip, currentIpCount + 1);
+
     const user = authSocket.user;
+    if (user?.id) {
+      // Increment User count
+      const currentUserCount = activeConnectionsPerUser.get(user.id) || 0;
+      activeConnectionsPerUser.set(user.id, currentUserCount + 1);
+    }
     const userRoom = user?.id ? `${USER_ROOM_PREFIX}${user.id}` : '';
     
     if (user?.id) {
@@ -201,6 +263,24 @@ export function initSocket(httpServer: HttpServer): Server {
 
     socket.on("disconnect", () => {
       try {
+        // Decrement IP count
+        const ipCount = activeConnectionsPerIp.get(ip) || 0;
+        if (ipCount <= 1) {
+          activeConnectionsPerIp.delete(ip);
+        } else {
+          activeConnectionsPerIp.set(ip, ipCount - 1);
+        }
+
+        // Decrement User count
+        if (user?.id) {
+          const userCount = activeConnectionsPerUser.get(user.id) || 0;
+          if (userCount <= 1) {
+            activeConnectionsPerUser.delete(user.id);
+          } else {
+            activeConnectionsPerUser.set(user.id, userCount - 1);
+          }
+        }
+
         const rooms = Array.from(socket.rooms);
         for (const room of rooms) {
           if (room.startsWith(USER_ROOM_PREFIX) || room.startsWith(AD_CHAT_PREFIX)) {

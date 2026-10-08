@@ -75,7 +75,6 @@ export const TOKEN_CATEGORIES_METADATA: Record<TokenCategory, { nameEn: string; 
 };
 
 export const TOKEN_REGISTRY: TokenDefinition[] = [
-  // Surfaces
   {
     key: '--surface-page',
     category: 'surfaces',
@@ -137,7 +136,6 @@ export const TOKEN_REGISTRY: TokenDefinition[] = [
     cssVariable: '--surface-overlay'
   },
 
-  // Typography
   {
     key: '--fg-primary',
     category: 'typography',
@@ -186,8 +184,24 @@ export const TOKEN_REGISTRY: TokenDefinition[] = [
     defaultValueDark: DEFAULT_DARK_TOKENS['--fg-on-emphasis'],
     cssVariable: '--fg-on-emphasis'
   },
+  {
+    key: '--font-display',
+    category: 'typography',
+    type: 'size',
+    labelEn: 'Display & Heading Font Family',
+    labelAr: 'خط العناوين البارزة (Display)',
+    descriptionEn: 'Font stack for sovereign titles and headings (Cairo / Geist)',
+    descriptionAr: 'عائلة الخطوط المستخدمة للعناوين الرئيسية والهيدرات البارزة',
+    defaultValueLight: DEFAULT_LIGHT_TOKENS['--font-display'],
+    defaultValueDark: DEFAULT_DARK_TOKENS['--font-display'],
+    options: [
+      '"Cairo", "Geist", system-ui, sans-serif',
+      '"Geist", "Cairo", system-ui, sans-serif',
+      '"Tajawal", system-ui, sans-serif'
+    ],
+    cssVariable: '--font-display'
+  },
 
-  // Brand & Accent
   {
     key: '--accent',
     category: 'brand_accent',
@@ -236,8 +250,67 @@ export const TOKEN_REGISTRY: TokenDefinition[] = [
     defaultValueDark: DEFAULT_DARK_TOKENS['--focus-outline'],
     cssVariable: '--focus-outline'
   },
+  {
+    key: '--github-green',
+    category: 'brand_accent',
+    type: 'color',
+    labelEn: 'GitHub Green (Primary Sovereign)',
+    labelAr: 'أخضر جيت هب السيادي (Primary Action)',
+    descriptionEn: 'Core sovereign green for major buttons, confirmations, and metrics',
+    descriptionAr: 'الأخضر السيادي المعتمد لأزرار الحفظ والإجراءات المحورية',
+    defaultValueLight: DEFAULT_LIGHT_TOKENS['--github-green'],
+    defaultValueDark: DEFAULT_DARK_TOKENS['--github-green'],
+    cssVariable: '--github-green'
+  },
+  {
+    key: '--github-blue',
+    category: 'brand_accent',
+    type: 'color',
+    labelEn: 'GitHub Blue (Links & Highlights)',
+    labelAr: 'أزرق جيت هب (الروابط والتمييز)',
+    descriptionEn: 'Classic GitHub blue used for hyper-links, active focus rings, and badges',
+    descriptionAr: 'الأزرق السيادي الكلاسيكي للروابط وحلقات التركيز والوسوم النشطة',
+    defaultValueLight: DEFAULT_LIGHT_TOKENS['--github-blue'],
+    defaultValueDark: DEFAULT_DARK_TOKENS['--github-blue'],
+    cssVariable: '--github-blue'
+  },
+  {
+    key: '--github-purple',
+    category: 'brand_accent',
+    type: 'color',
+    labelEn: 'GitHub Purple (Special Features)',
+    labelAr: 'بنفسجي جيت هب (الميزات الاستثنائية)',
+    descriptionEn: 'Royal purple for AI reasoning badges, advanced analytics, and Pro indicators',
+    descriptionAr: 'البنفسجي الملكي لوسوم الذكاء الاصطناعي وميزات الاحترافية',
+    defaultValueLight: DEFAULT_LIGHT_TOKENS['--github-purple'],
+    defaultValueDark: DEFAULT_DARK_TOKENS['--github-purple'],
+    cssVariable: '--github-purple'
+  },
+  {
+    key: '--github-orange',
+    category: 'brand_accent',
+    type: 'color',
+    labelEn: 'GitHub Orange (Warm Highlights)',
+    labelAr: 'برتقالي جيت هب (التنبيهات الدافئة)',
+    descriptionEn: 'Warm orange for attention badges, sponsor tags, and cautions',
+    descriptionAr: 'البرتقالي الدافئ لشارات الانتباه والوسوم الخاصة',
+    defaultValueLight: DEFAULT_LIGHT_TOKENS['--github-orange'],
+    defaultValueDark: DEFAULT_DARK_TOKENS['--github-orange'],
+    cssVariable: '--github-orange'
+  },
+  {
+    key: '--github-pink',
+    category: 'brand_accent',
+    type: 'color',
+    labelEn: 'GitHub Pink (Sponsorship & Viral)',
+    labelAr: 'وردي جيت هب (الدعم والتفاعل)',
+    descriptionEn: 'Vibrant pink for viral book interactions, creator badges, and gifts',
+    descriptionAr: 'الوردي الزاهي لتفاعلات مجتمع فيرال بوك والشارات التفاعلية',
+    defaultValueLight: DEFAULT_LIGHT_TOKENS['--github-pink'],
+    defaultValueDark: DEFAULT_DARK_TOKENS['--github-pink'],
+    cssVariable: '--github-pink'
+  },
 
-  // Borders & Dividers
   {
     key: '--border-default',
     category: 'borders_dividers',
@@ -287,7 +360,6 @@ export const TOKEN_REGISTRY: TokenDefinition[] = [
     cssVariable: '--border-accent'
   },
 
-  // Buttons & Controls
   {
     key: '--bg-btn-primary',
     category: 'buttons_controls',
@@ -481,7 +553,6 @@ export const TOKEN_REGISTRY: TokenDefinition[] = [
     cssVariable: '--border-followup-btn-hover'
   },
 
-  // Header Zone Buttons
   {
     key: '--btn-header-size',
     category: 'buttons_controls',
@@ -519,7 +590,6 @@ export const TOKEN_REGISTRY: TokenDefinition[] = [
     cssVariable: '--btn-header-border'
   },
 
-  // Input Zone Buttons
   {
     key: '--btn-input-size',
     category: 'buttons_controls',
@@ -545,7 +615,6 @@ export const TOKEN_REGISTRY: TokenDefinition[] = [
     cssVariable: '--btn-input-radius'
   },
 
-  // Tool & Utility Buttons
   {
     key: '--btn-tool-size',
     category: 'buttons_controls',
@@ -571,7 +640,6 @@ export const TOKEN_REGISTRY: TokenDefinition[] = [
     cssVariable: '--btn-tool-radius'
   },
 
-  // Action & Canvas Buttons
   {
     key: '--btn-action-size',
     category: 'buttons_controls',
@@ -621,7 +689,6 @@ export const TOKEN_REGISTRY: TokenDefinition[] = [
     cssVariable: '--control-active-fg'
   },
 
-  // Inputs & Forms
   {
     key: '--bg-input',
     category: 'inputs_forms',
@@ -647,7 +714,6 @@ export const TOKEN_REGISTRY: TokenDefinition[] = [
     cssVariable: '--border-focus'
   },
 
-  // Admin Layout & Data Tables
   {
     key: '--admin-nav-bg',
     category: 'admin_layout',
@@ -697,7 +763,6 @@ export const TOKEN_REGISTRY: TokenDefinition[] = [
     cssVariable: '--admin-table-row-hover'
   },
 
-  // Chat Messages
   {
     key: '--chat-bubble-user',
     category: 'chat_messages',
@@ -747,7 +812,6 @@ export const TOKEN_REGISTRY: TokenDefinition[] = [
     cssVariable: '--chat-bubble-assistant-text'
   },
 
-  // Status Alerts
   {
     key: '--fg-success',
     category: 'status_alerts',
@@ -797,7 +861,6 @@ export const TOKEN_REGISTRY: TokenDefinition[] = [
     cssVariable: '--fg-info'
   },
 
-  // Geometry & Elevation
   {
     key: '--radius-sm',
     category: 'geometry_elevation',
@@ -836,5 +899,17 @@ export const TOKEN_REGISTRY: TokenDefinition[] = [
     defaultValueDark: DEFAULT_DARK_TOKENS['--radius-lg'],
     options: ['12px', '16px', '20px', '24px'],
     cssVariable: '--radius-lg'
+  },
+  {
+    key: '--shadow-md',
+    category: 'geometry_elevation',
+    type: 'size',
+    labelEn: 'Card Ambient Shadow (Light Mode)',
+    labelAr: 'ظل البطاقات البيئي الملون (Light Mode)',
+    descriptionEn: 'Subtle green-tinted glow shadow for elevated cards in light mode',
+    descriptionAr: 'الظل البيئي الخافت الملون باللون الأخضر للبطاقات في النمط الفاتح',
+    defaultValueLight: DEFAULT_LIGHT_TOKENS['--shadow-md'],
+    defaultValueDark: DEFAULT_DARK_TOKENS['--shadow-md'],
+    cssVariable: '--shadow-md'
   }
 ];

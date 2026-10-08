@@ -64,6 +64,10 @@ export async function runSystemMaintenance() {
       {
         name: 'user_activity_logs',
         query: "DELETE FROM user_activity_logs WHERE created_at < NOW() AT TIME ZONE 'UTC' - INTERVAL '30 days'"
+      },
+      {
+        name: 'api_performance_logs',
+        query: "DELETE FROM api_performance_logs WHERE created_at < NOW() AT TIME ZONE 'UTC' - INTERVAL '14 days'"
       }
     ];
 

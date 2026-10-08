@@ -71,11 +71,11 @@ export const ImageUploadDropzone: React.FC<ImageUploadDropzoneProps> = ({
             fileInputRef.current.click();
           }
         }}
-        className={`relative overflow-hidden rounded-2xl border-2 border-dashed transition-all cursor-pointer ${
+        className={`relative overflow-hidden rounded-[var(--radius-lg)] border-2 border-dashed transition-all cursor-pointer ${
           isDragging
             ? 'border-accent bg-accent/10'
             : value
-            ? 'border-emerald-500/40 bg-[var(--surface-subtle)]'
+            ? 'border-[var(--fg-success)]/40 bg-[var(--surface-subtle)]'
             : 'border-[var(--border-default)] hover:border-accent/60 bg-[var(--surface-subtle)] hover:bg-[var(--surface-card)]'
         }`}
         style={{
@@ -95,7 +95,7 @@ export const ImageUploadDropzone: React.FC<ImageUploadDropzoneProps> = ({
           <div className="relative group w-full h-full p-2 flex items-center justify-between gap-3 min-h-[85px]">
             <div className="flex items-center gap-3 min-w-0">
               <div
-                className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-black/10 shrink-0"
+                className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)] bg-black/10 shrink-0"
                 style={{
                   width: aspectRatio === 1 ? '60px' : '90px',
                   height: '60px'
@@ -105,7 +105,7 @@ export const ImageUploadDropzone: React.FC<ImageUploadDropzoneProps> = ({
               </div>
 
               <div className="min-w-0">
-                <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-xs mb-0.5">
+                <div className="flex items-center gap-1 text-[var(--fg-success)] dark:text-[var(--fg-success)] font-bold text-xs mb-0.5">
                   <CheckCircle2 size={14} />
                   <span>{isRtl ? 'تم رفع الصورة' : 'Image Ready'}</span>
                 </div>
@@ -124,7 +124,7 @@ export const ImageUploadDropzone: React.FC<ImageUploadDropzoneProps> = ({
                   setSelectedFileForCrop(value);
                   setIsCropModalOpen(true);
                 }}
-                className="p-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] hover:bg-accent/10 hover:text-accent hover:border-accent/40 text-[var(--text-primary)] transition-all shadow-2xs"
+                className="p-1.5 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-card)] hover:bg-accent/10 hover:text-accent hover:border-accent/40 text-[var(--text-primary)] transition-all shadow-2xs"
                 title={isRtl ? 'قص وتعديل' : 'Crop & Edit'}
               >
                 <Crop size={14} />
@@ -136,7 +136,7 @@ export const ImageUploadDropzone: React.FC<ImageUploadDropzoneProps> = ({
                   e.stopPropagation();
                   if (fileInputRef.current) fileInputRef.current.click();
                 }}
-                className="p-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] hover:bg-accent/10 hover:text-accent hover:border-accent/40 text-[var(--text-primary)] transition-all shadow-2xs"
+                className="p-1.5 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-card)] hover:bg-accent/10 hover:text-accent hover:border-accent/40 text-[var(--text-primary)] transition-all shadow-2xs"
                 title={isRtl ? 'تغيير الصورة' : 'Change Image'}
               >
                 <Edit3 size={14} />
@@ -148,7 +148,7 @@ export const ImageUploadDropzone: React.FC<ImageUploadDropzoneProps> = ({
                   e.stopPropagation();
                   onChange('');
                 }}
-                className="p-1.5 rounded-lg border border-red-500/20 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all shadow-2xs"
+                className="p-1.5 rounded-[var(--radius-sm)] border border-red-500/20 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all shadow-2xs"
                 title={isRtl ? 'حذف الصورة' : 'Remove'}
               >
                 <Trash2 size={14} />
@@ -158,7 +158,7 @@ export const ImageUploadDropzone: React.FC<ImageUploadDropzoneProps> = ({
         ) : (
           /* Empty Dropzone Placeholder */
           <div className="p-4 flex flex-col items-center justify-center text-center gap-1">
-            <div className="w-9 h-9 rounded-full bg-accent/10 text-accent flex items-center justify-center">
+            <div className="w-9 h-9 rounded-shape-sm bg-accent/10 text-accent flex items-center justify-center">
               <Upload size={18} />
             </div>
             <div className="text-xs font-bold text-[var(--text-primary)]">

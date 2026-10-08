@@ -1,0 +1,42 @@
+# Service Level Agreement (SLA) & Uptime Commitment
+
+Effective Date: September 21, 2026  
+Infrastructure Operator: Cloud Operations Division, **ViralLinkUp Limited** (Company No: **16804604**).
+
+---
+
+## 1. Target Availability Commitment
+
+**ViralLinkUp Limited** commits to commercially reasonable technical efforts to maintain a Monthly Uptime Percentage of not less than **99.9%** across all Perplexta core API endpoints, intelligent routing gateways, and core authentication services.
+
+### 1.1 Calculation Formula
+Monthly Uptime Percentage is computed on an annualized calendar month basis as follows:
+
+$$\text{Monthly Uptime \%} = \frac{\text{Total Minutes in Month} - \text{Unscheduled Downtime Minutes}}{\text{Total Minutes in Month}} \times 100\%$$
+
+---
+
+## 2. SLA Exclusions
+
+Downtime does not encompass service disruptions resulting from:
+1. **Scheduled Maintenance:** System maintenance announced at least twenty-four (24) hours in advance and executed during designated low-traffic maintenance windows.
+2. **Upstream Foundation Outages:** Global catastrophic failures impacting upstream foundational model infrastructure outside the Company's operational perimeter.
+3. **Force Majeure & Mass Cyber Attacks:** Regional Internet routing collapse, international cable severance, or unprecedented volumetric DDoS attacks exceeding transit scrub capacities.
+
+---
+
+## 3. Service Credit Schedule
+
+In the event of confirmed breach of our Monthly Uptime Percentage commitment, eligible enterprise customers may claim service credits calculated against the affected month's consumption:
+
+| Verified Monthly Uptime | Service Credit Percentage Applied to Platform Balance |
+| :--- | :--- |
+| **99.0% to < 99.9%** | **10% of monthly billable consumption** |
+| **95.0% to < 99.0%** | **25% of monthly billable consumption** |
+| **< 95.0%** | **50% of monthly billable consumption** |
+
+---
+
+## 4. Credit Request & Claim Procedures
+
+To be considered for a service credit, written claims containing request log IDs, timestamp ranges, and outbound error headers must be submitted to `sla@perplexta.com` within thirty (30) calendar days following the conclusion of the affected month.

@@ -218,6 +218,22 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
     }
   }, [token, fetchAuditData]);
 
+  useEffect(() => {
+    const handleSyncEvent = () => {
+      handleRunFullSync();
+    };
+    const handleRefreshEvent = () => {
+      fetchAuditData();
+    };
+
+    window.addEventListener("admin-sync-seo", handleSyncEvent);
+    window.addEventListener("admin-refresh-seo", handleRefreshEvent);
+    return () => {
+      window.removeEventListener("admin-sync-seo", handleSyncEvent);
+      window.removeEventListener("admin-refresh-seo", handleRefreshEvent);
+    };
+  }, [fetchAuditData]);
+
   const handleRunFullSync = async () => {
     if (!summary) return;
     setIsSyncingAll(true);
@@ -352,7 +368,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 space-y-4">
-        <RefreshCw size={36} className="text-accent animate-spin" />
+        <RefreshCw size={36} className="text-[var(--fg-accent)] animate-spin" />
         <p className="text-[var(--text-secondary)] font-medium text-sm">
           {isAr ? "جاري إجراء الفحص الشامل لبيانات السيو والميتاداتا..." : "Conducting comprehensive SEO metadata audit..."}
         </p>
@@ -365,17 +381,17 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
   const healthTextClass = healthScore >= 85 ? "text-[var(--fg-success)]" : healthScore >= 60 ? "text-amber-500" : "text-rose-500";
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-full space-y-6 px-1 md:px-2">
       {/* Top Banner Header */}
-      <div className="p-6 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-lg transition-theme relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-accent/5 rounded-[4px] blur-3xl pointer-events-none" />
+      <div className="p-6 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-card)] shadow-lg transition-theme relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[var(--bg-accent-muted)]/40 rounded-[var(--radius-full)] blur-3xl pointer-events-none" />
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="p-2 rounded-md bg-accent/10 text-accent border border-accent/20">
+              <span className="p-2 rounded-[var(--radius-sm)] bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border border-[var(--border-accent)]/30">
                 <Globe size={22} />
               </span>
-              <span className="text-xs font-black uppercase tracking-widest text-accent">
+              <span className="text-xs font-black uppercase tracking-widest text-[var(--fg-accent)]">
                 {isAr ? "مركز أرشفة وتدقيق السيو الشامل" : "PERPLEXTA SEO & METADATA AUDIT CENTER"}
               </span>
             </div>
@@ -392,7 +408,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
           <div className="flex items-center gap-3">
             <button
               onClick={() => fetchAuditData()}
-              className="p-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-page)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-accent/40 transition-theme flex items-center justify-center shadow-sm"
+              className="p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-page)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-accent)]/40 transition-theme flex items-center justify-center shadow-sm cursor-pointer"
               title={isAr ? "إعادة تحديث التدقيق" : "Refresh Audit"}
             >
               <RefreshCw size={18} />
@@ -400,17 +416,17 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
             <button
               onClick={handleRunFullSync}
               disabled={isSyncingAll}
-              className="flex items-center gap-2 bg-accent hover:bg-accent/90 text-white font-bold px-5 py-3 rounded-lg transition-theme shadow-md hover:shadow-lg disabled:opacity-50 active:scale-95"
+              className="flex items-center gap-2 bg-[var(--accent)] hover:opacity-90 text-white font-bold px-4 py-2.5 rounded-[var(--radius-sm)] transition-opacity shadow-xs disabled:opacity-50 cursor-pointer whitespace-nowrap shrink-0 min-h-[44px] touch-target-44"
             >
               {isSyncingAll ? (
                 <>
-                  <RefreshCw size={18} className="animate-spin" />
-                  <span>{isAr ? "جاري التوليد بالذكاء الاصطناعي..." : "AI Sync Running..."}</span>
+                  <RefreshCw size={16} className="animate-spin" />
+                  <span>{isAr ? "جاري المزامنة..." : "Syncing..."}</span>
                 </>
               ) : (
                 <>
-                  <Sparkles size={18} />
-                  <span>{isAr ? "بدء المزامنة الشاملة بالذكاء الاصطناعي" : "Start Global AI Metadata Sync"}</span>
+                  <Sparkles size={16} />
+                  <span>{isAr ? "بدء المزامنة" : "Start Sync"}</span>
                 </>
               )}
             </button>
@@ -421,7 +437,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
       {/* Real-time Progress & Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Metric 1: Missing Metadata Items */}
-        <div className={`p-5 rounded-xl border transition-theme ${
+        <div className={`p-5 rounded-[var(--radius-md)] border transition-theme ${
           (summary?.items_missing_metadata || 0) > 0 
             ? 'border-amber-500/40 bg-amber-500/5 dark:bg-amber-500/10' 
             : 'border-[var(--border-default)] bg-[var(--surface-card)]'
@@ -452,7 +468,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
         </div>
 
         {/* Metric 2: SEO Health Score */}
-        <div className="p-5 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] transition-theme">
+        <div className="p-5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] transition-theme">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-black uppercase tracking-wider text-[var(--text-muted)]">
               {isAr ? "معدل صحة جودة السيو" : "SEO Health Score"}
@@ -466,16 +482,16 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
               {healthScore}%
             </span>
           </div>
-          <div className="w-full bg-[var(--surface-page)] h-2 rounded-[4px] overflow-hidden mt-3 border border-[var(--border-default)]">
+          <div className="w-full bg-[var(--surface-page)] h-2 rounded-[var(--radius-xs)] overflow-hidden mt-3 border border-[var(--border-default)]">
             <div
-              className={`h-full bg-accent transition-all duration-500`}
+              className={`h-full bg-[var(--accent)] transition-all duration-slow`}
               style={{ width: `${healthScore}%` }}
             />
           </div>
         </div>
 
         {/* Metric 3: Total Audited Items */}
-        <div className="p-5 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] transition-theme">
+        <div className="p-5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] transition-theme">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-black uppercase tracking-wider text-[var(--text-muted)]">
               {isAr ? "إجمالي المحتوى المفحوص" : "Total Content Audited"}
@@ -497,7 +513,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
         </div>
 
         {/* Metric 4: Real-time Estimated Time Remaining */}
-        <div className="p-5 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] transition-theme">
+        <div className="p-5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] transition-theme">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-black uppercase tracking-wider text-[var(--text-muted)]">
               {isAr ? "الوقت التقديري للاستكمال" : "Est. Completion Time"}
@@ -521,11 +537,11 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
 
       {/* Real-time Progress Monitor Component (When syncing is active) */}
       {isSyncingAll && (
-        <div className="p-6 rounded-xl border border-accent/40 bg-accent/5 backdrop-blur-md shadow-xl animate-pulse transition-theme space-y-4">
+        <div className="p-6 rounded-[var(--radius-lg)] border border-[var(--border-accent)]/40 bg-[var(--bg-accent-muted)]/30 backdrop-blur-md shadow-xl transition-theme space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-lg bg-accent text-white shadow-lg animate-spin">
-                <RefreshCw size={20} />
+              <div className="p-2.5 rounded-[var(--radius-sm)] bg-[var(--accent)] text-white shadow-sm">
+                <RefreshCw size={20} className="animate-spin" />
               </div>
               <div>
                 <h4 className="text-base font-bold text-[var(--text-primary)]">
@@ -537,7 +553,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
               </div>
             </div>
             <div className="text-right">
-              <span className="text-2xl font-black text-accent font-mono">
+              <span className="text-2xl font-black text-[var(--fg-accent)] font-mono">
                 {Math.round((syncProgress.completed / (syncProgress.total || 1)) * 100)}%
               </span>
               <p className="text-[11px] text-[var(--text-muted)] font-mono">
@@ -546,9 +562,9 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
             </div>
           </div>
 
-          <div className="w-full bg-[var(--surface-page)] h-3 rounded-[4px] overflow-hidden border border-[var(--border-default)] p-0.5">
+          <div className="w-full bg-[var(--surface-page)] h-3 rounded-[var(--radius-xs)] overflow-hidden border border-[var(--border-default)] p-0.5">
             <div
-              className="h-full bg-accent rounded-[4px] transition-all duration-300 shadow-[0_0_12px_rgba(156,163,175,0.8)]"
+              className="h-full bg-[var(--accent)] rounded-[var(--radius-xs)] transition-all duration-media"
               style={{ width: `${Math.min(100, Math.max(5, (syncProgress.completed / (syncProgress.total || 1)) * 100))}%` }}
             />
           </div>
@@ -561,13 +577,13 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
       )}
 
       {/* Control Bar & Filter Tabs */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)]">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-card)]">
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setFilterCategory('all')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-theme ${
+            className={`px-4 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-theme cursor-pointer ${
               filterCategory === 'all'
-                ? 'bg-accent text-white shadow-md'
+                ? 'bg-[var(--accent)] text-white shadow-sm'
                 : 'bg-[var(--surface-page)] text-[var(--text-muted)] hover:text-[var(--text-primary)] border border-[var(--border-default)]'
             }`}
           >
@@ -575,23 +591,23 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
           </button>
           <button
             onClick={() => setFilterCategory('missing')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-theme flex items-center gap-1 ${
+            className={`px-4 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-theme flex items-center gap-1 cursor-pointer ${
               filterCategory === 'missing'
-                ? 'bg-amber-500 text-white shadow-md'
+                ? 'bg-amber-500 text-white shadow-sm'
                 : 'bg-[var(--surface-page)] text-amber-500 hover:bg-amber-500/10 border border-amber-500/30'
             }`}
           >
             <AlertTriangle size={14} />
             <span>{isAr ? "يتطلب استكمال الميتاداتا" : "Requires Metadata"}</span>
-            <span className="px-1.5 py-0.5 rounded-[4px] bg-black/20 text-[10px]">
+            <span className="px-1.5 py-0.5 rounded-[var(--radius-xs)] bg-black/20 text-[10px]">
               {items.filter(i => i.requires_metadata_population).length}
             </span>
           </button>
           <button
             onClick={() => setFilterCategory('optimized')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-theme flex items-center gap-1 ${
+            className={`px-4 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-theme flex items-center gap-1 cursor-pointer ${
               filterCategory === 'optimized'
-                ? 'bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] shadow-md'
+                ? 'bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] shadow-sm'
                 : 'bg-[var(--surface-page)] text-[var(--fg-success)] hover:bg-[var(--status-success-subtle)] border border-[var(--fg-success)]/30'
             }`}
           >
@@ -600,9 +616,9 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
           </button>
           <button
             onClick={() => setFilterCategory('bulletin')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-theme flex items-center gap-1 ${
+            className={`px-4 py-2 rounded-[var(--radius-sm)] text-xs font-bold transition-theme flex items-center gap-1 cursor-pointer ${
               filterCategory === 'bulletin'
-                ? 'bg-orange-600 text-white shadow-md'
+                ? 'bg-orange-600 text-white shadow-sm'
                 : 'bg-[var(--surface-page)] text-orange-500 hover:bg-orange-500/10 border border-orange-500/30'
             }`}
           >
@@ -613,19 +629,19 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
 
         {/* Search Input */}
         <div className="relative min-w-[260px]">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+          <Search size={16} className="absolute ltr:left-3 rtl:right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={isAr ? "بحث بالعنوان أو التصنيف أو الرابط..." : "Search title, category, slug..."}
-            className="w-full pl-9 pr-4 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-page)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-accent"
+            className="w-full ltr:pl-9 ltr:pr-4 rtl:pr-9 rtl:pl-4 py-2.5 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-page)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-accent)] transition-colors"
           />
         </div>
       </div>
 
       {/* Main Content Audit Table */}
-      <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-md overflow-hidden transition-theme">
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-card)] shadow-md overflow-hidden transition-theme">
         <div className="overflow-x-auto">
           <table className="w-full text-right dir-rtl">
             <thead className="bg-[var(--surface-page)] border-b border-[var(--border-default)] text-[11px] font-black uppercase text-[var(--text-muted)] tracking-wider">
@@ -642,7 +658,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                 <tr>
                   <td colSpan={5} className="p-12 text-center text-[var(--text-muted)]">
                     <div className="flex flex-col items-center justify-center gap-2">
-                      <CheckCircle2 size={32} className="text-accent/60" />
+                      <CheckCircle2 size={32} className="text-[var(--fg-accent)]/60" />
                       <p className="font-bold text-sm">
                         {isAr ? "لا توجد عناصر مطابقة للفلتر المحدد" : "No content items match the selected filter"}
                       </p>
@@ -746,22 +762,22 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                       </td>
 
                       {/* Actions */}
-                      <td className="p-4 text-center">
-                        <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <td className="p-3 text-center min-w-[180px]">
+                        <div className="flex items-center justify-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={(e) => handleOpenSmartSuggest(item, e)}
-                            className="flex items-center gap-1 bg-accent/10 hover:bg-accent text-accent hover:text-white px-3 py-1.5 rounded-lg font-bold text-[11px] border border-accent/30 shadow-sm transition-all group"
+                            className="flex items-center gap-1 bg-[var(--bg-accent-muted)] hover:bg-[var(--accent)] text-[var(--fg-accent)] hover:text-white px-2.5 py-1.5 rounded-[var(--radius-sm)] font-bold text-[11px] border border-[var(--border-accent)]/30 shadow-xs transition-colors cursor-pointer whitespace-nowrap min-h-[36px] touch-target-44 shrink-0"
                             title={isAr ? "عرض المقتراحات الذكية بالذكاء الاصطناعي والتحديث بنقرة واحدة" : "Smart AI Suggest & 1-Click Update"}
                           >
-                            <Wand2 size={13} className="group-hover:rotate-12 transition-transform" />
-                            <span>{isAr ? "اقتراح ذكي ✨" : "Smart Suggest ✨"}</span>
+                            <Wand2 size={13} />
+                            <span>{isAr ? "اقتراح ذكي" : "Suggest"}</span>
                           </button>
 
                           {item.requires_metadata_population ? (
                             <button
                               onClick={(e) => handleSyncSingleItem(item, e)}
                               disabled={isSyncingThis}
-                              className="flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1.5 rounded-lg font-bold text-[10px] shadow-sm transition-theme disabled:opacity-50"
+                              className="flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1.5 rounded-[var(--radius-sm)] font-bold text-[11px] shadow-xs transition-theme disabled:opacity-50 cursor-pointer whitespace-nowrap min-h-[36px] touch-target-44 shrink-0"
                               title={isAr ? "استكمال الميتاداتا تلقائياً" : "Auto Populate"}
                             >
                               {isSyncingThis ? (
@@ -769,13 +785,13 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                               ) : (
                                 <Zap size={12} />
                               )}
-                              <span>{isAr ? "توليد سريع" : "Quick AI"}</span>
+                              <span>{isAr ? "توليد" : "AI Sync"}</span>
                             </button>
                           ) : (
                             <button
                               onClick={(e) => handleSyncSingleItem(item, e)}
                               disabled={isSyncingThis}
-                              className="flex items-center gap-1 bg-[var(--surface-page)] hover:bg-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)] px-2.5 py-1.5 rounded-lg font-bold text-[10px] border border-[var(--border-default)] transition-theme disabled:opacity-50"
+                              className="flex items-center gap-1 bg-[var(--surface-page)] hover:bg-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)] px-2.5 py-1.5 rounded-[var(--radius-sm)] font-bold text-[11px] border border-[var(--border-default)] transition-theme disabled:opacity-50 cursor-pointer whitespace-nowrap min-h-[36px] touch-target-44 shrink-0"
                               title={isAr ? "إعادة توليد الميتاداتا" : "Regenerate Metadata"}
                             >
                               <RefreshCw size={12} className={isSyncingThis ? "animate-spin" : ""} />
@@ -796,10 +812,10 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
       {/* Selected Item Detail Drawer/Modal */}
       {selectedItem && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[var(--surface-card)] border border-[var(--border-default)] rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-[var(--surface-card)] border border-[var(--border-default)] rounded-[var(--radius-lg)] max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between pb-4 border-b border-[var(--border-default)]">
               <div>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-accent/10 text-accent border border-accent/20">
+                <span className="px-2 py-0.5 rounded-[var(--radius-xs)] text-[10px] font-bold bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border border-[var(--border-accent)]/30">
                   {isAr ? "منشور / إعلان بيربليكستا بورد" : "Perplexta Board Post / Ad"}
                 </span>
                 <h3 className="text-xl font-black text-[var(--text-primary)] mt-1">
@@ -819,18 +835,18 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
 
             <div className="space-y-4 text-xs">
               {/* Score & Status Banner */}
-              <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--surface-page)] border border-[var(--border-default)]">
+              <div className="flex items-center justify-between p-4 rounded-[var(--radius-md)] bg-[var(--surface-page)] border border-[var(--border-default)]">
                 <div>
                   <span className="text-[10px] text-[var(--text-muted)] font-black uppercase">
                     {isAr ? "تقييم أرشفة السيو" : "SEO Audit Score"}
                   </span>
-                  <div className="text-2xl font-black font-mono text-accent mt-0.5">
+                  <div className="text-2xl font-black font-mono text-[var(--fg-accent)] mt-0.5">
                     {selectedItem.seo_score} / 100
                   </div>
                 </div>
                 <div>
                   {selectedItem.requires_metadata_population ? (
-                    <span className="px-3 py-1 rounded-[4px] text-xs font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                    <span className="px-3 py-1 rounded-[var(--radius-xs)] text-xs font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30">
                       ⚠️ {isAr ? "يتطلب استكمال البيانات" : "Requires Metadata"}
                     </span>
                   ) : (
@@ -878,7 +894,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
             <div className="flex items-center justify-between pt-4 border-t border-[var(--border-default)]">
               <button
                 onClick={() => setSelectedItem(null)}
-                className="px-4 py-2 rounded-lg border border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)] font-bold text-xs"
+                className="px-4 py-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)] font-bold text-xs cursor-pointer"
               >
                 {isAr ? "إغلاق" : "Close"}
               </button>
@@ -889,7 +905,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                     setSelectedItem(null);
                     handleOpenSmartSuggest(item, e);
                   }}
-                  className="flex items-center gap-1 bg-accent text-white font-black px-4 py-2 rounded-lg text-xs shadow-md hover:bg-accent/90"
+                  className="flex items-center gap-1 bg-[var(--accent)] text-white font-black px-4 py-2 rounded-[var(--radius-sm)] text-xs shadow-sm hover:opacity-90 cursor-pointer"
                 >
                   <Wand2 size={14} />
                   <span>{isAr ? "اقتراح ذكي وتعديل ✨" : "Smart Suggest & Edit ✨"}</span>
@@ -897,7 +913,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                 <button
                   onClick={() => handleSyncSingleItem(selectedItem)}
                   disabled={syncingItemId === `${selectedItem.type}-${selectedItem.id}`}
-                  className="flex items-center gap-1 bg-[var(--surface-page)] hover:bg-[var(--border-default)] text-[var(--text-primary)] font-bold px-4 py-2 rounded-lg text-xs border border-[var(--border-default)] shadow-sm"
+                  className="flex items-center gap-1 bg-[var(--surface-page)] hover:bg-[var(--border-default)] text-[var(--text-primary)] font-bold px-4 py-2 rounded-[var(--radius-sm)] text-xs border border-[var(--border-default)] shadow-sm cursor-pointer"
                 >
                   <Sparkles size={14} />
                   <span>{isAr ? "توليد تلقائي فوراً" : "Auto Populate Now"}</span>
@@ -911,19 +927,19 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
       {/* Smart Suggest Modal */}
       {smartSuggestItem && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[var(--surface-card)] border border-[var(--border-default)] rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+          <div className="bg-[var(--surface-card)] border border-[var(--border-default)] rounded-[var(--radius-lg)] max-w-3xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
             {/* Header */}
             <div className="flex items-start justify-between pb-4 border-b border-[var(--border-default)]">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-accent/10 text-accent border border-accent/20">
+                <div className="p-2.5 rounded-[var(--radius-sm)] bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border border-[var(--border-accent)]/30">
                   <Wand2 size={24} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-accent/10 text-accent">
+                    <span className="px-2 py-0.5 rounded-[var(--radius-xs)] text-[10px] font-black uppercase bg-[var(--bg-accent-muted)] text-[var(--fg-accent)]">
                       {isAr ? "اقتراح ذكي بالذكاء الاصطناعي" : "AI Smart Suggest"}
                     </span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[var(--surface-page)] text-[var(--text-muted)] border border-[var(--border-default)]">
+                    <span className="px-2 py-0.5 rounded-[var(--radius-xs)] text-[10px] font-bold bg-[var(--surface-page)] text-[var(--text-muted)] border border-[var(--border-default)]">
                       {isAr ? "منشور / إعلان بيربليكستا بورد" : "Perplexta Board Post / Ad"}
                     </span>
                   </div>
@@ -934,7 +950,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
               </div>
               <button
                 onClick={() => setSmartSuggestItem(null)}
-                className="p-2 rounded-lg bg-[var(--surface-page)] hover:bg-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                className="p-2 rounded-[var(--radius-sm)] bg-[var(--surface-page)] hover:bg-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
               >
                 ✕
               </button>
@@ -942,8 +958,8 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
 
             {loadingSmartSuggest ? (
               <div className="flex flex-col items-center justify-center py-16 space-y-4">
-                <div className="p-4 rounded-[4px] bg-accent/10 text-accent animate-bounce">
-                  <Wand2 size={32} />
+                <div className="p-4 rounded-[var(--radius-sm)] bg-[var(--bg-accent-muted)] text-[var(--fg-accent)] border border-[var(--border-accent)]/20 shadow-xs">
+                  <RefreshCw size={32} className="animate-spin text-accent" />
                 </div>
                 <div className="text-center space-y-1">
                   <p className="font-bold text-sm text-[var(--text-primary)]">
@@ -959,7 +975,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                 {/* Meta Titles Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Meta Title EN */}
-                  <div className="space-y-2 p-3.5 rounded-xl border border-[var(--border-default)] bg-[var(--surface-page)]">
+                  <div className="space-y-2 p-3.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-page)]">
                     <div className="flex items-center justify-between">
                       <label className="font-black text-[var(--text-primary)] flex items-center gap-1">
                         <span>{isAr ? "عنوان SEO المقترح (إنكليزي)" : "Meta Title Suggested (EN)"}</span>
@@ -978,12 +994,12 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                       value={suggestMetaTitleEn}
                       onChange={(e) => setSuggestMetaTitleEn(e.target.value)}
                       placeholder="Meta Title EN..."
-                      className="w-full px-3 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] text-xs text-[var(--text-primary)] font-medium focus:outline-none focus:border-accent"
+                      className="w-full px-3 py-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-card)] text-xs text-[var(--text-primary)] font-medium focus:outline-none focus:border-[var(--border-accent)]"
                     />
                   </div>
 
                   {/* Meta Title AR */}
-                  <div className="space-y-2 p-3.5 rounded-xl border border-[var(--border-default)] bg-[var(--surface-page)]">
+                  <div className="space-y-2 p-3.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-page)]">
                     <div className="flex items-center justify-between">
                       <label className="font-black text-[var(--text-primary)] flex items-center gap-1">
                         <span>{isAr ? "عنوان SEO المقترح (عربي)" : "Meta Title Suggested (AR)"}</span>
@@ -993,7 +1009,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                       </span>
                     </div>
                     {smartSuggestData?.current?.meta_title_ar && (
-                      <div className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-card)] p-2 rounded border border-[var(--border-default)]">
+                      <div className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-card)] p-2 rounded-[var(--radius-xs)] border border-[var(--border-default)]">
                         <span className="font-bold">{isAr ? "العنوان الحالي:" : "Current:"}</span> {smartSuggestData.current.meta_title_ar}
                       </div>
                     )}
@@ -1002,7 +1018,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                       value={suggestMetaTitleAr}
                       onChange={(e) => setSuggestMetaTitleAr(e.target.value)}
                       placeholder="Meta Title AR..."
-                      className="w-full px-3 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] text-xs text-[var(--text-primary)] font-medium focus:outline-none focus:border-accent dir-rtl"
+                      className="w-full px-3 py-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-card)] text-xs text-[var(--text-primary)] font-medium focus:outline-none focus:border-[var(--border-accent)] dir-rtl"
                     />
                   </div>
                 </div>
@@ -1010,7 +1026,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                 {/* Meta Descriptions Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Meta Desc EN */}
-                  <div className="space-y-2 p-3.5 rounded-xl border border-[var(--border-default)] bg-[var(--surface-page)]">
+                  <div className="space-y-2 p-3.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-page)]">
                     <div className="flex items-center justify-between">
                       <label className="font-black text-[var(--text-primary)]">
                         {isAr ? "وصف SEO المقترح (إنكليزي)" : "Meta Description Suggested (EN)"}
@@ -1022,7 +1038,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                       </span>
                     </div>
                     {smartSuggestData?.current?.meta_description_en && (
-                      <div className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-card)] p-2 rounded border border-[var(--border-default)]">
+                      <div className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-card)] p-2 rounded-[var(--radius-xs)] border border-[var(--border-default)]">
                         <span className="font-bold">{isAr ? "الوصف الحالي:" : "Current:"}</span> {smartSuggestData.current.meta_description_en}
                       </div>
                     )}
@@ -1031,12 +1047,12 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                       value={suggestMetaDescEn}
                       onChange={(e) => setSuggestMetaDescEn(e.target.value)}
                       placeholder="Meta Description EN..."
-                      className="w-full p-2.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] text-xs text-[var(--text-primary)] leading-relaxed focus:outline-none focus:border-accent resize-none"
+                      className="w-full p-2.5 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-card)] text-xs text-[var(--text-primary)] leading-relaxed focus:outline-none focus:border-[var(--border-accent)] resize-none"
                     />
                   </div>
 
                   {/* Meta Desc AR */}
-                  <div className="space-y-2 p-3.5 rounded-xl border border-[var(--border-default)] bg-[var(--surface-page)]">
+                  <div className="space-y-2 p-3.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-page)]">
                     <div className="flex items-center justify-between">
                       <label className="font-black text-[var(--text-primary)]">
                         {isAr ? "وصف SEO المقترح (عربي)" : "Meta Description Suggested (AR)"}
@@ -1048,7 +1064,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                       </span>
                     </div>
                     {smartSuggestData?.current?.meta_description_ar && (
-                      <div className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-card)] p-2 rounded border border-[var(--border-default)]">
+                      <div className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-card)] p-2 rounded-[var(--radius-xs)] border border-[var(--border-default)]">
                         <span className="font-bold">{isAr ? "الوصف الحالي:" : "Current:"}</span> {smartSuggestData.current.meta_description_ar}
                       </div>
                     )}
@@ -1057,14 +1073,14 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                       value={suggestMetaDescAr}
                       onChange={(e) => setSuggestMetaDescAr(e.target.value)}
                       placeholder="Meta Description AR..."
-                      className="w-full p-2.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] text-xs text-[var(--text-primary)] leading-relaxed focus:outline-none focus:border-accent resize-none dir-rtl"
+                      className="w-full p-2.5 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-card)] text-xs text-[var(--text-primary)] leading-relaxed focus:outline-none focus:border-[var(--border-accent)] resize-none dir-rtl"
                     />
                   </div>
                 </div>
 
                 {/* Keywords & Slug */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1 p-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-page)]">
+                  <div className="space-y-1 p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-page)]">
                     <label className="font-bold text-[var(--text-primary)] block text-[11px]">
                       {isAr ? "الكلمات المفتاحية (EN)" : "Keywords (EN)"}
                     </label>
@@ -1072,11 +1088,11 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                       type="text"
                       value={suggestKeywordsEn}
                       onChange={(e) => setSuggestKeywordsEn(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded border border-[var(--border-default)] bg-[var(--surface-card)] text-[11px] font-mono"
+                      className="w-full px-2.5 py-1.5 rounded-[var(--radius-xs)] border border-[var(--border-default)] bg-[var(--surface-card)] text-[11px] font-mono"
                     />
                   </div>
 
-                  <div className="space-y-1 p-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-page)]">
+                  <div className="space-y-1 p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-page)]">
                     <label className="font-bold text-[var(--text-primary)] block text-[11px]">
                       {isAr ? "الكلمات المفتاحية (AR)" : "Keywords (AR)"}
                     </label>
@@ -1084,11 +1100,11 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                       type="text"
                       value={suggestKeywordsAr}
                       onChange={(e) => setSuggestKeywordsAr(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded border border-[var(--border-default)] bg-[var(--surface-card)] text-[11px] font-mono dir-rtl"
+                      className="w-full px-2.5 py-1.5 rounded-[var(--radius-xs)] border border-[var(--border-default)] bg-[var(--surface-card)] text-[11px] font-mono dir-rtl"
                     />
                   </div>
 
-                  <div className="space-y-1 p-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-page)]">
+                  <div className="space-y-1 p-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-page)]">
                     <label className="font-bold text-[var(--text-primary)] block text-[11px]">
                       {isAr ? "الرابط الدائم (Slug)" : "Slug URL"}
                     </label>
@@ -1096,7 +1112,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                       type="text"
                       value={suggestSlug}
                       onChange={(e) => setSuggestSlug(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded border border-[var(--border-default)] bg-[var(--surface-card)] text-[11px] font-mono"
+                      className="w-full px-2.5 py-1.5 rounded-[var(--radius-xs)] border border-[var(--border-default)] bg-[var(--surface-card)] text-[11px] font-mono"
                     />
                   </div>
                 </div>
@@ -1108,7 +1124,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
               <button
                 type="button"
                 onClick={() => setSmartSuggestItem(null)}
-                className="px-4 py-2 rounded-lg border border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)] font-bold text-xs"
+                className="px-4 py-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--text-primary)] font-bold text-xs cursor-pointer"
               >
                 {isAr ? "إلغاء" : "Cancel"}
               </button>
@@ -1118,7 +1134,7 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                   type="button"
                   onClick={() => smartSuggestItem && handleOpenSmartSuggest(smartSuggestItem)}
                   disabled={loadingSmartSuggest || isApplyingSuggest}
-                  className="flex items-center gap-1 px-3.5 py-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-page)] text-[var(--text-primary)] font-bold text-xs hover:border-accent/40 disabled:opacity-50"
+                  className="flex items-center gap-1 px-3.5 py-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-page)] text-[var(--text-primary)] font-bold text-xs hover:border-[var(--border-accent)]/40 disabled:opacity-50 cursor-pointer"
                 >
                   <RefreshCw size={14} className={loadingSmartSuggest ? "animate-spin" : ""} />
                   <span>{isAr ? "إعادة التوليد" : "Regenerate Suggestion"}</span>
@@ -1128,17 +1144,17 @@ export const SeoCenterView: React.FC<SeoCenterViewProps> = ({
                   type="button"
                   onClick={handleApplySmartSuggest}
                   disabled={loadingSmartSuggest || isApplyingSuggest}
-                  className="flex items-center gap-2 bg-accent hover:bg-accent/90 text-white font-black px-6 py-2.5 rounded-lg text-xs shadow-lg hover:shadow-xl transition-all disabled:opacity-50 active:scale-95"
+                  className="flex items-center gap-2 bg-[var(--accent)] hover:opacity-90 text-white font-bold px-4 py-2.5 rounded-[var(--radius-sm)] text-xs shadow-xs transition-opacity disabled:opacity-50 cursor-pointer whitespace-nowrap shrink-0 min-h-[44px] touch-target-44"
                 >
                   {isApplyingSuggest ? (
                     <>
-                      <RefreshCw size={16} className="animate-spin" />
-                      <span>{isAr ? "جاري الاعتماد والتحديث..." : "Applying Update..."}</span>
+                      <RefreshCw size={14} className="animate-spin" />
+                      <span>{isAr ? "جاري التحديث..." : "Applying..."}</span>
                     </>
                   ) : (
                     <>
-                      <Zap size={16} />
-                      <span>{isAr ? "تطبيق وتحديث بنقرة واحدة ⚡" : "One-Click Apply & Save ⚡"}</span>
+                      <Zap size={14} />
+                      <span>{isAr ? "تطبيق التحديث" : "Apply Update"}</span>
                     </>
                   )}
                 </button>

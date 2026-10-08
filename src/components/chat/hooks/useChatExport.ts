@@ -30,9 +30,9 @@ export const useChatExport = (messages: Message[], dir: 'rtl' | 'ltr', theme: st
         exportEl.style.top = '0';
         exportEl.style.width = '800px';
         exportEl.style.padding = '40px';
-        exportEl.style.backgroundColor = theme === 'dark' ? '#0f0f11' : '#ffffff';
+        exportEl.style.backgroundColor = theme === 'dark' ? '#0d1117' : '#ffffff';
         exportEl.style.color = theme === 'dark' ? '#ececec' : '#1a1a1a';
-        exportEl.style.fontFamily = 'sans-serif';
+        exportEl.style.fontFamily = "'Tajawal', 'Geist', 'Inter', sans-serif";
         exportEl.dir = dir;
 
         const header = document.createElement('h1');
@@ -75,7 +75,7 @@ export const useChatExport = (messages: Message[], dir: 'rtl' | 'ltr', theme: st
         footer.style.textAlign = 'center';
         footer.style.fontSize = '10px';
         footer.style.opacity = '0.3';
-        footer.innerText = '© 2026 ViralLinkUp PLATFORM - CONFIDENTIAL AI REPORT';
+        footer.innerText = '© 2026 PERPLEXTA PLATFORM - CONFIDENTIAL AI REPORT';
         exportEl.appendChild(footer);
 
         document.body.appendChild(exportEl);
@@ -83,7 +83,7 @@ export const useChatExport = (messages: Message[], dir: 'rtl' | 'ltr', theme: st
         await new Promise((resolve) => setTimeout(resolve, 500));
 
         const imgData = await toPng(exportEl, {
-          backgroundColor: theme === 'dark' ? '#0f0f11' : '#ffffff',
+          backgroundColor: theme === 'dark' ? '#0d1117' : '#ffffff',
           pixelRatio: 2,
         });
 
@@ -119,7 +119,7 @@ export const useChatExport = (messages: Message[], dir: 'rtl' | 'ltr', theme: st
           <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
           <head><meta charset='utf-8'><title>Chat Export</title>
           <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; }
+            body { font-family: 'Tajawal', 'Geist', 'Inter', sans-serif; line-height: 1.6; }
             .user { background-color: #f0f0f0; padding: 10px; margin-bottom: 10px; }
             .assistant { padding: 10px; margin-bottom: 10px; border-left: 3px solid #334155; }
             .label { font-weight: bold; color: #334155; font-size: 0.8em; }

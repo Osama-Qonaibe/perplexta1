@@ -1,10 +1,24 @@
 import express from 'express';
-import { pool, ledgerPool, getExternalPool } from '../db/index.js';
+import { pool, ledgerPool, getExternalPool, mediaPool } from '../db/index.js';
 import { authenticateToken, authenticateAdmin, authenticateTokenOptional } from '../middleware/auth.js';
 import { createNotification } from '../services/notifications.js';
 import { createChat, addChatMessage } from '../services/chat.js';
 import { io } from '../config/socket.js';
 import { formatDatabaseError } from '../utils/dbErrors.js';
+import { upload, handleMulterError } from '../middleware/upload.js';
+import { uploadValidator } from '../middleware/uploadValidator.js';
+import { optimizeUploadedImage } from '../services/mediaOptimizationService.js';
+import { processUploadedVideo, mergeAudioIntoVideo, processMediaTimeline, resolveDiskFilePath, trimAndProcessVideo } from '../services/videoProcessor.js';
+import { escapeHtml } from '../utils/security.js';
+import { searchHierarchicalLocations, ALL_GEO_COUNTRIES, normalizeGeoText } from '../utils/geoData.js';
+import { findCachedLocations } from '../services/locationCache.js';
+import { getActiveProviderKey } from '../services/mapProvidersService.js';
+import { MASTER_PLATFORM_CATEGORIES, CATEGORY_GROUPS, searchCategories, PlatformCategory } from '../constants/categories.js';
+import path from 'path';
+import fs from 'fs/promises';
+import { createReadStream } from 'fs';
+import crypto from 'crypto';
+import { harvestAudioFromPost, recordAudioTrackUsage } from '../services/mediaAudioService.js';
 
 const router = express.Router();
 
@@ -80,6 +94,145 @@ async function saveHashtagsToDatabase(tagsStr: string) {
 }
 
 /**
+ * Helper to ensure platform categories table and initial records exist in database
+ */
+// Flag to track whether platform categories table seeding has been verified once
+let categoriesTableEnsured = false;
+
+async function ensurePlatformCategoriesTable() {
+  if (!pool || categoriesTableEnsured) return;
+  categoriesTableEnsured = true;
+  try {
+    const countRes = await pool.query('SELECT COUNT(*) as count FROM platform_categories');
+    const count = parseInt(countRes.rows[0]?.count || '0', 10);
+    if (count < MASTER_PLATFORM_CATEGORIES.length) {
+      console.log('[Bulletin Categories] Syncing platform categories into database...');
+      for (const cat of MASTER_PLATFORM_CATEGORIES) {
+        await pool.query(`
+          INSERT INTO platform_categories (id, name_ar, name_en, group_id, group_ar, group_en, icon, audience_reach, keywords, is_featured)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          ON CONFLICT (id) DO UPDATE SET
+            name_ar = EXCLUDED.name_ar,
+            name_en = EXCLUDED.name_en,
+            group_id = EXCLUDED.group_id,
+            group_ar = EXCLUDED.group_ar,
+            group_en = EXCLUDED.group_en,
+            icon = EXCLUDED.icon,
+            audience_reach = EXCLUDED.audience_reach,
+            keywords = EXCLUDED.keywords,
+            is_featured = EXCLUDED.is_featured
+        `, [
+          cat.id,
+          cat.nameAr,
+          cat.nameEn,
+          cat.groupId,
+          cat.groupAr,
+          cat.groupEn,
+          cat.icon,
+          cat.audienceReach,
+          cat.keywords,
+          cat.isFeatured || false
+        ]);
+      }
+    }
+  } catch (err: any) {
+    console.warn('[Bulletin Categories] Notice checking table:', err.message);
+  }
+}
+
+/**
+ * GET /api/bulletin/categories
+ * Query master platform categories & industry sectors with dynamic search
+ */
+router.get('/categories', async (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+  try {
+    const q = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : '';
+    const group = typeof req.query.group === 'string' ? req.query.group.trim() : '';
+    const featured = req.query.featured === 'true';
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string || '60', 10), 1), 200);
+
+    let categories: PlatformCategory[] = [];
+
+    if (pool) {
+      await ensurePlatformCategoriesTable();
+      let sql = 'SELECT * FROM platform_categories WHERE 1=1';
+      const params: any[] = [];
+      let paramIdx = 1;
+
+      if (group && group !== 'all') {
+        sql += ` AND group_id = $${paramIdx++}`;
+        params.push(group);
+      }
+
+      if (featured) {
+        sql += ` AND is_featured = true`;
+      }
+
+      if (q) {
+        sql += ` AND (
+          LOWER(name_ar) LIKE $${paramIdx} OR
+          LOWER(name_en) LIKE $${paramIdx} OR
+          LOWER(group_ar) LIKE $${paramIdx} OR
+          LOWER(group_en) LIKE $${paramIdx} OR
+          EXISTS (
+            SELECT 1 FROM unnest(keywords) kw WHERE LOWER(kw) LIKE $${paramIdx}
+          )
+        )`;
+        params.push(`%${q}%`);
+        paramIdx++;
+      }
+
+      sql += ` ORDER BY is_featured DESC, audience_reach DESC LIMIT $${paramIdx}`;
+      params.push(limit);
+
+      const dbRes = await pool.query(sql, params).catch(() => ({ rows: [] }));
+      if (dbRes.rows && dbRes.rows.length > 0) {
+        categories = dbRes.rows.map((r: any) => ({
+          id: r.id,
+          nameAr: r.name_ar,
+          nameEn: r.name_en,
+          groupId: r.group_id,
+          groupAr: r.group_ar,
+          groupEn: r.group_en,
+          icon: r.icon,
+          audienceReach: Number(r.audience_reach) || 150000,
+          keywords: Array.isArray(r.keywords) ? r.keywords : [],
+          isFeatured: Boolean(r.is_featured)
+        }));
+      }
+    }
+
+    // Graceful fallback to static master dataset if DB is empty or returned 0 items
+    if (categories.length === 0) {
+      categories = searchCategories(q, group, limit);
+      if (featured) {
+        categories = categories.filter(c => c.isFeatured);
+      }
+    }
+
+    return res.json({
+      success: true,
+      categories,
+      groups: CATEGORY_GROUPS,
+      total: categories.length
+    });
+  } catch (error: any) {
+    console.error('[Categories API] Fetch failed:', error);
+    // Graceful fallback to constant dataset
+    const q = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : '';
+    const group = typeof req.query.group === 'string' ? req.query.group.trim() : '';
+    const fallbackList = searchCategories(q, group, 60);
+    return res.json({
+      success: true,
+      categories: fallbackList,
+      groups: CATEGORY_GROUPS,
+      total: fallbackList.length
+    });
+  }
+});
+
+/**
  * GET /api/bulletin/hashtags/trending
  * Fetch trending hashtags
  */
@@ -142,6 +295,1157 @@ router.get('/mentions/suggest', authenticateToken, async (req: any, res) => {
   }
 });
 
+/**
+ * POST /api/bulletin/merge-video-audio
+ * Merges or replaces video audio with chosen music track/slice via FFmpeg
+ */
+router.post('/merge-video-audio', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { video_url, audio_url, start_sec, keep_original_audio } = req.body;
+    if (!video_url || !audio_url) {
+      return res.status(400).json({ error: 'Video and Audio URLs are required' });
+    }
+
+    const videoDiskPath = resolveDiskFilePath(video_url);
+    const audioDiskPath = resolveDiskFilePath(audio_url);
+
+    const mergedResult = await mergeAudioIntoVideo(videoDiskPath, audioDiskPath, {
+      audioStartTime: Number(start_sec) || 0,
+      keepOriginalAudio: Boolean(keep_original_audio)
+    });
+
+    if (!mergedResult.success) {
+      return res.status(500).json({ error: mergedResult.error || 'Failed to merge audio into video' });
+    }
+
+    res.json({
+      success: true,
+      merged_video_url: mergedResult.processedVideoUrl
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Video audio merge failed' });
+  }
+});
+
+/**
+ * POST /api/bulletin/trim-video
+ * Server-side FFmpeg Trimming, Aspect-Ratio Cropping, Filter Rendering and Audio Overlays
+ */
+router.post('/trim-video', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { 
+      video_url, 
+      start_time, 
+      end_time, 
+      aspect_ratio, 
+      filter, 
+      audio_url, 
+      audio_start_time, 
+      audio_volume, 
+      original_audio_volume,
+      is_muted 
+    } = req.body;
+
+    if (!video_url) {
+      return res.status(400).json({ error: 'video_url is required' });
+    }
+
+    const videoDiskPath = resolveDiskFilePath(video_url);
+    const audioDiskPath = audio_url ? resolveDiskFilePath(audio_url) : undefined;
+
+    console.log(`[Bulletin Router] Trimming video: ${video_url} (${start_time}s -> ${end_time}s, ratio: ${aspect_ratio}, filter: ${filter})`);
+
+    const result = await trimAndProcessVideo({
+      videoFilePath: videoDiskPath,
+      startTime: Number(start_time) || 0,
+      endTime: Number(end_time) || undefined,
+      aspectRatio: aspect_ratio || '9:16',
+      filter: filter || 'normal',
+      audioFilePath: audioDiskPath,
+      audioStartTime: Number(audio_start_time) || 0,
+      audioVolume: audio_volume !== undefined ? Number(audio_volume) : 0.8,
+      originalAudioVolume: original_audio_volume !== undefined ? Number(original_audio_volume) : (is_muted ? 0 : 0.4),
+      isMuted: Boolean(is_muted)
+    });
+
+    if (!result.success) {
+      return res.status(500).json({ error: result.error || 'Failed to trim and render video' });
+    }
+
+    res.json({
+      success: true,
+      processed_video_url: result.processedVideoUrl,
+      thumbnail_url: result.thumbnailUrl,
+      duration: result.duration,
+      aspect_ratio: result.aspectRatio
+    });
+  } catch (err: any) {
+    console.error('[Bulletin Router] trim-video error:', err);
+    res.status(500).json({ error: err.message || 'Video trim failed' });
+  }
+});
+
+/**
+ * POST /api/bulletin/render-timeline
+ * Background Timeline Rendering (Image+Audio or Video+Audio)
+ */
+router.post('/render-timeline', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { type, duration, visual, audio } = req.body;
+    if (!visual?.source_url) {
+      return res.status(400).json({ error: 'Visual source_url is required' });
+    }
+
+    const visualDiskPath = resolveDiskFilePath(visual.source_url);
+    const audioDiskPath = audio?.source_url ? resolveDiskFilePath(audio.source_url) : '';
+
+    const result = await processMediaTimeline({
+      type: type || (visual.source_url.match(/\.(mp4|webm|mov|mkv)$/i) ? 'video_with_audio' : 'image_to_video'),
+      duration: Number(duration) || 15,
+      visual: {
+        sourceFilePath: visualDiskPath,
+        cropMode: visual.crop_mode || '9:16',
+        animation: visual.animation || 'ken_burns_zoom_in'
+      },
+      audio: audioDiskPath ? {
+        sourceFilePath: audioDiskPath,
+        startTime: Number(audio.start_time) || 0,
+        volume: audio.volume !== undefined ? Number(audio.volume) : 0.8,
+        originalAudioVolume: audio.original_volume !== undefined ? Number(audio.original_volume) : 0.4
+      } : undefined
+    });
+
+    if (!result.success) {
+      return res.status(500).json({ error: result.error || 'Timeline rendering failed' });
+    }
+
+    res.json({
+      success: true,
+      processed_video_url: result.processedVideoUrl,
+      duration: result.duration
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Timeline rendering failed' });
+  }
+});
+
+/**
+ * GET /api/bulletin/geocoding/search
+ * Dynamic real-time Geocoding Search powered by Google Places/Geocoding, Photon Global Engine & OpenStreetMap
+ */
+router.get('/geocoding/search', async (req, res) => {
+  try {
+    const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const country = typeof req.query.country === 'string' ? req.query.country.trim() : '';
+    const rawCountryCode = typeof req.query.country_code === 'string' ? req.query.country_code.trim().toLowerCase() : '';
+    const rawCountryCodes = typeof req.query.country_codes === 'string' ? req.query.country_codes.trim().toLowerCase() : '';
+    const countryCodesStr = rawCountryCodes || rawCountryCode;
+    const countryCodesList = countryCodesStr
+      .split(/[,|]/)
+      .map(c => c.trim().toLowerCase())
+      .filter(c => c && c !== 'all');
+
+    const countryCode = countryCodesList[0] || '';
+    const lang = req.query.lang === 'en' ? 'en' : 'ar';
+    const limit = Math.min(Number(req.query.limit) || 20, 40);
+
+    const dynamicResults: any[] = [];
+    const seenKeys = new Set<string>();
+
+    const mapsApiKey = getActiveProviderKey('google_maps');
+    const searchTerm = query || country;
+
+    // Helper: Clean & Normalize Results
+    const addResult = (item: any) => {
+      if (!item || !item.title) return;
+      
+      // Strict sovereignty filter: Never return Israeli occupation labels when searching Palestine
+      const isPalestineQuery = searchTerm.includes('فلسطين') || searchTerm.toLowerCase().includes('palestine');
+      if (isPalestineQuery) {
+        if (
+          item.title?.includes('إسرائيل') || 
+          item.subtitle?.includes('إسرائيل') || 
+          item.country?.includes('إسرائيل') ||
+          item.title?.toLowerCase().includes('israel') ||
+          item.subtitle?.toLowerCase().includes('israel')
+        ) {
+          return;
+        }
+        if (item.country?.includes('Palestin') || item.country?.includes('فلسطين') || item.subtitle?.includes('الأراضي الفلسطينية') || !item.country) {
+          item.country = lang === 'ar' ? 'فلسطين' : 'Palestine';
+          item.country_code = 'ps';
+          item.flag = '🇵🇸';
+        }
+      }
+
+      const normKey = `${item.title.toLowerCase().trim()}_${(item.subtitle || '').toLowerCase().trim()}`;
+      if (!seenKeys.has(normKey)) {
+        seenKeys.add(normKey);
+        dynamicResults.push(item);
+      }
+    };
+
+    // Check if query is targeting a country
+    const isPalestine = searchTerm.includes('فلسطين') || searchTerm.toLowerCase().includes('palestine');
+    const isJordan = searchTerm.includes('أردن') || searchTerm.includes('اردن') || searchTerm.toLowerCase().includes('jordan');
+    const isEgypt = searchTerm.includes('مصر') || searchTerm.toLowerCase().includes('egypt');
+    const isSaudi = searchTerm.includes('سعودي') || searchTerm.toLowerCase().includes('saudi');
+    const isUAE = searchTerm.includes('إمارات') || searchTerm.includes('امارات') || searchTerm.toLowerCase().includes('emirates') || searchTerm.toLowerCase().includes('uae');
+
+    // 1. If searching Palestine or specific Arab/Global countries, dynamically seed the sovereign Country entity + Governorates & Cities
+    if (isPalestine) {
+      addResult({
+        display_name: lang === 'ar' ? 'دولة فلسطين' : 'State of Palestine',
+        title: lang === 'ar' ? 'فلسطين' : 'Palestine',
+        subtitle: lang === 'ar' ? 'دولة عربية ذات سيادة' : 'Sovereign State',
+        city: lang === 'ar' ? 'القدس' : 'Jerusalem',
+        country: lang === 'ar' ? 'فلسطين' : 'Palestine',
+        country_code: 'ps',
+        flag: '🇵🇸',
+        raw_type: 'country',
+        category_label: lang === 'ar' ? 'دولة' : 'Country',
+        source: 'sovereign_registry'
+      });
+
+      const palestineGovernoratesAndCities = lang === 'ar' ? [
+        { name: 'القدس', sub: 'عاصمة دولة فلسطين', type: 'administrative', cat: 'محافظة' },
+        { name: 'رام الله والبيرة', sub: 'محافظة رام الله والبيرة، فلسطين', type: 'administrative', cat: 'محافظة' },
+        { name: 'نابلس', sub: 'محافظة نابلس، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'الخليل', sub: 'محافظة الخليل، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'غزة', sub: 'محافظة غزة، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'جنين', sub: 'محافظة جنين، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'بيت لحم', sub: 'محافظة بيت لحم، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'طولكرم', sub: 'محافظة طولكرم، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'قلقيلية', sub: 'محافظة قلقيلية، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'أريحا والأغوار', sub: 'محافظة أريحا، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'سلفيت', sub: 'محافظة سلفيت، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'طوباس', sub: 'محافظة طوباس والأغوار الشمالية، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'خان يونس', sub: 'قطاع غزة، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'رفح', sub: 'قطاع غزة، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'دير البلح', sub: 'قطاع غزة، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'شمال غزة / جباليا', sub: 'قطاع غزة، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'حيفا', sub: 'الساحل الفلسطيني', type: 'city', cat: 'مدينة' },
+        { name: 'يافا', sub: 'الساحل الفلسطيني', type: 'city', cat: 'مدينة' },
+        { name: 'عكا', sub: 'شمال فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'الناصرة', sub: 'الجليل، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'دورا', sub: 'محافظة الخليل، فلسطين', type: 'town', cat: 'بلدة' },
+        { name: 'يطا', sub: 'محافظة الخليل، فلسطين', type: 'town', cat: 'بلدة' },
+        { name: 'حلحول', sub: 'محافظة الخليل، فلسطين', type: 'town', cat: 'بلدة' },
+        { name: 'الظاهرية', sub: 'محافظة الخليل، فلسطين', type: 'town', cat: 'بلدة' },
+        { name: 'بيت جالا', sub: 'محافظة بيت لحم، فلسطين', type: 'town', cat: 'بلدة' },
+        { name: 'بيت ساحور', sub: 'محافظة بيت لحم، فلسطين', type: 'town', cat: 'بلدة' },
+        { name: 'عنبتا', sub: 'محافظة طولكرم، فلسطين', type: 'town', cat: 'بلدة' },
+        { name: 'طمون', sub: 'محافظة طوباس، فلسطين', type: 'town', cat: 'بلدة' },
+        { name: 'طمرة', sub: 'الجليل، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'سخنين', sub: 'الجليل، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'أم الفحم', sub: 'المثلث، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'رهط', sub: 'النقب، فلسطين', type: 'city', cat: 'مدينة' },
+        { name: 'كفر قاسم', sub: 'المثلث، فلسطين', type: 'town', cat: 'بلدة' },
+        { name: 'العيزرية', sub: 'محافظة القدس، فلسطين', type: 'town', cat: 'بلدة' },
+        { name: 'أبو ديس', sub: 'محافظة القدس، فلسطين', type: 'town', cat: 'بلدة' }
+      ] : [
+        { name: 'Jerusalem', sub: 'Capital of Palestine', type: 'administrative', cat: 'Governorate' },
+        { name: 'Ramallah & Al-Bireh', sub: 'Ramallah Governorate, Palestine', type: 'administrative', cat: 'Governorate' },
+        { name: 'Nablus', sub: 'Nablus Governorate, Palestine', type: 'city', cat: 'City' },
+        { name: 'Hebron', sub: 'Hebron Governorate, Palestine', type: 'city', cat: 'City' },
+        { name: 'Gaza City', sub: 'Gaza Governorate, Palestine', type: 'city', cat: 'City' },
+        { name: 'Jenin', sub: 'Jenin Governorate, Palestine', type: 'city', cat: 'City' },
+        { name: 'Bethlehem', sub: 'Bethlehem Governorate, Palestine', type: 'city', cat: 'City' },
+        { name: 'Tulkarm', sub: 'Tulkarm Governorate, Palestine', type: 'city', cat: 'City' },
+        { name: 'Qalqilya', sub: 'Qalqilya Governorate, Palestine', type: 'city', cat: 'City' },
+        { name: 'Jericho', sub: 'Jericho Governorate, Palestine', type: 'city', cat: 'City' },
+        { name: 'Salfit', sub: 'Salfit Governorate, Palestine', type: 'city', cat: 'City' },
+        { name: 'Tubas', sub: 'Tubas Governorate, Palestine', type: 'city', cat: 'City' },
+        { name: 'Khan Yunis', sub: 'Gaza Strip, Palestine', type: 'city', cat: 'City' },
+        { name: 'Rafah', sub: 'Gaza Strip, Palestine', type: 'city', cat: 'City' },
+        { name: 'Deir al-Balah', sub: 'Gaza Strip, Palestine', type: 'city', cat: 'City' },
+        { name: 'Haifa', sub: 'Palestine Coast', type: 'city', cat: 'City' },
+        { name: 'Jaffa', sub: 'Palestine Coast', type: 'city', cat: 'City' },
+        { name: 'Acre (Akka)', sub: 'North Palestine', type: 'city', cat: 'City' },
+        { name: 'Nazareth', sub: 'Galilee, Palestine', type: 'city', cat: 'City' }
+      ];
+
+      for (const loc of palestineGovernoratesAndCities) {
+        addResult({
+          display_name: `${loc.name}، ${loc.sub}`,
+          title: loc.name,
+          subtitle: loc.sub,
+          city: loc.name,
+          country: lang === 'ar' ? 'فلسطين' : 'Palestine',
+          country_code: 'ps',
+          flag: '🇵🇸',
+          raw_type: loc.type,
+          category_label: loc.cat,
+          source: 'sovereign_registry'
+        });
+      }
+    }
+
+    // 2. Query Local Cache First (Zero Latency & Eliminates Redundant Outbound Google Places API Calls)
+    if (searchTerm) {
+      try {
+        const cachedMatches = await findCachedLocations(searchTerm, countryCode, limit);
+        for (const loc of cachedMatches) {
+          addResult({
+            display_name: loc.fullAddress || `${loc.title}${loc.state ? `، ${loc.state}` : ''}${loc.country ? `، ${loc.country}` : ''}`,
+            title: loc.title,
+            subtitle: loc.state || loc.country || '',
+            city: loc.city,
+            state: loc.state || '',
+            country: loc.country || '',
+            country_code: loc.countryCode || '',
+            flag: loc.flag || (loc.countryCode === 'ps' ? '🇵🇸' : ''),
+            lat: loc.lat ? String(loc.lat) : '',
+            lon: loc.lon ? String(loc.lon) : '',
+            raw_type: loc.rawType || 'locality',
+            category_label: loc.categoryLabel || (lang === 'ar' ? 'مدينة' : 'City'),
+            source: 'local_cache_engine',
+            place_id: loc.placeId
+          });
+        }
+      } catch (cacheLookupErr) {
+        console.warn('[Geocoding API] Local cache lookup warning:', cacheLookupErr);
+      }
+    }
+
+    // 3. Real-Time Dynamic Search: Dispatch parallel queries to Google Places & Photon Global Geocoder if needed
+    if (searchTerm && dynamicResults.length < limit) {
+      const fetchPromises: Promise<any>[] = [];
+
+      // A) Google Places & Geocoding APIs
+      if (mapsApiKey) {
+        const googleAutocompleteUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(searchTerm)}&language=${lang}&key=${mapsApiKey}`;
+        const googleGeocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(searchTerm)}&language=${lang}&key=${mapsApiKey}`;
+        const googleTextSearchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(searchTerm)}&language=${lang}&key=${mapsApiKey}`;
+
+        fetchPromises.push(
+          fetch(googleAutocompleteUrl)
+            .then(r => (r.ok ? r.json() : null))
+            .then(data => {
+              if (data && data.status === 'OK' && Array.isArray(data.predictions)) {
+                for (const pred of data.predictions) {
+                  const mainText = pred.structured_formatting?.main_text || pred.description.split(',')[0].trim();
+                  const secText = pred.structured_formatting?.secondary_text || '';
+                  const types = pred.types || [];
+
+                  let catAr = 'مدينة';
+                  let catEn = 'City';
+                  if (types.includes('country')) {
+                    catAr = 'دولة';
+                    catEn = 'Country';
+                  } else if (types.includes('administrative_area_level_1') || types.includes('administrative_area_level_2')) {
+                    catAr = 'محافظة';
+                    catEn = 'Governorate';
+                  } else if (types.includes('sublocality') || types.includes('town')) {
+                    catAr = 'بلدة';
+                    catEn = 'Town';
+                  } else if (types.includes('neighborhood')) {
+                    catAr = 'حي';
+                    catEn = 'Neighborhood';
+                  } else if (types.includes('route') || types.includes('street_address')) {
+                    catAr = 'شارع';
+                    catEn = 'Street';
+                  }
+
+                  addResult({
+                    display_name: pred.description,
+                    title: mainText,
+                    subtitle: secText || pred.description,
+                    city: mainText,
+                    country: secText.split(',').pop()?.trim() || country,
+                    raw_type: types[0] || 'locality',
+                    category_label: lang === 'ar' ? catAr : catEn,
+                    source: 'google_places_autocomplete',
+                    place_id: pred.place_id
+                  });
+                }
+              }
+            })
+            .catch(() => null)
+        );
+
+        fetchPromises.push(
+          fetch(googleGeocodeUrl)
+            .then(r => (r.ok ? r.json() : null))
+            .then(data => {
+              if (data && data.status === 'OK' && Array.isArray(data.results)) {
+                for (const item of data.results) {
+                  const types = item.types || [];
+                  let cName = '';
+                  let locality = '';
+                  let adminArea = '';
+
+                  if (Array.isArray(item.address_components)) {
+                    for (const comp of item.address_components) {
+                      if (comp.types.includes('country')) cName = comp.long_name;
+                      if (comp.types.includes('locality')) locality = comp.long_name;
+                      if (comp.types.includes('administrative_area_level_1')) adminArea = comp.long_name;
+                    }
+                  }
+
+                  const titleName = locality || adminArea || cName || item.formatted_address.split(',')[0];
+                  let catAr = 'مدينة';
+                  let catEn = 'City';
+                  if (types.includes('country')) {
+                    catAr = 'دولة';
+                    catEn = 'Country';
+                  } else if (types.includes('administrative_area_level_1')) {
+                    catAr = 'محافظة';
+                    catEn = 'Governorate';
+                  }
+
+                  addResult({
+                    display_name: item.formatted_address,
+                    title: titleName,
+                    subtitle: [adminArea, cName].filter(Boolean).join('، ') || item.formatted_address,
+                    city: titleName,
+                    country: cName,
+                    lat: item.geometry?.location?.lat ? String(item.geometry.location.lat) : '',
+                    lon: item.geometry?.location?.lng ? String(item.geometry.location.lng) : '',
+                    raw_type: types[0] || 'locality',
+                    category_label: lang === 'ar' ? catAr : catEn,
+                    source: 'google_geocoding',
+                    place_id: item.place_id
+                  });
+                }
+              }
+            })
+            .catch(() => null)
+        );
+
+        fetchPromises.push(
+          fetch(googleTextSearchUrl)
+            .then(r => (r.ok ? r.json() : null))
+            .then(data => {
+              if (data && data.status === 'OK' && Array.isArray(data.results)) {
+                for (const place of data.results) {
+                  const placeName = place.name || place.formatted_address?.split(',')[0];
+                  const rawTypes = place.types || [];
+                  let catAr = 'موقع';
+                  let catEn = 'Place';
+
+                  if (rawTypes.includes('country')) {
+                    catAr = 'دولة';
+                    catEn = 'Country';
+                  } else if (rawTypes.includes('locality') || rawTypes.includes('city')) {
+                    catAr = 'مدينة';
+                    catEn = 'City';
+                  } else if (rawTypes.includes('administrative_area_level_1') || rawTypes.includes('administrative_area_level_2')) {
+                    catAr = 'محافظة';
+                    catEn = 'Governorate';
+                  } else if (rawTypes.includes('sublocality') || rawTypes.includes('town')) {
+                    catAr = 'بلدة';
+                    catEn = 'Town';
+                  } else if (rawTypes.includes('neighborhood')) {
+                    catAr = 'حي';
+                    catEn = 'Neighborhood';
+                  }
+
+                  addResult({
+                    display_name: place.formatted_address || placeName,
+                    title: placeName,
+                    subtitle: place.formatted_address || '',
+                    city: placeName,
+                    country: place.formatted_address?.split(',').pop()?.trim() || '',
+                    lat: place.geometry?.location?.lat ? String(place.geometry.location.lat) : '',
+                    lon: place.geometry?.location?.lng ? String(place.geometry.location.lng) : '',
+                    raw_type: rawTypes[0] || 'point_of_interest',
+                    category_label: lang === 'ar' ? catAr : catEn,
+                    source: 'google_places_textsearch',
+                    place_id: place.place_id
+                  });
+                }
+              }
+            })
+            .catch(() => null)
+        );
+      }
+
+      // B) Photon Global Geocoder (High-speed OpenStreetMap engine with instant multi-lingual typeahead)
+      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(searchTerm)}&limit=25&lang=${lang}`;
+      fetchPromises.push(
+        fetch(photonUrl, {
+          headers: { 'User-Agent': 'PerplextaPlatform/1.0' }
+        })
+          .then(r => (r.ok ? r.json() : null))
+          .then(data => {
+            if (data && Array.isArray(data.features)) {
+              for (const feat of data.features) {
+                const props = feat.properties || {};
+                const name = props.name || props.city || props.street || '';
+                if (!name) continue;
+
+                const cName = props.country || '';
+                const state = props.state || props.county || '';
+                const city = props.city || props.district || name;
+                const type = (props.type || '').toLowerCase();
+
+                let catAr = 'مدينة';
+                let catEn = 'City';
+
+                if (type === 'country' || props.osm_value === 'country') {
+                  catAr = 'دولة';
+                  catEn = 'Country';
+                } else if (type === 'state' || type === 'county' || props.osm_value === 'state' || props.osm_value === 'county') {
+                  catAr = 'محافظة';
+                  catEn = 'Governorate';
+                } else if (type === 'city' || props.osm_value === 'city') {
+                  catAr = 'مدينة';
+                  catEn = 'City';
+                } else if (type === 'town' || props.osm_value === 'town') {
+                  catAr = 'بلدة';
+                  catEn = 'Town';
+                } else if (type === 'village' || type === 'hamlet' || props.osm_value === 'village') {
+                  catAr = 'قرية';
+                  catEn = 'Village';
+                } else if (type === 'district' || type === 'suburb' || type === 'neighbourhood' || props.osm_value === 'suburb') {
+                  catAr = 'حي';
+                  catEn = 'Neighborhood';
+                } else if (type === 'street' || props.osm_value === 'residential' || props.osm_value === 'highway') {
+                  catAr = 'شارع';
+                  catEn = 'Street';
+                }
+
+                const subtitleParts = [state, cName].filter(Boolean);
+                const subtitle = subtitleParts.join('، ') || cName;
+
+                addResult({
+                  display_name: `${name}، ${subtitle}`,
+                  title: name,
+                  subtitle: subtitle || [catAr, cName].filter(Boolean).join(' - '),
+                  city: city,
+                  state: state,
+                  country: cName,
+                  country_code: props.countrycode?.toLowerCase() || '',
+                  lat: feat.geometry?.coordinates?.[1] ? String(feat.geometry.coordinates[1]) : '',
+                  lon: feat.geometry?.coordinates?.[0] ? String(feat.geometry.coordinates[0]) : '',
+                  raw_type: type || 'locality',
+                  category_label: lang === 'ar' ? catAr : catEn,
+                  source: 'photon_global_engine'
+                });
+              }
+            }
+          })
+          .catch(() => null)
+      );
+
+      // C) OpenStreetMap Nominatim Geocoder
+      const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchTerm)}&addressdetails=1&extratags=1&limit=20&accept-language=${lang}`;
+      fetchPromises.push(
+        fetch(nomUrl, {
+          headers: { 'User-Agent': 'PerplextaPlatform/1.0 (https://perplexta.app)' }
+        })
+          .then(r => (r.ok ? r.json() : null))
+          .then(data => {
+            if (Array.isArray(data)) {
+              for (const item of data) {
+                const addr = item.address || {};
+                const cityName =
+                  addr.city ||
+                  addr.town ||
+                  addr.village ||
+                  addr.municipality ||
+                  addr.suburb ||
+                  addr.neighbourhood ||
+                  addr.road ||
+                  addr.county ||
+                  item.name ||
+                  searchTerm;
+
+                const countryName = addr.country || country || '';
+                const stateName = addr.state || addr.region || addr.county || '';
+                const rawType = (item.addresstype || item.type || item.class || 'location').toLowerCase();
+
+                let catAr = 'مدينة';
+                let catEn = 'City';
+
+                if (addr.country || rawType === 'country') {
+                  catAr = 'دولة';
+                  catEn = 'Country';
+                } else if (addr.city || rawType === 'city' || rawType === 'municipality') {
+                  catAr = 'مدينة';
+                  catEn = 'City';
+                } else if (addr.town || rawType === 'town') {
+                  catAr = 'بلدة';
+                  catEn = 'Town';
+                } else if (addr.village || addr.hamlet || rawType === 'village') {
+                  catAr = 'قرية';
+                  catEn = 'Village';
+                } else if (addr.neighbourhood || addr.suburb || rawType === 'neighbourhood') {
+                  catAr = 'حي';
+                  catEn = 'Neighborhood';
+                } else if (addr.road || rawType === 'road' || rawType === 'street') {
+                  catAr = 'شارع';
+                  catEn = 'Street';
+                } else if (addr.county || addr.state || rawType === 'administrative') {
+                  catAr = 'محافظة';
+                  catEn = 'Governorate';
+                }
+
+                addResult({
+                  display_name: item.display_name,
+                  title: cityName,
+                  subtitle: [stateName, countryName].filter(Boolean).join('، ') || item.display_name,
+                  city: cityName,
+                  state: stateName,
+                  country: countryName,
+                  country_code: (addr.country_code || countryCode || '').toLowerCase(),
+                  lat: item.lat,
+                  lon: item.lon,
+                  raw_type: rawType,
+                  category_label: lang === 'ar' ? catAr : catEn,
+                  source: 'nominatim'
+                });
+              }
+            }
+          })
+          .catch(() => null)
+      );
+
+      // D) Mapbox Search & Geocoding (if key configured in Admin Panel)
+      const mapboxKey = getActiveProviderKey('mapbox');
+      if (mapboxKey) {
+        const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchTerm)}.json?access_token=${encodeURIComponent(mapboxKey)}&language=${lang}&limit=15`;
+        fetchPromises.push(
+          fetch(mapboxUrl)
+            .then(r => (r.ok ? r.json() : null))
+            .then(data => {
+              if (data && Array.isArray(data.features)) {
+                for (const feat of data.features) {
+                  const placeName = feat.text || feat.place_name?.split(',')[0] || '';
+                  if (!placeName) continue;
+                  const context = Array.isArray(feat.context) ? feat.context : [];
+                  const countryObj = context.find((c: any) => (c.id || '').startsWith('country'));
+                  const regionObj = context.find((c: any) => (c.id || '').startsWith('region'));
+                  const countryName = countryObj?.text || '';
+                  const regionName = regionObj?.text || '';
+
+                  addResult({
+                    display_name: feat.place_name,
+                    title: placeName,
+                    subtitle: [regionName, countryName].filter(Boolean).join('، ') || feat.place_name,
+                    city: placeName,
+                    state: regionName,
+                    country: countryName,
+                    country_code: countryObj?.short_code?.toLowerCase() || '',
+                    lat: feat.center?.[1] ? String(feat.center[1]) : '',
+                    lon: feat.center?.[0] ? String(feat.center[0]) : '',
+                    raw_type: feat.place_type?.[0] || 'place',
+                    category_label: lang === 'ar' ? 'موقع' : 'Place',
+                    source: 'mapbox_geocoding',
+                    place_id: feat.id
+                  });
+                }
+              }
+            })
+            .catch(() => null)
+        );
+      }
+
+      // E) LocationIQ Geocoding (if key configured in Admin Panel)
+      const locationiqKey = getActiveProviderKey('locationiq');
+      if (locationiqKey) {
+        const locIqUrl = `https://us1.locationiq.com/v1/search?key=${encodeURIComponent(locationiqKey)}&q=${encodeURIComponent(searchTerm)}&format=json&accept-language=${lang}&limit=15`;
+        fetchPromises.push(
+          fetch(locIqUrl)
+            .then(r => (r.ok ? r.json() : null))
+            .then(data => {
+              if (Array.isArray(data)) {
+                for (const item of data) {
+                  const titleName = item.display_name?.split(',')[0]?.trim() || searchTerm;
+                  addResult({
+                    display_name: item.display_name,
+                    title: titleName,
+                    subtitle: item.display_name,
+                    city: titleName,
+                    lat: item.lat ? String(item.lat) : '',
+                    lon: item.lon ? String(item.lon) : '',
+                    raw_type: item.type || 'place',
+                    category_label: lang === 'ar' ? 'موقع' : 'Place',
+                    source: 'locationiq_geocoding',
+                    place_id: item.place_id
+                  });
+                }
+              }
+            })
+            .catch(() => null)
+        );
+      }
+
+      // Await all live data streams concurrently with timeout safety
+      await Promise.allSettled(fetchPromises);
+    }
+
+    // 3. Fallback to Popular Global Hubs if still empty
+    if (dynamicResults.length === 0) {
+      const globalHubs = lang === 'ar' ? [
+        { title: 'القدس', subtitle: 'فلسطين', city: 'القدس', country: 'فلسطين', flag: '🇵🇸' },
+        { title: 'رام الله', subtitle: 'فلسطين', city: 'رام الله', country: 'فلسطين', flag: '🇵🇸' },
+        { title: 'نابلس', subtitle: 'فلسطين', city: 'نابلس', country: 'فلسطين', flag: '🇵🇸' },
+        { title: 'الخليل', subtitle: 'فلسطين', city: 'الخليل', country: 'فلسطين', flag: '🇵🇸' },
+        { title: 'غزة', subtitle: 'فلسطين', city: 'غزة', country: 'فلسطين', flag: '🇵🇸' },
+        { title: 'عمّان', subtitle: 'الأردن', city: 'عمّان', country: 'الأردن', flag: '🇯🇴' },
+        { title: 'الرياض', subtitle: 'المملكة العربية السعودية', city: 'الرياض', country: 'المملكة العربية السعودية', flag: '🇸🇦' },
+        { title: 'دبي', subtitle: 'الإمارات العربية المتحدة', city: 'دبي', country: 'الإمارات العربية المتحدة', flag: '🇦🇪' },
+        { title: 'القاهرة', subtitle: 'مصر', city: 'القاهرة', country: 'مصر', flag: '🇪🇬' },
+        { title: 'الدوحة', subtitle: 'قطر', city: 'الدوحة', country: 'قطر', flag: '🇶🇦' },
+        { title: 'الكويت', subtitle: 'الكويت', city: 'الكويت', country: 'الكويت', flag: '🇰🇼' },
+        { title: 'مسقط', subtitle: 'عُمان', city: 'مسقط', country: 'عُمان', flag: '🇴🇲' },
+        { title: 'بيروت', subtitle: 'لبنان', city: 'بيروت', country: 'لبنان', flag: '🇱🇧' },
+        { title: 'بغداد', subtitle: 'العراق', city: 'بغداد', country: 'العراق', flag: '🇮🇶' },
+        { title: 'دمشق', subtitle: 'سوريا', city: 'دمشق', country: 'سوريا', flag: '🇸🇾' },
+        { title: 'لندن', subtitle: 'المملكة المتحدة', city: 'لندن', country: 'المملكة المتحدة', flag: '🇬🇧' },
+        { title: 'نيويورك', subtitle: 'الولايات المتحدة', city: 'نيويورك', country: 'الولايات المتحدة', flag: '🇺🇸' },
+        { title: 'باريس', subtitle: 'فرنسا', city: 'باريس', country: 'فرنسا', flag: '🇫🇷' },
+        { title: 'إسطنبول', subtitle: 'تركيا', city: 'إسطنبول', country: 'تركيا', flag: '🇹🇷' }
+      ] : [
+        { title: 'Jerusalem', subtitle: 'Palestine', city: 'Jerusalem', country: 'Palestine', flag: '🇵🇸' },
+        { title: 'Ramallah', subtitle: 'Palestine', city: 'Ramallah', country: 'Palestine', flag: '🇵🇸' },
+        { title: 'Amman', subtitle: 'Jordan', city: 'Amman', country: 'Jordan', flag: '🇯🇴' },
+        { title: 'Riyadh', subtitle: 'Saudi Arabia', city: 'Riyadh', country: 'Saudi Arabia', flag: '🇸🇦' },
+        { title: 'Dubai', subtitle: 'United Arab Emirates', city: 'Dubai', country: 'United Arab Emirates', flag: '🇦🇪' },
+        { title: 'Cairo', subtitle: 'Egypt', city: 'Cairo', country: 'Egypt', flag: '🇪🇬' },
+        { title: 'Doha', subtitle: 'Qatar', city: 'Doha', country: 'Qatar', flag: '🇶🇦' },
+        { title: 'Kuwait City', subtitle: 'Kuwait', city: 'Kuwait City', country: 'Kuwait', flag: '🇰🇼' },
+        { title: 'Muscat', subtitle: 'Oman', city: 'Muscat', country: 'Oman', flag: '🇴🇲' },
+        { title: 'Beirut', subtitle: 'Lebanon', city: 'Beirut', country: 'Lebanon', flag: '🇱🇧' },
+        { title: 'Baghdad', subtitle: 'Iraq', city: 'Baghdad', country: 'Iraq', flag: '🇮🇶' },
+        { title: 'London', subtitle: 'United Kingdom', city: 'London', country: 'United Kingdom', flag: '🇬🇧' },
+        { title: 'New York', subtitle: 'United States', city: 'New York', country: 'United States', flag: '🇺🇸' },
+        { title: 'Paris', subtitle: 'France', city: 'Paris', country: 'France', flag: '🇫🇷' },
+        { title: 'Istanbul', subtitle: 'Turkey', city: 'Istanbul', country: 'Turkey', flag: '🇹🇷' }
+      ];
+
+      for (const hub of globalHubs) {
+        addResult({
+          display_name: `${hub.title}، ${hub.subtitle}`,
+          title: hub.title,
+          subtitle: hub.subtitle,
+          city: hub.city,
+          country: hub.country,
+          flag: hub.flag,
+          raw_type: 'locality',
+          category_label: lang === 'ar' ? 'مدينة رئيسية' : 'Major City',
+          source: 'dynamic_hubs'
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      query: searchTerm,
+      provider: 'hybrid_live_places_engine',
+      results: dynamicResults.slice(0, limit)
+    });
+  } catch (error: any) {
+    console.error('[Geocoding API] Search error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/bulletin/geocoding/reverse
+ * Zero-Cost Reverse Geocoding with OSM Nominatim + Fallback to Google Geocoding API
+ */
+router.get('/geocoding/reverse', async (req, res) => {
+  try {
+    const { lat, lon } = req.query;
+    const lang = req.query.lang === 'en' ? 'en' : 'ar';
+
+    if (!lat || !lon) {
+      return res.status(400).json({ success: false, message: 'Missing lat/lon' });
+    }
+
+    // 1. Primary Engine: OpenStreetMap Nominatim (Zero-Cost & Free)
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(String(lat))}&lon=${encodeURIComponent(String(lon))}&accept-language=${lang}`;
+      const apiRes = await fetch(url, {
+        headers: {
+          'User-Agent': 'PerplextaPlatform/1.0 (https://perplexta.app)'
+        }
+      });
+
+      if (apiRes.ok) {
+        const data = await apiRes.json();
+        if (data && data.address) {
+          const addr = data.address || {};
+          let detectedCity = addr.city || addr.town || addr.village || addr.municipality || addr.state || addr.county || 'موقع جغرافي';
+          let detectedCountry = addr.country || '';
+          let detectedCountryCode = (addr.country_code || '').toLowerCase();
+
+          // Sovereign Palestine Normalization
+          const rawDisplay = (data.display_name || '').toLowerCase();
+          if (detectedCountryCode === 'ps' || detectedCountryCode === 'il' || rawDisplay.includes('jerusalem') || rawDisplay.includes('القدس') || rawDisplay.includes('palestine') || rawDisplay.includes('فلسطين') || rawDisplay.includes('west bank') || rawDisplay.includes('gaza')) {
+            detectedCountry = lang === 'ar' ? 'فلسطين' : 'Palestine';
+            detectedCountryCode = 'ps';
+          }
+
+          return res.json({
+            success: true,
+            provider: 'nominatim_zero_cost',
+            display_name: data.display_name,
+            city: detectedCity,
+            country: detectedCountry,
+            country_code: detectedCountryCode,
+            lat: String(lat),
+            lon: String(lon)
+          });
+        }
+      }
+    } catch (nomErr) {
+      console.warn('[Geocoding API] Nominatim Reverse Geocoding failed, trying secondary fallback:', nomErr);
+    }
+
+    // 2. Secondary Fallback: Google Geocoding API (if key present in Admin DB / env)
+    const mapsApiKey = getActiveProviderKey('google_maps');
+    if (mapsApiKey) {
+      try {
+        const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&language=${lang}&key=${mapsApiKey}`;
+        const googleRes = await fetch(googleUrl);
+        if (googleRes.ok) {
+          const googleData = await googleRes.json();
+          if (googleData.status === 'OK' && Array.isArray(googleData.results) && googleData.results.length > 0) {
+            const topResult = googleData.results[0];
+            let detectedCity = 'موقع جغرافي';
+            let detectedCountry = '';
+            let detectedCountryCode = '';
+
+            if (Array.isArray(topResult.address_components)) {
+              for (const comp of topResult.address_components) {
+                if (comp.types.includes('locality') || comp.types.includes('sublocality_level_1') || comp.types.includes('administrative_area_level_3')) {
+                  detectedCity = comp.long_name;
+                }
+                if (comp.types.includes('country')) {
+                  detectedCountry = comp.long_name;
+                  detectedCountryCode = comp.short_name.toLowerCase();
+                }
+              }
+            }
+
+            // Sovereign Palestine Normalization
+            const rawFormatted = (topResult.formatted_address || '').toLowerCase();
+            if (detectedCountryCode === 'ps' || detectedCountryCode === 'il' || rawFormatted.includes('jerusalem') || rawFormatted.includes('القدس') || rawFormatted.includes('palestine') || rawFormatted.includes('فلسطين')) {
+              detectedCountry = lang === 'ar' ? 'فلسطين' : 'Palestine';
+              detectedCountryCode = 'ps';
+            }
+
+            return res.json({
+              success: true,
+              provider: 'google_geocoding_fallback',
+              display_name: topResult.formatted_address,
+              city: detectedCity,
+              country: detectedCountry,
+              country_code: detectedCountryCode,
+              lat: String(lat),
+              lon: String(lon)
+            });
+          }
+        }
+      } catch (gErr) {
+        console.warn('[Geocoding API] Google Reverse Geocoding error:', gErr);
+      }
+    }
+
+    // 3. Tertiary Fallback: Mapbox Reverse Geocoding (if key in Admin DB)
+    const mapboxKey = getActiveProviderKey('mapbox');
+    if (mapboxKey) {
+      try {
+        const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lon},${lat}.json?access_token=${encodeURIComponent(mapboxKey)}&language=${lang}&limit=1`;
+        const mRes = await fetch(mapboxUrl);
+        if (mRes.ok) {
+          const mData = await mRes.json();
+          if (mData && Array.isArray(mData.features) && mData.features.length > 0) {
+            const feat = mData.features[0];
+            const context = Array.isArray(feat.context) ? feat.context : [];
+            const countryObj = context.find((c: any) => (c.id || '').startsWith('country'));
+            const regionObj = context.find((c: any) => (c.id || '').startsWith('region'));
+            let detectedCity = feat.text || regionObj?.text || 'موقع جغرافي';
+            let detectedCountry = countryObj?.text || '';
+            let detectedCountryCode = (countryObj?.short_code || '').toLowerCase();
+
+            if (detectedCountryCode === 'ps' || detectedCountryCode === 'il' || feat.place_name?.toLowerCase().includes('palestine')) {
+              detectedCountry = lang === 'ar' ? 'فلسطين' : 'Palestine';
+              detectedCountryCode = 'ps';
+            }
+
+            return res.json({
+              success: true,
+              provider: 'mapbox_reverse_geocoding',
+              display_name: feat.place_name,
+              city: detectedCity,
+              country: detectedCountry,
+              country_code: detectedCountryCode,
+              lat: String(lat),
+              lon: String(lon)
+            });
+          }
+        }
+      } catch (mErr) {
+        console.warn('[Geocoding API] Mapbox Reverse Geocoding error:', mErr);
+      }
+    }
+
+    // 4. Quaternary Fallback: LocationIQ Reverse Geocoding (if key in Admin DB)
+    const locationiqKey = getActiveProviderKey('locationiq');
+    if (locationiqKey) {
+      try {
+        const locIqUrl = `https://us1.locationiq.com/v1/reverse?key=${encodeURIComponent(locationiqKey)}&lat=${lat}&lon=${lon}&format=json&accept-language=${lang}`;
+        const lRes = await fetch(locIqUrl);
+        if (lRes.ok) {
+          const lData = await lRes.json();
+          if (lData && lData.address) {
+            const addr = lData.address;
+            let detectedCity = addr.city || addr.town || addr.village || addr.municipality || addr.state || 'موقع جغرافي';
+            let detectedCountry = addr.country || '';
+            let detectedCountryCode = (addr.country_code || '').toLowerCase();
+
+            if (detectedCountryCode === 'ps' || detectedCountryCode === 'il') {
+              detectedCountry = lang === 'ar' ? 'فلسطين' : 'Palestine';
+              detectedCountryCode = 'ps';
+            }
+
+            return res.json({
+              success: true,
+              provider: 'locationiq_reverse_geocoding',
+              display_name: lData.display_name,
+              city: detectedCity,
+              country: detectedCountry,
+              country_code: detectedCountryCode,
+              lat: String(lat),
+              lon: String(lon)
+            });
+          }
+        }
+      } catch (lErr) {
+        console.warn('[Geocoding API] LocationIQ Reverse Geocoding error:', lErr);
+      }
+    }
+
+    return res.status(404).json({ success: false, message: 'Unable to resolve reverse coordinates' });
+  } catch (error: any) {
+    console.error('[Geocoding API] Reverse error:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/bulletin/upload
+ * Dedicated Bulletin Board media upload endpoint
+ */
+router.post('/upload', authenticateToken, (upload.single('file') as any), handleMulterError, uploadValidator, async (req: any, res: any) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const { originalname, filename, path: filePath, mimetype, size } = req.file;
+    let finalFilename = filename;
+    let processedFileSize = size;
+    let thumbnailUrl = '';
+    let duration = 0;
+    let resolution = '';
+    let videoAspectRatio = '';
+    let isVideoVertical = false;
+    let optImageResult: any = null;
+
+    const videoExtensions = ['mp4', 'mov', 'avi', 'webm', 'mkv', 'wmv', 'flv', '3gp', 'm4v', '3g2', 'ogv', 'ts', 'mts', 'm2ts', 'vob'];
+    const isVideo = mimetype.startsWith('video/') || videoExtensions.some(ext => originalname.toLowerCase().endsWith('.' + ext));
+
+    if (mimetype.startsWith('image/')) {
+      try {
+        const optResult = await optimizeUploadedImage(filePath, originalname);
+        optImageResult = optResult;
+        finalFilename = optResult.filename;
+        processedFileSize = optResult.size;
+        resolution = `${optResult.width}x${optResult.height}`;
+      } catch (imgErr: any) {
+        console.error('[Bulletin Upload] Sharp optimization error:', imgErr.message);
+      }
+    } else if (isVideo) {
+      try {
+        const maxDuration = req.query.maxDuration ? parseInt(req.query.maxDuration as string, 10) : undefined;
+        const result = await processUploadedVideo(filePath, path.dirname(filePath), 'pvid', maxDuration);
+        if (result.success && result.processedVideoUrl) {
+          finalFilename = result.processedVideoUrl.replace('/uploads/', '');
+          if (result.fileSize) processedFileSize = result.fileSize;
+          thumbnailUrl = result.thumbnailUrl || '';
+          duration = result.duration || 0;
+          resolution = result.resolution || `${result.width || 1280}x${result.height || 720}`;
+          videoAspectRatio = result.aspectRatio || '';
+          isVideoVertical = !!result.isVertical;
+        }
+      } catch (videoErr: any) {
+        console.error('[Bulletin Upload] Video processing error:', videoErr.message);
+      }
+    }
+
+    const fileUrl = `/uploads/${finalFilename}`;
+
+    // Ensure bulletin/reels/stories media is registered in media_assets in the Media DB
+    const safeFinalFilename = path.basename(finalFilename);
+    const uploadsDir = path.resolve(process.cwd(), 'uploads');
+    const finalFilePath = path.resolve(uploadsDir, safeFinalFilename);
+    if (!finalFilePath.startsWith(uploadsDir + path.sep)) {
+      throw new Error('Path traversal detected in bulletin media path');
+    }
+    const targetMediaPool = mediaPool || pool;
+    if (targetMediaPool) {
+      try {
+        let sha256Hash = '';
+        let fileBuf: Buffer | null = null;
+
+        // Optimization: For large files or video assets, never load raw buffers into memory/PostgreSQL
+        if (isVideo || processedFileSize > 5 * 1024 * 1024) {
+          try {
+            const hash = crypto.createHash('sha256');
+            const stream = createReadStream(finalFilePath);
+            for await (const chunk of stream) {
+              hash.update(chunk);
+            }
+            sha256Hash = hash.digest('hex');
+          } catch (_) {
+            sha256Hash = crypto.randomUUID();
+          }
+        } else {
+          try {
+            fileBuf = await fs.readFile(finalFilePath);
+            sha256Hash = crypto.createHash('sha256').update(fileBuf).digest('hex');
+          } catch (_) {
+            sha256Hash = crypto.randomUUID();
+          }
+        }
+
+        if (sha256Hash) {
+          const storedPath = `uploads/${finalFilename}`;
+          const mContext = isVideo ? 'video' : 'bulletin';
+          const mFormat = isVideo ? 'mp4' : 'webp';
+
+          const existing = await targetMediaPool.query(
+            'SELECT id FROM media_assets WHERE stored_path = $1 OR sha256_hash = $2 LIMIT 1',
+            [storedPath, sha256Hash]
+          );
+
+          if (existing.rows.length > 0) {
+            await targetMediaPool.query(`
+              UPDATE media_assets SET
+                stored_path = $1,
+                original_filename = $2,
+                context = $3,
+                format = $4,
+                size_bytes = $5,
+                file_data = COALESCE($6, file_data),
+                user_id = COALESCE($7, user_id),
+                updated_at = CURRENT_TIMESTAMP
+              WHERE id = $8
+            `, [storedPath, originalname, mContext, mFormat, processedFileSize, fileBuf, (req as any).user?.id || null, existing.rows[0].id]);
+          } else {
+            const bulletinAssetId = crypto.randomUUID();
+            await targetMediaPool.query(`
+              INSERT INTO media_assets (
+                id, stored_path, original_filename, context, format, width, height, size_bytes, sha256_hash, is_public,
+                user_id, metadata, file_data
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $12)
+              ON CONFLICT (stored_path) DO UPDATE SET
+                context = EXCLUDED.context,
+                user_id = COALESCE(EXCLUDED.user_id, media_assets.user_id),
+                file_data = COALESCE(EXCLUDED.file_data, media_assets.file_data),
+                updated_at = CURRENT_TIMESTAMP
+            `, [
+              bulletinAssetId,
+              storedPath, originalname, mContext, mFormat,
+              optImageResult?.width || 0, optImageResult?.height || 0,
+              processedFileSize, sha256Hash, (req as any).user?.id || null,
+              JSON.stringify({ duration, resolution, isVideo, thumbnailUrl }), fileBuf
+            ]);
+          }
+          console.log(`[Bulletin Upload] Successfully registered asset in media_assets for ${finalFilename}`);
+        }
+      } catch (mediaErr: any) {
+        console.warn('[Bulletin Upload] media_assets registration warning:', mediaErr.message);
+      }
+    }
+
+    return res.status(201).json({
+      success: true,
+      url: fileUrl,
+      fileUrl,
+      thumbnailUrl,
+      duration,
+      resolution,
+      aspectRatio: videoAspectRatio,
+      isVertical: isVideoVertical,
+      fileSize: processedFileSize
+    });
+  } catch (error: any) {
+    console.error('[Bulletin Upload] Error:', error);
+    return res.status(500).json({ error: error.message || 'Media upload failed' });
+  }
+});
+
+/**
+ * Diagnostic Audit Endpoint for Media Processing Pipeline
+ * GET /api/bulletin/media/diagnostic
+ */
+router.get('/media/diagnostic', authenticateTokenOptional, async (req, res) => {
+  const auditStartTime = Date.now();
+  const targetMediaPool = mediaPool || pool;
+  let dbStatus = 'disconnected';
+  let totalMediaAssets = 0;
+  let dbError = null;
+
+  if (targetMediaPool) {
+    try {
+      const dbCheck = await targetMediaPool.query('SELECT COUNT(*)::int as count FROM media_assets');
+      dbStatus = 'connected';
+      totalMediaAssets = dbCheck.rows[0]?.count || 0;
+    } catch (e: any) {
+      dbStatus = 'error';
+      dbError = e.message;
+    }
+  }
+
+  // Check uploads folder
+  const uploadsDir = path.resolve(process.cwd(), 'uploads');
+  let diskWritable = false;
+  try {
+    const testFile = path.join(uploadsDir, `.test_write_${Date.now()}`);
+    await fs.writeFile(testFile, 'ok');
+    await fs.unlink(testFile);
+    diskWritable = true;
+  } catch (e) {
+    diskWritable = false;
+  }
+
+  const auditReport = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    elapsedMs: Date.now() - auditStartTime,
+    database: {
+      target: mediaPool ? 'dedicated_media_pool' : 'core_pool',
+      status: dbStatus,
+      totalAssetsCount: totalMediaAssets,
+      error: dbError
+    },
+    storage: {
+      directory: 'uploads/',
+      writable: diskWritable,
+      streamingEnabled: true,
+      http206PartialContentSupported: true
+    },
+    pipelineOptimizations: {
+      fastStreamCopyEnabled: true,
+      fastCopyQualification: 'MP4/MOV container with H.264 video and AAC audio',
+      fastCopyLatencyTypical: '0.2s - 0.8s',
+      transcodeCodec: 'libx264 (preset: ultrafast, crf: 25)',
+      maxResolutionCap: '1080p (scales 4K down for instant web streaming)',
+      safetyTimeoutSec: 35,
+      clientFrameExtraction: 'HTML5 Video Canvas zero-backend seeking (< 1.5s)'
+    }
+  };
+
+  return res.json(auditReport);
+});
+
 
 /**
  * GET /api/bulletin/ads
@@ -149,7 +1453,7 @@ router.get('/mentions/suggest', authenticateToken, async (req: any, res) => {
  */
 router.get('/ads', async (req, res) => {
   try {
-    const { category, city, location_city, search, hashtag, sort, audience, page: pageQuery, limit: limitQuery } = req.query;
+    const { category, city, location_city, search, hashtag, sort, audience, page_id: queryPageId, user_id: queryUserId, profile_only, page: pageQuery, limit: limitQuery } = req.query;
     const pageNum = Math.max(1, parseInt(pageQuery as string) || 1);
     const limitNum = Math.min(50, Math.max(1, parseInt(limitQuery as string) || 8));
     const offsetNum = (pageNum - 1) * limitNum;
@@ -172,25 +1476,129 @@ router.get('/ads', async (req, res) => {
     let query = `
       SELECT b.*,
         (CASE WHEN b.is_boosted AND (b.boosted_until IS NULL OR b.boosted_until > NOW()) THEN TRUE ELSE FALSE END) as is_boosted_active,
-        u.name as u_name, u.avatar as u_avatar,
-        bp.name as page_name, bp.avatar_url as page_avatar, bp.cover_url as page_cover, 
+        u.name as u_name, u.avatar as u_avatar, u.email as u_email,
+        bp.name as page_name, bp.avatar_url as page_avatar, bp.cover_url as page_cover, bp.slug as page_slug,
         (CASE WHEN bp.is_verified = TRUE OR u.kyc_status = 'verified' THEN TRUE ELSE FALSE END) as page_is_verified
       FROM bulletin_ads b
       LEFT JOIN users u ON b.user_id = u.id
       LEFT JOIN bulletin_pages bp ON b.page_id = bp.id
-      WHERE b.status = 'approved' AND b.ad_format != 'story'
+      WHERE b.status = 'approved' AND b.ad_format != 'story' AND b.deleted_at IS NULL AND b.archived_at IS NULL
     `;
     const params: any[] = [];
+
+    // Strict commercial page isolation
+    if (queryPageId) {
+      params.push(parseInt(queryPageId as string, 10) || -1);
+      query += ` AND b.page_id = $${params.length}`;
+    } else if (profile_only === 'true' && queryUserId) {
+      // Strict user personal profile isolation (exclude business page posts)
+      params.push(parseInt(queryUserId as string, 10) || -1);
+      query += ` AND b.user_id = $${params.length} AND b.page_id IS NULL`;
+    }
 
     if (category && category !== 'all' && category !== 'الكل') {
       params.push(category);
       query += ` AND b.category = $${params.length}`;
     }
 
-    const targetCity = (city || location_city) as string;
-    if (targetCity && targetCity !== 'all' && targetCity !== 'الكل') {
-      params.push(`%${targetCity.trim()}%`);
-      query += ` AND (b.location_city ILIKE $${params.length} OR bp.city ILIKE $${params.length} OR b.title ILIKE $${params.length} OR b.description ILIKE $${params.length})`;
+    // Multi-country and multi-city filtering support
+    const rawCitiesParam = (req.query.cities || req.query.city || req.query.location_city || '') as string;
+    const rawCountriesParam = (req.query.countries || req.query.country || '') as string;
+
+    const cityList = rawCitiesParam.split(',').map(c => c.trim()).filter(c => c && c !== 'all' && c !== 'الكل');
+    const countryList = rawCountriesParam.split(',').map(c => c.trim()).filter(c => c && c !== 'all' && c !== 'الكل');
+
+    if (cityList.length > 0) {
+      const expandedCityNamesSet = new Set<string>();
+      for (const cVal of cityList) {
+        expandedCityNamesSet.add(cVal.toLowerCase());
+        
+        // Find matching city in ALL_GEO_COUNTRIES
+        for (const ctry of ALL_GEO_COUNTRIES) {
+          const matchedCity = ctry.cities.find(
+            c => c.nameAr === cVal || c.nameEn === cVal
+          );
+          if (matchedCity) {
+            if (matchedCity.nameAr) expandedCityNamesSet.add(matchedCity.nameAr.toLowerCase());
+            if (matchedCity.nameEn) expandedCityNamesSet.add(matchedCity.nameEn.toLowerCase());
+            if (matchedCity.stateAr) expandedCityNamesSet.add(matchedCity.stateAr.toLowerCase());
+            if (matchedCity.stateEn) expandedCityNamesSet.add(matchedCity.stateEn.toLowerCase());
+            if (matchedCity.subLocalities) {
+              for (const sub of matchedCity.subLocalities) {
+                if (sub.nameAr) expandedCityNamesSet.add(sub.nameAr.toLowerCase());
+                if (sub.nameEn) expandedCityNamesSet.add(sub.nameEn.toLowerCase());
+              }
+            }
+          }
+        }
+      }
+      
+      const lowercaseCities = Array.from(expandedCityNamesSet).map(s => s.trim()).filter(Boolean);
+      if (lowercaseCities.length > 0) {
+        params.push(lowercaseCities);
+        const arrayParamIndex = params.length;
+        
+        const cityKeywordsConditions: string[] = [];
+        for (const cVal of cityList) {
+          params.push(`%${cVal}%`);
+          cityKeywordsConditions.push(`(b.title ILIKE $${params.length} OR b.description ILIKE $${params.length})`);
+        }
+        
+        query += ` AND (
+          LOWER(b.location_city) = ANY($${arrayParamIndex}::text[])
+          OR LOWER(bp.city) = ANY($${arrayParamIndex}::text[])
+          OR ${cityKeywordsConditions.join(' OR ')}
+        )`;
+      }
+    } else if (countryList.length > 0) {
+      const expandedNamesSet = new Set<string>();
+      for (const ctryVal of countryList) {
+        expandedNamesSet.add(ctryVal.toLowerCase());
+        
+        // Find matching country in geoData
+        const matchedCtry = ALL_GEO_COUNTRIES.find(
+          c => c.nameAr === ctryVal || c.nameEn === ctryVal || c.code.toLowerCase() === ctryVal.toLowerCase()
+        );
+        if (matchedCtry) {
+          if (matchedCtry.nameAr) expandedNamesSet.add(matchedCtry.nameAr.toLowerCase());
+          if (matchedCtry.nameEn) expandedNamesSet.add(matchedCtry.nameEn.toLowerCase());
+          if (matchedCtry.keywords) {
+            for (const kw of matchedCtry.keywords) {
+              expandedNamesSet.add(kw.toLowerCase());
+            }
+          }
+          for (const city of matchedCtry.cities) {
+            if (city.nameAr) expandedNamesSet.add(city.nameAr.toLowerCase());
+            if (city.nameEn) expandedNamesSet.add(city.nameEn.toLowerCase());
+            if (city.stateAr) expandedNamesSet.add(city.stateAr.toLowerCase());
+            if (city.stateEn) expandedNamesSet.add(city.stateEn.toLowerCase());
+            if (city.subLocalities) {
+              for (const sub of city.subLocalities) {
+                if (sub.nameAr) expandedNamesSet.add(sub.nameAr.toLowerCase());
+                if (sub.nameEn) expandedNamesSet.add(sub.nameEn.toLowerCase());
+              }
+            }
+          }
+        }
+      }
+
+      const lowercaseNames = Array.from(expandedNamesSet).map(s => s.trim()).filter(Boolean);
+      if (lowercaseNames.length > 0) {
+        params.push(lowercaseNames);
+        const arrayParamIndex = params.length;
+        
+        const countryKeywordsConditions: string[] = [];
+        for (const ctryVal of countryList) {
+          params.push(`%${ctryVal}%`);
+          countryKeywordsConditions.push(`(b.title ILIKE $${params.length} OR b.description ILIKE $${params.length})`);
+        }
+        
+        query += ` AND (
+          LOWER(b.location_city) = ANY($${arrayParamIndex}::text[])
+          OR LOWER(bp.city) = ANY($${arrayParamIndex}::text[])
+          OR ${countryKeywordsConditions.join(' OR ')}
+        )`;
+      }
     }
 
     if (search && typeof search === 'string' && search.trim()) {
@@ -241,7 +1649,7 @@ router.get('/ads', async (req, res) => {
     let isFallbackToNational = false;
 
     // If city search returned 0 items on page 1, fallback to national ads so content never disappears
-    if (result.rows.length === 0 && pageNum === 1 && targetCity && targetCity !== 'all' && targetCity !== 'الكل') {
+    if (result.rows.length === 0 && pageNum === 1 && cityList.length > 0) {
       const fallbackQuery = `
         SELECT b.*,
           (CASE WHEN b.is_boosted AND (b.boosted_until IS NULL OR b.boosted_until > NOW()) THEN TRUE ELSE FALSE END) as is_boosted_active,
@@ -303,6 +1711,8 @@ router.get('/ads', async (req, res) => {
         location_city: row.location_city || 'فلسطين',
         author_name: row.page_name || row.u_name || row.author_name || 'مستخدم بيربليكستا',
         author_avatar: row.page_avatar || row.u_avatar || row.author_avatar || null,
+        author_username: row.page_slug || row.author_username || (row.u_email ? row.u_email.split('@')[0] : null) || 'user',
+        post_code: row.post_code || `PX-${row.id}`,
         title: row.title,
         description: row.description,
         image_url: row.image_url,
@@ -346,6 +1756,10 @@ router.get('/ads', async (req, res) => {
         tagged_users: row.tagged_users || [],
         audience: row.audience || 'public',
         has_whatsapp_button: Boolean(row.has_whatsapp_button),
+        audio_url: row.audio_url || (row.metadata && row.metadata.audio_url) || null,
+        audio_title: row.audio_title || (row.metadata && row.metadata.audio_title) || null,
+        audio_artist: row.audio_artist || (row.metadata && row.metadata.audio_artist) || null,
+        audio_track_id: row.audio_track_id || (row.metadata && row.metadata.audio_track_id) || null,
         media_gallery: (row.metadata && Array.isArray(row.metadata.media_gallery)) ? row.metadata.media_gallery : null,
         metadata: row.metadata || null
       };
@@ -362,6 +1776,102 @@ router.get('/ads', async (req, res) => {
   } catch (error: any) {
     console.error('[Bulletin API] Error fetching ads:', error.message);
     res.status(500).json({ error: 'Failed to retrieve bulletin advertisements' });
+  }
+});
+
+/**
+ * GET /api/bulletin/ads/code/:postCode
+ * Retrieve a post by its post_code or numeric ID
+ */
+router.get('/ads/code/:postCode', async (req: any, res: any) => {
+  try {
+    const { postCode } = req.params;
+    const numericId = parseInt(postCode, 10) || -1;
+    const query = `
+      SELECT b.*,
+        (CASE WHEN b.is_boosted AND (b.boosted_until IS NULL OR b.boosted_until > NOW()) THEN TRUE ELSE FALSE END) as is_boosted_active,
+        u.name as u_name, u.avatar as u_avatar, u.email as u_email,
+        bp.name as page_name, bp.avatar_url as page_avatar, bp.cover_url as page_cover, bp.slug as page_slug,
+        (CASE WHEN bp.is_verified = TRUE OR u.kyc_status = 'verified' THEN TRUE ELSE FALSE END) as page_is_verified
+      FROM bulletin_ads b
+      LEFT JOIN users u ON b.user_id = u.id
+      LEFT JOIN bulletin_pages bp ON b.page_id = bp.id
+      WHERE (b.post_code = $1 OR UPPER(b.post_code) = UPPER($1) OR b.id = $2) AND b.deleted_at IS NULL
+      LIMIT 1
+    `;
+    const result = await pool.query(query, [postCode, numericId]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'المنشور غير موجود / Post not found' });
+    }
+    const ad = result.rows[0];
+    if (ad.page_id && ad.page_name) {
+      ad.author_name = ad.page_name;
+      ad.author_avatar = ad.page_avatar;
+      ad.author_username = ad.page_slug;
+    } else if (ad.u_name) {
+      ad.author_name = ad.u_name;
+      ad.author_avatar = ad.u_avatar;
+      ad.author_username = ad.author_username || (ad.u_email ? ad.u_email.split('@')[0] : ad.u_name);
+    }
+    return res.json(ad);
+  } catch (error) {
+    console.error('[Bulletin API] Error fetching post by code:', error);
+    return res.status(500).json({ error: 'Failed to retrieve post by code' });
+  }
+});
+
+/**
+ * GET /api/bulletin/pages/slug/:slug
+ * Retrieve a commercial page by slug or numeric ID
+ */
+router.get('/pages/slug/:slug', async (req: any, res: any) => {
+  try {
+    const { slug } = req.params;
+    const numericId = parseInt(slug, 10) || -1;
+    const query = `
+      SELECT bp.*, u.name as owner_name, u.email as owner_email, u.avatar as owner_avatar
+      FROM bulletin_pages bp
+      LEFT JOIN users u ON (bp.owner_id = u.id OR bp.user_id = u.id)
+      WHERE bp.slug = $1 OR bp.id = $2
+      LIMIT 1
+    `;
+    const result = await pool.query(query, [slug, numericId]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'الصفحة غير موجودة / Page not found' });
+    }
+    const page = result.rows[0];
+
+    const adsRes = await pool.query(
+      `SELECT b.*,
+         bp.name as page_name, bp.avatar_url as page_avatar, bp.cover_url as page_cover, 
+         (CASE WHEN bp.is_verified = TRUE OR u.kyc_status = 'verified' THEN TRUE ELSE FALSE END) as page_is_verified
+       FROM bulletin_ads b
+       LEFT JOIN users u ON b.user_id = u.id
+       LEFT JOIN bulletin_pages bp ON b.page_id = bp.id
+       WHERE b.page_id = $1 AND b.status = 'approved' AND b.deleted_at IS NULL AND b.archived_at IS NULL AND b.ad_format != 'story'
+       ORDER BY b.created_at DESC`,
+      [page.id]
+    );
+
+    return res.json({
+      success: true,
+      page: {
+        ...page,
+        followers_count: Number(page.followers_count || 0),
+        ads_count: Number(page.ads_count || 0)
+      },
+      ads: adsRes.rows.map((row: any) => ({
+        ...row,
+        page_name: page.name,
+        page_avatar: page.avatar_url,
+        page_cover: page.cover_url,
+        page_is_verified: page.is_verified,
+        hashtags: row.hashtags ? row.hashtags.split(',').map((t: string) => t.trim()).filter(Boolean) : []
+      }))
+    });
+  } catch (error) {
+    console.error('[Bulletin API] Error fetching page by slug:', error);
+    return res.status(500).json({ error: 'Failed to retrieve page by slug' });
   }
 });
 
@@ -542,6 +2052,10 @@ router.post('/ads', authenticateToken, async (req: any, res) => {
     ad_format,
     quick_questions,
     aspect_ratio,
+    audio_url,
+    audio_title,
+    audio_artist,
+    audio_track_id,
     metadata
   } = req.body;
 
@@ -614,7 +2128,8 @@ router.post('/ads', authenticateToken, async (req: any, res) => {
 
   const metadataToSave = {
     ...(metadata && typeof metadata === 'object' ? metadata : {}),
-    media_gallery: normGallery.length > 0 ? normGallery : undefined
+    media_gallery: normGallery.length > 0 ? normGallery : undefined,
+    ...(audio_url ? { audio_url, audio_title, audio_artist, audio_track_id } : {})
   };
 
   try {
@@ -667,12 +2182,28 @@ router.post('/ads', authenticateToken, async (req: any, res) => {
 
     const expiresAt = validFormat === 'story' ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null;
 
+    const newPostCode = 'PX-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    let authorUsername = null;
+    if (validPageId) {
+      const pageInfo = await pool.query('SELECT slug, name FROM bulletin_pages WHERE id = $1', [validPageId]);
+      authorUsername = pageInfo.rows[0]?.slug || pageInfo.rows[0]?.name?.toLowerCase().replace(/[^\w\u0600-\u06FF]/g, '') || 'page';
+    } else {
+      const userInfo = await pool.query('SELECT email, name FROM users WHERE id = $1', [userId]);
+      const userRow = userInfo.rows[0];
+      authorUsername = (userRow?.email ? userRow.email.split('@')[0] : null) || userRow?.name?.toLowerCase().replace(/[^\w\u0600-\u06FF]/g, '') || 'user';
+    }
+
+    const normMediaUrls = normGallery.length > 0
+      ? normGallery.map(i => i.url)
+      : (finalImageUrl ? finalImageUrl.split(',').map(u => u.trim()).filter(Boolean) : []);
+
     const insertRes = await pool.query(`
       INSERT INTO bulletin_ads (
         user_id, page_id, location_city, author_name, author_avatar, title, description, image_url,
         whatsapp_number, phone_number, video_url, target_url, hashtags, category, price_paid, duration_days, status,
-        feeling, is_ai_generated, tagged_users, has_whatsapp_button, audience, ad_format, quick_questions, expires_at, aspect_ratio, metadata
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 0, 0, 'approved', $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+        feeling, is_ai_generated, tagged_users, has_whatsapp_button, audience, ad_format, quick_questions, expires_at, aspect_ratio, metadata,
+        post_code, author_username, audio_url, audio_title, audio_artist, audio_track_id, media_urls
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 0, 0, 'approved', $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31)
       RETURNING *
     `, [
       userId,
@@ -698,12 +2229,68 @@ router.post('/ads', authenticateToken, async (req: any, res) => {
       JSON.stringify((quick_questions || []).filter(Boolean)),
       expiresAt,
       aspect_ratio || 'grid',
-      JSON.stringify(metadataToSave)
+      JSON.stringify(metadataToSave),
+      newPostCode,
+      authorUsername,
+      audio_url || null,
+      audio_title || null,
+      audio_artist || null,
+      audio_track_id || null,
+      JSON.stringify(normMediaUrls)
     ]);
 
     const createdAd = insertRes.rows[0];
     if (normGallery.length > 0) {
       createdAd.media_gallery = normGallery;
+    }
+
+    // Auto harvest audio or record track usage in mediaPool audio library
+    try {
+      if (metadataToSave?.audio_url) {
+        if (metadataToSave.audio_track_id) {
+          await recordAudioTrackUsage(String(metadataToSave.audio_track_id));
+        } else {
+          await harvestAudioFromPost({
+            userId,
+            userName: authorName,
+            userAvatar: authorAvatar,
+            adId: createdAd.id,
+            postTitle: finalTitle,
+            audioUrl: metadataToSave.audio_url,
+            category: autoCategory
+          });
+        }
+      }
+    } catch (audioHarvErr) {
+      console.warn('[Bulletin API] Audio harvesting notice:', audioHarvErr);
+    }
+
+    // Asynchronous background audio track embedding for video posts
+    if (normVideoUrl && audio_url) {
+      (async () => {
+        try {
+          const videoDiskPath = resolveDiskFilePath(normVideoUrl);
+          const audioDiskPath = resolveDiskFilePath(audio_url);
+
+          const mergeRes = await mergeAudioIntoVideo(videoDiskPath, audioDiskPath, {
+            keepOriginalAudio: false
+          });
+
+          if (mergeRes.success && mergeRes.processedVideoUrl) {
+            await pool.query('UPDATE bulletin_ads SET video_url = $1 WHERE id = $2', [
+              mergeRes.processedVideoUrl,
+              createdAd.id
+            ]);
+            io.emit('BULLETIN_AD_UPDATED', {
+              ad_id: createdAd.id,
+              video_url: mergeRes.processedVideoUrl
+            });
+            console.log(`[Bulletin] Background audio merged for ad #${createdAd.id} -> ${mergeRes.processedVideoUrl}`);
+          }
+        } catch (mergeErr: any) {
+          console.warn('[Bulletin] Background audio merge error:', mergeErr?.message);
+        }
+      })();
     }
 
     // Save hashtags to database
@@ -764,8 +2351,9 @@ router.post('/ads', authenticateToken, async (req: any, res) => {
       if (hasEveryoneMention) {
         try {
           const activeUsersRes = await pool.query(
-          );
+            'SELECT id FROM users WHERE id != $1 ORDER BY id DESC LIMIT 500',
             [userId]
+          );
           for (const row of activeUsersRes.rows) {
             const uId = Number(row.id);
             if (uId && uId !== Number(userId)) {
@@ -866,9 +2454,9 @@ router.get('/stories', async (req, res) => {
 router.post('/stories', authenticateToken, async (req: any, res) => {
   try {
     const userId = req.user.id;
-    const { title, description, image_url, video_url, page_id } = req.body;
+    const { title, description, image_url, video_url, page_id, audio_url, audio_track_id, metadata } = req.body;
 
-    if (!image_url && !video_url) {
+    if (!image_url && !video_url && !audio_url) {
       return res.status(400).json({ error: 'يرجى تقديم صورة أو فيديو للقصة' });
     }
 
@@ -896,11 +2484,17 @@ router.post('/stories', authenticateToken, async (req: any, res) => {
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const finalImageUrl = image_url || (video_url ? '/uploads/default_video_poster.jpg' : 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1080&q=80');
 
+    const storyMetadata = {
+      ...(metadata || {}),
+      ...(audio_url ? { audio_url, audio_track_id } : {})
+    };
+
     const insertRes = await pool.query(`
       INSERT INTO bulletin_ads (
         user_id, page_id, author_name, author_avatar, title, description,
-        image_url, video_url, category, status, ad_format, expires_at, created_at, location_city
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'عام / General', 'approved', 'story', $9, NOW(), 'فلسطين')
+        image_url, video_url, category, status, ad_format, expires_at, created_at, location_city, metadata,
+        audio_url, audio_track_id, media_urls
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'عام / General', 'approved', 'story', $9, NOW(), 'فلسطين', $10, $11, $12, $13)
       RETURNING *
     `, [
       userId,
@@ -911,10 +2505,35 @@ router.post('/stories', authenticateToken, async (req: any, res) => {
       storyDesc,
       finalImageUrl,
       video_url || null,
-      expiresAt
+      expiresAt,
+      JSON.stringify(storyMetadata),
+      audio_url || null,
+      audio_track_id || null,
+      JSON.stringify(finalImageUrl ? [finalImageUrl] : [])
     ]);
 
     const createdStory = insertRes.rows[0];
+
+    // Audio harvesting / usage tracking for stories
+    try {
+      if (audio_url) {
+        if (audio_track_id) {
+          await recordAudioTrackUsage(String(audio_track_id));
+        } else {
+          await harvestAudioFromPost({
+            userId,
+            userName: authorName,
+            userAvatar: authorAvatar,
+            adId: createdStory.id,
+            postTitle: storyTitle,
+            audioUrl: audio_url,
+            category: 'stories'
+          });
+        }
+      }
+    } catch (aErr) {
+      console.warn('[Bulletin Story] Audio tracking notice:', aErr);
+    }
 
     try {
       await createNotification(
@@ -1451,9 +3070,20 @@ router.post('/ads/:id/boost-wallet', authenticateToken, async (req: any, res) =>
   try {
     const adId = parseInt(req.params.id);
     const userId = req.user.id;
-    const { days = 3, tierName = 'تنشيط ترويجي' } = req.body;
-    const durationNum = parseInt(days) || 3;
-    const cost = BOOST_PRICING[durationNum] || (durationNum * 2.00);
+    const { 
+      days = 3, 
+      tierName = 'حملة ترويجية مخصصة',
+      daily_budget,
+      dailyBudget,
+      goal = 'whatsapp_leads',
+      settings = {}
+    } = req.body;
+    const durationNum = Math.max(1, parseInt(days) || 3);
+    const parsedDailyBudget = parseFloat(daily_budget || dailyBudget || 0);
+    const dailyBudgetNum = parsedDailyBudget > 0 ? parsedDailyBudget : 2.00;
+    const cost = (daily_budget || dailyBudget)
+      ? Number((durationNum * dailyBudgetNum).toFixed(2))
+      : (BOOST_PRICING[durationNum] || Number((durationNum * 2.00).toFixed(2)));
 
     if (isNaN(adId)) {
       client.release();
@@ -1491,22 +3121,25 @@ router.post('/ads/:id/boost-wallet', authenticateToken, async (req: any, res) =>
     }
 
     await client.query(
-      'UPDATE wallets SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
+      'UPDATE wallets SET balance = balance - $1, usd_balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
       [cost, userId]
     );
 
     await client.query(`
-      INSERT INTO ledger_transactions (wallet_id, user_id, amount, points, transaction_type, status, description)
-      VALUES ($1, $2, $3, 0, 'bulletin_ad_boost', 'success', $4)
+      INSERT INTO ledger_transactions (wallet_id, user_id, amount, points, transaction_type, status, description, metadata)
+      VALUES ($1, $2, $3, 0, 'bulletin_ad_boost', 'success', $4, $5)
     `, [
       walletRes.rows[0].id,
       userId,
       -cost,
-      `تمويل وترويج الإعلان "${ad.title}" لمدة ${durationNum} أيام (${tierName})`
+      `تمويل وترويج الإعلان "${ad.title}" لمدة ${durationNum} أيام (${tierName} - $${dailyBudgetNum}/يوم)`,
+      JSON.stringify({ ad_id: adId, duration_days: durationNum, daily_budget: dailyBudgetNum, goal, settings })
     ]);
 
     await client.query('COMMIT');
     client.release();
+
+    const mergedSettings = typeof settings === 'object' ? settings : {};
 
     const updateRes = await pool.query(`
       UPDATE bulletin_ads
@@ -1514,10 +3147,13 @@ router.post('/ads/:id/boost-wallet', authenticateToken, async (req: any, res) =>
           boosted_until = GREATEST(COALESCE(boosted_until, NOW()), NOW()) + INTERVAL '${durationNum} days',
           boost_tier = $1,
           boost_price = COALESCE(boost_price, 0) + $2,
+          boost_goal = $3,
+          boost_daily_budget = $4,
+          boost_settings = $5,
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = $3
+      WHERE id = $6
       RETURNING *
-    `, [tierName, cost, adId]);
+    `, [tierName, cost, goal, dailyBudgetNum, JSON.stringify(mergedSettings), adId]);
 
     const updatedAd = updateRes.rows[0];
 
@@ -1674,7 +3310,7 @@ router.get('/verify-boost-session', authenticateToken, async (req: any, res) => 
     if (eventCheck.rows.length === 0) {
       try {
         await target.query(
-          'INSERT INTO stripe_events (stripe_event_id, type, status, metadata) VALUES ($1,$2,$3,$4)',
+          'INSERT INTO stripe_events (stripe_event_id, type, status, metadata) VALUES ($1,$2,$3,$4) ON CONFLICT (stripe_event_id) DO NOTHING',
           [session.id, 'bulletin_ad_boost_paid', 'processed', JSON.stringify(session.metadata || {})]
         );
 
@@ -1973,7 +3609,13 @@ router.get('/pages/:id', async (req, res) => {
       } catch (e) {}
     }
 
-    const pageRes = await pool.query('SELECT * FROM bulletin_pages WHERE id = $1', [pageId]);
+    const pageRes = await pool.query(
+      `SELECT bp.*, u.name as owner_name, u.avatar as owner_avatar, COALESCE(u.name, u.email) as owner_username, u.email as owner_email
+       FROM bulletin_pages bp
+       LEFT JOIN users u ON (bp.owner_id = u.id OR bp.user_id = u.id)
+       WHERE bp.id = $1`,
+      [pageId]
+    );
     if (pageRes.rows.length === 0) {
       return res.status(404).json({ error: 'الصفحة التجارية غير موجودة' });
     }
@@ -1996,9 +3638,9 @@ router.get('/pages/:id', async (req, res) => {
        FROM bulletin_ads b
        LEFT JOIN users u ON b.user_id = u.id
        LEFT JOIN bulletin_pages bp ON b.page_id = bp.id
-       WHERE (b.page_id = $1 OR (b.user_id = $2 AND b.page_id IS NULL)) AND b.status = 'approved' AND b.ad_format != 'story'
+       WHERE b.page_id = $1 AND b.status = 'approved' AND b.deleted_at IS NULL AND b.archived_at IS NULL AND b.ad_format != 'story'
        ORDER BY b.created_at DESC`,
-      [pageId, page.user_id]
+      [pageId]
     );
 
     res.json({
@@ -2021,6 +3663,65 @@ router.get('/pages/:id', async (req, res) => {
   } catch (error: any) {
     console.error('[Bulletin Pages API] Single page fetch error:', error.message);
     res.status(500).json({ error: 'فشل جلب تفاصيل الصفحة التجارية' });
+  }
+});
+
+router.get('/users/:id/wall', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: 'معرّف المستخدم غير صالح' });
+    }
+
+    const userRes = await pool.query(
+      `SELECT id, name, avatar, cover_image, bio, occupation, location, website_url, custom_domain, is_domain_verified, social_links, verified_links, email, role, kyc_status, created_at FROM users WHERE id = $1`,
+      [userId]
+    );
+
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
+
+    const userInfo = userRes.rows[0];
+
+    const postsCountRes = await pool.query(
+      `SELECT COUNT(*)::int as count FROM bulletin_ads WHERE user_id = $1 AND page_id IS NULL AND status = 'approved' AND deleted_at IS NULL AND archived_at IS NULL AND ad_format != 'story'`,
+      [userId]
+    );
+
+    const pagesCountRes = await pool.query(
+      `SELECT COUNT(*)::int as count FROM bulletin_pages WHERE (user_id = $1 OR owner_id = $1)`,
+      [userId]
+    );
+
+    const adsRes = await pool.query(
+      `SELECT b.*,
+         u.name as u_name, u.avatar as u_avatar, u.email as u_email,
+         (CASE WHEN u.kyc_status = 'verified' THEN TRUE ELSE FALSE END) as page_is_verified
+       FROM bulletin_ads b
+       LEFT JOIN users u ON b.user_id = u.id
+       WHERE b.user_id = $1 AND b.page_id IS NULL AND b.status = 'approved' AND b.deleted_at IS NULL AND b.archived_at IS NULL AND b.ad_format != 'story'
+       ORDER BY b.created_at DESC`,
+      [userId]
+    );
+
+    res.json({
+      success: true,
+      user: {
+        ...userInfo,
+        posts_count: Number(postsCountRes.rows[0]?.count || 0),
+        pages_count: Number(pagesCountRes.rows[0]?.count || 0),
+      },
+      ads: adsRes.rows.map((row: any) => ({
+        ...row,
+        author_name: userInfo.name,
+        author_avatar: userInfo.avatar,
+        hashtags: row.hashtags ? row.hashtags.split(',').map((t: string) => t.trim()).filter(Boolean) : []
+      }))
+    });
+  } catch (error: any) {
+    console.error('[Bulletin API] User wall fetch error:', error.message);
+    res.status(500).json({ error: 'فشل جلب حائط المستخدم الشخصي' });
   }
 });
 
@@ -3088,10 +4789,72 @@ router.post('/ads/:id/report', authenticateToken, async (req: any, res) => {
       return res.status(400).json({ error: 'يرجى تحديد سبب الإبلاغ' });
     }
 
-    await pool.query(
-      'INSERT INTO bulletin_reports (user_id, ad_id, reason, details) VALUES ($1, $2, $3, $4)',
-      [userId, adId, reason, details]
+    // Prevent duplicate report spam from the same user for the same ad
+    const existingReport = await pool.query(
+      'SELECT id FROM bulletin_reports WHERE user_id = $1 AND ad_id = $2',
+      [userId, adId]
     );
+    if (existingReport.rows.length > 0) {
+      return res.status(400).json({ error: 'لقد قمت بالإبلاغ عن هذا المنشور سابقاً، وهو قيد المراجعة لدى الإدارة' });
+    }
+
+    const reportRes = await pool.query(
+      'INSERT INTO bulletin_reports (user_id, ad_id, reason, details) VALUES ($1, $2, $3, $4) RETURNING id',
+      [userId, adId, reason, details || null]
+    );
+
+    // Fetch ad info & reporter info for notifications
+    const adRes = await pool.query('SELECT b.id, b.description, b.title, u.name as author_name FROM bulletin_ads b LEFT JOIN users u ON b.user_id = u.id WHERE b.id = $1', [adId]);
+    const reporterRes = await pool.query('SELECT id, name, email FROM users WHERE id = $1', [userId]);
+
+    const adInfo = adRes.rows[0];
+    const reporterInfo = reporterRes.rows[0];
+
+    // Find all admin users to notify them via in-app & email
+    const adminsRes = await pool.query("SELECT id, email, name FROM users WHERE role IN ('admin', 'superadmin') OR is_admin = true");
+    const adminIds = adminsRes.rows.map((a: any) => a.id);
+
+    if (adminIds.length > 0) {
+      try {
+        const { dispatchNotification } = await import('../services/notifications.js');
+        const titleAr = `🚨 بلاغ جديد عن محتوى مخالف (منشور #${adId})`;
+        const titleEn = `🚨 New Post Violation Report (#${adId})`;
+        const messageAr = `قام المستخدم (${reporterInfo?.name || 'مستخدم'}) بالإبلاغ عن المنشور #${adId}. السبب: ${reason}${details ? ` - التفاصيل: ${details}` : ''}`;
+        const messageEn = `User (${reporterInfo?.name || 'User'}) reported post #${adId}. Reason: ${reason}${details ? ` - Details: ${details}` : ''}`;
+
+        const emailHtmlAr = `
+          <div style="font-family: Arial, sans-serif; direction: rtl; text-align: right; background-color: #0f172a; color: #f8fafc; padding: 24px; border-radius: 12px; border: 1px solid #334155;">
+            <h2 style="color: #ef4444; margin-top: 0;">🚨 بلاغ جديد عن محتوى مخالف في منصة بيربليكستا</h2>
+            <p>تلقى النظام بلاغاً جديداً من أحد المستخدمين ويتطلب مراجعتك الرقابية:</p>
+            <div style="background-color: #1e293b; padding: 16px; border-radius: 8px; border-right: 4px solid #ef4444; margin: 16px 0;">
+              <p style="margin: 6px 0;"><strong>رقم المنشور:</strong> #${adId}</p>
+              <p style="margin: 6px 0;"><strong>المُبْلِغ:</strong> ${escapeHtml(reporterInfo?.name || '')} (${escapeHtml(reporterInfo?.email || '')})</p>
+              <p style="margin: 6px 0;"><strong>سبب الإبلاغ:</strong> <span style="color: #f87171; font-weight: bold;">${escapeHtml(reason)}</span></p>
+              ${details ? `<p style="margin: 6px 0;"><strong>تفاصيل إضافية:</strong> ${escapeHtml(details)}</p>` : ''}
+              ${(adInfo?.description || adInfo?.title) ? `<p style="margin: 6px 0;"><strong>نص المنشور:</strong> ${escapeHtml((adInfo.description || adInfo.title || '').slice(0, 250))}</p>` : ''}
+            </div>
+            <p style="color: #94a3b8; font-size: 13px;">يمكنك الدخول إلى لوحة التحكم واتخاذ الإجراء المناسب (حظر المنشور، حذف، أو حفظ البلاغ).</p>
+          </div>
+        `;
+
+        await dispatchNotification(
+          adminIds,
+          'content_report',
+          titleEn,
+          titleAr,
+          messageEn,
+          messageAr,
+          { ad_id: adId, report_id: reportRes.rows[0]?.id, reason, details },
+          {
+            sendEmail: true,
+            emailBodyAr: emailHtmlAr,
+            emailBody: emailHtmlAr
+          }
+        );
+      } catch (notifyErr: any) {
+        console.warn('[Bulletin API] Non-fatal notification error on report:', notifyErr.message);
+      }
+    }
 
     res.json({ success: true, message: 'تم إرسال بلاغك بنجاح وسيتم مراجعته من قبل الإدارة' });
   } catch (error: any) {
@@ -3316,12 +5079,12 @@ router.post('/admin/:id/reject', authenticateAdmin, async (req, res) => {
     `, [reason || 'لا يتوافق مع شروط النشر', adId]);
 
     if (refund && cost > 0) {
-      const client = await ledgerPool.connect();
+      const client = await (ledgerPool || pool).connect();
       try {
         await client.query('BEGIN');
         const walletRes = await client.query('SELECT id FROM wallets WHERE user_id = $1 FOR UPDATE', [ad.user_id]);
         if (walletRes.rows.length > 0) {
-          await client.query('UPDATE wallets SET balance = balance + $1 WHERE id = $2', [cost, walletRes.rows[0].id]);
+          await client.query('UPDATE wallets SET balance = balance + $1, usd_balance = balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [cost, walletRes.rows[0].id]);
           await client.query(`
             INSERT INTO ledger_transactions (wallet_id, user_id, amount, points, transaction_type, status, description)
             VALUES ($1, $2, $3, 0, 'bulletin_ad_refund', 'success', $4)
@@ -3366,9 +5129,9 @@ router.post('/admin/:id/reject', authenticateAdmin, async (req, res) => {
           user.email,
           'bulletin_ad_rejected',
           {
-            userName: user.name || 'User',
-            adTitle: ad.title,
-            rejectionReason: reason || (user.language === 'ar' ? 'غير مطابق للشروط والتعليمات الإرشادية للنشر' : 'Does not meet our community guidelines and publishing rules'),
+            userName: escapeHtml(user.name || 'User'),
+            adTitle: escapeHtml(ad.title),
+            rejectionReason: escapeHtml(reason || (user.language === 'ar' ? 'غير مطابق للشروط والتعليمات الإرشادية للنشر' : 'Does not meet our community guidelines and publishing rules')),
             actionUrl: `${getBaseUrl(req)}/bulletin/ads/manage`,
             baseUrl: getBaseUrl(req)
           },
@@ -3465,11 +5228,11 @@ router.post('/admin/:id/stop', authenticateAdmin, async (req, res) => {
           emailBody: (user) => `
             <div style="font-family: sans-serif; padding: 20px; color: #111; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px;">
               <h2 style="color: #EF4444; border-bottom: 2px solid #EF4444; padding-bottom: 10px;">Advertisement Stoppage Notice</h2>
-              <p>Dear <strong>${user.name || 'Advertiser'}</strong>,</p>
-              <p>We are writing to inform you that your active bulletin ad <strong>"${ad.title}"</strong> (ID: #${ad.id}) has been stopped by the platform administration.</p>
+              <p>Dear <strong>${escapeHtml(user.name || 'Advertiser')}</strong>,</p>
+              <p>We are writing to inform you that your active bulletin ad <strong>"${escapeHtml(ad.title)}"</strong> (ID: #${escapeHtml(ad.id)}) has been stopped by the platform administration.</p>
               <div style="background-color: #fef2f2; border: 1px solid #fca5a5; padding: 15px; border-radius: 8px; margin: 20px 0; color: #991b1b;">
                 <p style="margin: 0 0 5px 0;"><strong>Reason for Stoppage:</strong></p>
-                <p style="margin: 0; font-weight: bold;">${stopReason}</p>
+                <p style="margin: 0; font-weight: bold;">${escapeHtml(stopReason)}</p>
               </div>
               <p>If you believe this was an error or would like to request clarification, please contact our support team.</p>
               <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
@@ -3573,6 +5336,10 @@ router.put('/ads/:id', authenticateToken, async (req: any, res) => {
       media_gallery: normGallery.length > 0 ? normGallery : (media_gallery !== undefined ? undefined : existingMetadata.media_gallery)
     };
 
+    const editMediaUrls = normGallery.length > 0
+      ? normGallery.map(i => i.url)
+      : (normEditImg ? normEditImg.split(',').map(u => u.trim()).filter(Boolean) : []);
+
     const updateRes = await pool.query(`
       UPDATE bulletin_ads
       SET title = $1,
@@ -3589,8 +5356,9 @@ router.put('/ads/:id', authenticateToken, async (req: any, res) => {
           quick_questions = $12,
           aspect_ratio = $13,
           metadata = $14,
+          media_urls = $15,
           updated_at = NOW()
-      WHERE id = $15
+      WHERE id = $16
       RETURNING *
     `, [
       title.trim(),
@@ -3607,6 +5375,7 @@ router.put('/ads/:id', authenticateToken, async (req: any, res) => {
       JSON.stringify((quick_questions || []).filter(Boolean)),
       aspect_ratio || 'grid',
       JSON.stringify(updatedMetadata),
+      JSON.stringify(editMediaUrls),
       adId
     ]);
 

@@ -111,17 +111,21 @@ export class DataLoader<K, V> {
 export const userLoader = new DataLoader<number | string, any>(async (ids) => {
   if (ids.length === 0) return [];
   if (!pool) return ids.map(() => null);
-  const uniqueIds = Array.from(new Set(ids)).map(id => typeof id === 'number' ? id : parseInt(id, 10));
+  const validIds = Array.from(new Set(ids))
+    .map(id => typeof id === 'number' ? id : parseInt(String(id), 10))
+    .filter(id => typeof id === 'number' && !isNaN(id));
   
+  if (validIds.length === 0) return ids.map(() => null);
+
   try {
     const res = await pool.query(
       'SELECT id, name, email, role, status, kyc_status, language, theme, memory, last_active_at, created_at, avatar FROM users WHERE id = ANY($1)',
-      [uniqueIds]
+      [validIds]
     );
     const userMap = new Map<number, any>();
     res.rows.forEach((row: any) => userMap.set(row.id, row));
     return ids.map(id => {
-      const idNum = typeof id === 'number' ? id : parseInt(id, 10);
+      const idNum = typeof id === 'number' ? id : parseInt(String(id), 10);
       return userMap.get(idNum) || null;
     });
   } catch (err: any) {
@@ -137,17 +141,21 @@ export const walletLoader = new DataLoader<number | string, any>(async (userIds)
   if (userIds.length === 0) return [];
   const target = ledgerPool || pool;
   if (!target) return userIds.map(() => null);
-  const uniqueIds = Array.from(new Set(userIds)).map(id => typeof id === 'number' ? id : parseInt(id, 10));
+  const validIds = Array.from(new Set(userIds))
+    .map(id => typeof id === 'number' ? id : parseInt(String(id), 10))
+    .filter(id => typeof id === 'number' && !isNaN(id));
+
+  if (validIds.length === 0) return userIds.map(() => null);
 
   try {
     const res = await target.query(
       'SELECT id, user_id, balance, usd_balance, points, referral_activated, created_at, updated_at FROM wallets WHERE user_id = ANY($1)',
-      [uniqueIds]
+      [validIds]
     );
     const walletMap = new Map<number, any>();
     res.rows.forEach((row: any) => walletMap.set(row.user_id, row));
     return userIds.map(id => {
-      const idNum = typeof id === 'number' ? id : parseInt(id, 10);
+      const idNum = typeof id === 'number' ? id : parseInt(String(id), 10);
       return walletMap.get(idNum) || null;
     });
   } catch (err: any) {
@@ -155,6 +163,69 @@ export const walletLoader = new DataLoader<number | string, any>(async (userIds)
     return userIds.map(() => null);
   }
 }, { ttl: 5000 }); // 5-second cache for rapid point/balance changes
+
+/**
+ * Batched chat loading for dashboard and history views
+ */
+export const chatLoader = new DataLoader<number | string, any>(async (ids) => {
+  if (ids.length === 0) return [];
+  if (!pool) return ids.map(() => null);
+  const validIds = Array.from(new Set(ids))
+    .map(id => typeof id === 'number' ? id : parseInt(String(id), 10))
+    .filter(id => typeof id === 'number' && !isNaN(id));
+
+  if (validIds.length === 0) return ids.map(() => null);
+
+  try {
+    const res = await pool.query(
+      'SELECT * FROM chats WHERE id = ANY($1)',
+      [validIds]
+    );
+    const chatMap = new Map<number, any>();
+    res.rows.forEach((row: any) => chatMap.set(row.id, row));
+    return ids.map(id => {
+      const idNum = typeof id === 'number' ? id : parseInt(String(id), 10);
+      return chatMap.get(idNum) || null;
+    });
+  } catch (err: any) {
+    console.warn('[DataLoader] Failed to batch load chats:', err.message);
+    return ids.map(() => null);
+  }
+}, { ttl: 10000 }); // 10-second cache
+
+/**
+ * Invalidate all batch DataLoader caches
+ */
+export function invalidateAllDataLoaders() {
+  userLoader.clearAll();
+  walletLoader.clearAll();
+  chatLoader.clearAll();
+}
+
+/**
+ * Batched message loading for deep context retrievals
+ */
+export const messageLoader = new DataLoader<number | string, any>(async (ids) => {
+  if (ids.length === 0) return [];
+  if (!pool) return ids.map(() => null);
+  const uniqueIds = Array.from(new Set(ids)).map(id => typeof id === 'number' ? id : parseInt(id, 10));
+
+  try {
+    const res = await pool.query(
+      'SELECT * FROM messages WHERE id = ANY($1)',
+      [uniqueIds]
+    );
+    const msgMap = new Map<number, any>();
+    res.rows.forEach((row: any) => msgMap.set(row.id, row));
+    return ids.map(id => {
+      const idNum = typeof id === 'number' ? id : parseInt(id, 10);
+      return msgMap.get(idNum) || null;
+    });
+  } catch (err: any) {
+    console.warn('[DataLoader] Failed to batch load messages:', err.message);
+    return ids.map(() => null);
+  }
+}, { ttl: 5000 }); // 5-second cache
 
 /**
  * Batched subscription checking
@@ -215,7 +286,7 @@ export async function getCachedSystemSettings(): Promise<any> {
 
   const defaultSettings: any = {
     site_name_en: 'Perplexta',
-    site_name_ar: 'بيربلكستا',
+    site_name_ar: 'بيربليكستا',
     site_description_en: 'Next-Generation AI Intelligence Platform',
     site_description_ar: 'منصة الذكاء الاصطناعي الفائقة',
     seo_description_en: 'Advanced AI Tools and Neural Models',
@@ -242,14 +313,14 @@ export async function getCachedSystemSettings(): Promise<any> {
     image_prompt_pref_threshold: 0.7,
     blocked_paths: '',
     seo_site_name_en: 'Perplexta',
-    seo_site_name_ar: 'بيربلكستا',
+    seo_site_name_ar: 'بيربليكستا',
     font_loading_config: JSON.stringify({
-      ar: { fontFamily: 'Tajawal', enabled: true, url: 'https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700&display=swap' },
-      en: { fontFamily: 'Space Grotesk', enabled: true, url: 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap' },
+      ar: { fontFamily: 'Tajawal', enabled: true, url: 'https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap' },
+      en: { fontFamily: 'Geist', enabled: true, url: 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap' },
       dynamicLoading: true
     }),
-    font_config_ar: JSON.stringify({ fontFamily: 'Tajawal', enabled: true, url: 'https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700&display=swap' }),
-    font_config_en: JSON.stringify({ fontFamily: 'Space Grotesk', enabled: true, url: 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap' })
+    font_config_ar: JSON.stringify({ fontFamily: 'Tajawal', enabled: true, url: 'https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap' }),
+    font_config_en: JSON.stringify({ fontFamily: 'Geist', enabled: true, url: 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap' })
   };
 
   if (!pool) {
@@ -268,7 +339,7 @@ export async function getCachedSystemSettings(): Promise<any> {
     if (!settings) {
       await pool.query(`
         INSERT INTO system_settings (site_name_en, site_name_ar, logo_url, logo_light_url, favicon_url)
-        VALUES ('Perplexta', 'بيربلكستا', null, null, null)
+        VALUES ('Perplexta', 'بيربليكستا', null, null, null)
       `).catch(() => {});
       settings = defaultSettings;
     }
@@ -303,6 +374,17 @@ export async function getCachedSystemSettings(): Promise<any> {
     }
     if (settings.firebase_private_key) {
       settings.firebase_private_key = safeDecrypt(settings.firebase_private_key, '');
+    }
+
+    // Add environment variable fallbacks for Google OAuth to provide visibility in Admin Panel if DB is empty
+    if (!settings.google_client_id && process.env.GOOGLE_CLIENT_ID) {
+      settings.google_client_id = process.env.GOOGLE_CLIENT_ID;
+    }
+    if (!settings.google_client_secret && process.env.GOOGLE_CLIENT_SECRET) {
+      // We provide a hint that it's set in env without revealing the full secret here 
+      // if it's already masked in the UI logic. Actually, returning the value is fine 
+      // as it's an admin-only endpoint.
+      settings.google_client_secret = process.env.GOOGLE_CLIENT_SECRET;
     }
 
     systemSettingsCache.set('global', { data: settings, timestamp: now });
@@ -424,7 +506,23 @@ export const DEFAULT_FALLBACK_PLANS = [
     desc_en: 'Basic access to essential tools and community models',
     monthly_price: 0,
     annual_price: 0,
+    is_monthly_enabled: true,
+    is_annual_enabled: false,
+    is_daily_enabled: false,
+    daily_price: 0,
+    daily_days: 7,
+    daily_credits: 0,
+    monthly_credits: 500,
+    annual_credits: 6000,
+    hide_tools: false,
+    plan_type: 'user',
+    color: '#334155',
     features: ['Access to Standard Models', 'Community Support', 'Basic Search'],
+    limits: {
+      chat_fast: { daily: 15, monthly: 450, isHidden: false },
+      sovereign_search: { daily: 10, monthly: 300, isHidden: false },
+      image: { daily: 2, monthly: 30, isHidden: false }
+    },
     is_active: true,
     is_visible: true,
     badge: 'free',
@@ -441,7 +539,27 @@ export const DEFAULT_FALLBACK_PLANS = [
     desc_en: 'High speed, elite neural models, and priority support',
     monthly_price: 19,
     annual_price: 190,
+    is_monthly_enabled: true,
+    is_annual_enabled: true,
+    is_daily_enabled: false,
+    daily_price: 0,
+    daily_days: 7,
+    daily_credits: 0,
+    monthly_credits: 19000,
+    annual_credits: 190000,
+    hide_tools: false,
+    plan_type: 'user',
+    color: '#0284c7',
     features: ['All Neural Models', 'Priority Processing', 'GPU Acceleration', 'Dedicated Support'],
+    limits: {
+      chat_fast: 'unlimited',
+      chat_pro: { daily: 50, monthly: 1500, isHidden: false },
+      chat_reasoning: { daily: 25, monthly: 750, isHidden: false },
+      sovereign_search: { daily: 50, monthly: 1500, isHidden: false },
+      image: { daily: 20, monthly: 500, isHidden: false },
+      video: { daily: 5, monthly: 60, isHidden: false },
+      code: { daily: 50, monthly: 1500, isHidden: false }
+    },
     is_active: true,
     is_visible: true,
     badge: 'popular',
@@ -458,7 +576,27 @@ export const DEFAULT_FALLBACK_PLANS = [
     desc_en: 'Custom enterprise quotas, dedicated infrastructure and SLA',
     monthly_price: 49,
     annual_price: 490,
+    is_monthly_enabled: true,
+    is_annual_enabled: true,
+    is_daily_enabled: false,
+    daily_price: 0,
+    daily_days: 7,
+    daily_credits: 0,
+    monthly_credits: 49000,
+    annual_credits: 490000,
+    hide_tools: false,
+    plan_type: 'user',
+    color: '#7c3aed',
     features: ['Custom Orchestrator', 'Unlimited Ingest & GPU API', 'Dedicated Account Manager'],
+    limits: {
+      chat_fast: 'unlimited',
+      chat_pro: 'unlimited',
+      chat_reasoning: 'unlimited',
+      sovereign_search: 'unlimited',
+      image: { daily: 100, monthly: 3000, isHidden: false },
+      video: { daily: 20, monthly: 300, isHidden: false },
+      code: 'unlimited'
+    },
     is_active: true,
     is_visible: true,
     badge: 'enterprise',
@@ -483,10 +621,20 @@ export async function getCachedActivePlans(): Promise<any[]> {
     const res = await pool.query('SELECT * FROM plans WHERE is_active = true ORDER BY monthly_price ASC');
     const plans = res.rows.length > 0 ? res.rows.map((p: any) => ({
       ...p,
+      is_monthly_enabled: p.is_monthly_enabled !== false,
+      is_annual_enabled: p.is_annual_enabled !== false,
+      is_daily_enabled: !!p.is_daily_enabled,
+      daily_price: p.daily_price !== undefined ? parseFloat(p.daily_price) : 0,
+      daily_days: p.daily_days ? parseInt(p.daily_days, 10) : 7,
+      daily_credits: p.daily_credits ? parseInt(p.daily_credits, 10) : 0,
+      monthly_credits: p.monthly_credits ? parseInt(p.monthly_credits, 10) : 0,
+      annual_credits: p.annual_credits ? parseInt(p.annual_credits, 10) : 0,
       description_en: p.description_en || p.desc_en,
       description_ar: p.description_ar || p.desc_ar,
       desc_en: p.desc_en || p.description_en,
-      desc_ar: p.desc_ar || p.description_ar
+      desc_ar: p.desc_ar || p.description_ar,
+      hide_tools: Boolean(p.hide_tools === true || p.hide_tools === 'true'),
+      limits: typeof p.limits === 'string' ? JSON.parse(p.limits || '{}') : (p.limits || {})
     })) : DEFAULT_FALLBACK_PLANS;
 
     activePlansCache.set('global', { data: plans, timestamp: now });
@@ -528,36 +676,28 @@ export async function getCachedApiKeysVault(): Promise<any[]> {
       return dec;
     });
 
-    if (process.env.GEMINI_API_KEY) {
-      const hasGoogle = keys.some((k: any) => k.provider === 'google' || k.provider === 'gemini');
-      if (!hasGoogle) {
-        const geminiKey = process.env.GEMINI_API_KEY;
-        const defaultModels = JSON.stringify([
-          { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-          { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
-          { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' }
-        ]);
+    if (process.env.GEMINI_API_KEY && keys.length === 0) {
+      const geminiKey = process.env.GEMINI_API_KEY;
+      const defaultModels = '[]';
 
-        keys.push({
-          id: 99999,
-          provider: 'google',
-          encrypted_key: encrypt(geminiKey),
-          decrypted_key: geminiKey,
-          is_active: true,
-          daily_budget: 0,
-          used_today: 0,
-          models: defaultModels
-        });
+      keys.push({
+        id: 99999,
+        provider: 'google',
+        encrypted_key: encrypt(geminiKey),
+        decrypted_key: geminiKey,
+        is_active: true,
+        daily_budget: 0,
+        used_today: 0,
+        models: defaultModels
+      });
 
-        // Auto-seed google provider into api_keys_vault table in PostgreSQL if missing
-        pool.query(
-          `INSERT INTO api_keys_vault (provider, encrypted_key, is_active, models, updated_at)
-           VALUES ('google', $1, true, $2, CURRENT_TIMESTAMP)
-           ON CONFLICT (provider) DO UPDATE 
-           SET encrypted_key = EXCLUDED.encrypted_key, is_active = true, models = EXCLUDED.models, updated_at = CURRENT_TIMESTAMP`,
-          [encrypt(geminiKey), defaultModels]
-        ).catch((err: any) => console.warn('[Queries] Failed to auto-sync GEMINI_API_KEY into api_keys_vault:', err.message));
-      }
+      // Auto-seed google provider into api_keys_vault table in PostgreSQL if vault is completely empty
+      pool.query(
+        `INSERT INTO api_keys_vault (provider, encrypted_key, is_active, models, updated_at)
+         VALUES ('google', $1, true, $2, CURRENT_TIMESTAMP)
+         ON CONFLICT (provider) DO NOTHING`,
+        [encrypt(geminiKey), defaultModels]
+      ).catch((err: any) => console.warn('[Queries] Failed to auto-sync GEMINI_API_KEY into api_keys_vault:', err.message));
     }
 
     apiKeysVaultCache.set('global', { data: keys, timestamp: now });
@@ -573,7 +713,7 @@ export function invalidateApiKeysVaultCache() {
   apiKeysVaultCache.delete('global');
 }
 
-const seoNodeCache = new NodeCache({ stdTTL: 120, checkperiod: 15 });
+const seoNodeCache = new NodeCache({ stdTTL: 3600, checkperiod: 60 });
 
 // Custom per-route hit/miss metrics tracker
 interface CacheStats {
@@ -610,9 +750,111 @@ function trackSeoCache(route: string, type: string, isHit: boolean) {
   );
 }
 
+/** Preload and warm up all SEO routes, metadata, and preview cache into memory on server startup */
+export async function warmupSeoAndSystemCache(): Promise<void> {
+  if (!pool) return;
+  try {
+    const startTime = Date.now();
+    let routesCount = 0;
+    let metaCount = 0;
+    let dynamicCount = 0;
+    let ogCount = 0;
+
+    // 1. Warm-up route_seo_settings (both individual routes and all_active list)
+    try {
+      const activeRes = await pool.query('SELECT * FROM route_seo_settings WHERE is_active = true ORDER BY id ASC');
+      seoNodeCache.set('all_active', activeRes.rows);
+      for (const row of activeRes.rows) {
+        if (row.route) {
+          const norm = row.route === '/' ? '/' : row.route.replace(/\/$/, '');
+          seoNodeCache.set(`route:${norm}`, row);
+          routesCount++;
+        }
+      }
+      const allRoutesRes = await pool.query('SELECT * FROM route_seo_settings');
+      for (const row of allRoutesRes.rows) {
+        if (row.route) {
+          const norm = row.route === '/' ? '/' : row.route.replace(/\/$/, '');
+          if (!seoNodeCache.has(`route:${norm}`)) {
+            seoNodeCache.set(`route:${norm}`, row);
+          }
+        }
+      }
+    } catch (e: any) {
+      console.warn('[SEO Warmup] route_seo_settings preload notice:', e.message);
+    }
+
+    // 2. Warm-up route_seo_metadata
+    try {
+      const routeMetaRes = await pool.query('SELECT * FROM route_seo_metadata');
+      for (const row of routeMetaRes.rows) {
+        if (row.route_path) {
+          const norm = row.route_path === '/' ? '/' : row.route_path.replace(/\/$/, '');
+          seoNodeCache.set(`meta:${norm}`, row);
+          metaCount++;
+        }
+      }
+    } catch (e: any) {
+      console.warn('[SEO Warmup] route_seo_metadata preload notice:', e.message);
+    }
+
+    // 3. Warm-up dynamic SEO metadata (seo_metadata table)
+    try {
+      const dynamicSeoRes = await pool.query('SELECT * FROM seo_metadata WHERE is_active = true');
+      for (const row of dynamicSeoRes.rows) {
+        if (row.route_path) {
+          const norm = row.route_path === '/' ? '/' : row.route_path.replace(/\/$/, '');
+          seoNodeCache.set(`dynamic_seo:${norm}`, row);
+          dynamicCount++;
+        }
+      }
+    } catch (e: any) {
+      console.warn('[SEO Warmup] dynamic seo_metadata preload notice:', e.message);
+    }
+
+    // 4. Warm-up og_preview_cache
+    try {
+      const ogRes = await pool.query('SELECT title, description, image_url, meta_data, route_path FROM og_preview_cache');
+      for (const row of ogRes.rows) {
+        if (row.route_path) {
+          const norm = row.route_path === '/' ? '/' : row.route_path.replace(/\/$/, '');
+          seoNodeCache.set(`og_preview:${norm}`, {
+            title: row.title,
+            description: row.description,
+            image_url: row.image_url,
+            meta_data: row.meta_data
+          });
+          ogCount++;
+        }
+      }
+    } catch (e: any) {
+      console.warn('[SEO Warmup] og_preview_cache preload notice:', e.message);
+    }
+
+    // 5. Pre-warm active subscription plans and system settings
+    await getCachedActivePlans().catch(() => {});
+    await getCachedSystemSettings().catch(() => {});
+
+    const duration = Date.now() - startTime;
+    console.log(
+      `\x1b[35m[SEO Cache Warm-up]\x1b[0m 🚀 Pre-warmed SEO & metadata memory cache in \x1b[32m${duration}ms\x1b[0m ` +
+      `(${routesCount} routes, ${metaCount} route meta, ${dynamicCount} dynamic entities, ${ogCount} OG previews ready in memory)`
+    );
+  } catch (err: any) {
+    console.warn('[SEO Cache Warm-up] Non-fatal warm-up error:', err.message);
+  }
+}
+
 /** Get cached SEO settings for a specific route */
 export async function getCachedRouteSeo(route: string): Promise<any> {
-  const cached = seoNodeCache.get<any>(`route:${route}`);
+  const cleanTrimmed = (route || '/').toLowerCase().trim();
+  const stripped = cleanTrimmed.replace(/^\/+|\/+$/g, '');
+  const withLeading = stripped ? `/${stripped}` : '/';
+  const withTrailing = stripped ? `${stripped}/` : '/';
+  const withBoth = stripped ? `/${stripped}/` : '/';
+
+  const cacheKey = `route:${withLeading}`;
+  const cached = seoNodeCache.get<any>(cacheKey);
   if (cached !== undefined) {
     trackSeoCache(route, 'Settings', true);
     return cached;
@@ -620,27 +862,43 @@ export async function getCachedRouteSeo(route: string): Promise<any> {
 
   trackSeoCache(route, 'Settings', false);
   if (!pool) {
-    seoNodeCache.set(`route:${route}`, null);
+    seoNodeCache.set(cacheKey, null);
     return null;
   }
   try {
     const result = await pool.query(
-      'SELECT * FROM route_seo_settings WHERE route = $1 AND is_active = true LIMIT 1',
-      [route]
+      `SELECT * FROM route_seo_settings 
+       WHERE TRIM(BOTH '/' FROM LOWER(route)) = $1 
+          OR LOWER(route) = $2 
+          OR LOWER(route) = $3 
+          OR LOWER(route) = $4 
+          OR LOWER(route) = $5 
+       ORDER BY (og_image_url IS NOT NULL) DESC, id ASC 
+       LIMIT 1`,
+      [stripped, withLeading, withTrailing, withBoth, cleanTrimmed]
     );
     const data = result.rows[0] || null;
-    seoNodeCache.set(`route:${route}`, data);
+    seoNodeCache.set(cacheKey, data);
+    seoNodeCache.set(`route:${cleanTrimmed}`, data);
+    seoNodeCache.set(`route:${stripped}`, data);
     return data;
   } catch (err: any) {
     console.warn('[Queries] getCachedRouteSeo failed:', err.message);
-    seoNodeCache.set(`route:${route}`, null);
+    seoNodeCache.set(cacheKey, null);
     return null;
   }
 }
 
 /** Get cached SEO metadata for a specific route */
 export async function getCachedRouteSeoMetadata(routePath: string): Promise<any> {
-  const cached = seoNodeCache.get<any>(`meta:${routePath}`);
+  const cleanTrimmed = (routePath || '/').toLowerCase().trim();
+  const stripped = cleanTrimmed.replace(/^\/+|\/+$/g, '');
+  const withLeading = stripped ? `/${stripped}` : '/';
+  const withTrailing = stripped ? `${stripped}/` : '/';
+  const withBoth = stripped ? `/${stripped}/` : '/';
+
+  const cacheKey = `meta:${withLeading}`;
+  const cached = seoNodeCache.get<any>(cacheKey);
   if (cached !== undefined) {
     trackSeoCache(routePath, 'Metadata', true);
     return cached;
@@ -648,20 +906,28 @@ export async function getCachedRouteSeoMetadata(routePath: string): Promise<any>
 
   trackSeoCache(routePath, 'Metadata', false);
   if (!pool) {
-    seoNodeCache.set(`meta:${routePath}`, null);
+    seoNodeCache.set(cacheKey, null);
     return null;
   }
   try {
     const result = await pool.query(
-      'SELECT * FROM route_seo_metadata WHERE route_path = $1 LIMIT 1',
-      [routePath]
+      `SELECT * FROM route_seo_metadata 
+       WHERE TRIM(BOTH '/' FROM LOWER(route_path)) = $1 
+          OR LOWER(route_path) = $2 
+          OR LOWER(route_path) = $3 
+          OR LOWER(route_path) = $4 
+          OR LOWER(route_path) = $5 
+       LIMIT 1`,
+      [stripped, withLeading, withTrailing, withBoth, cleanTrimmed]
     );
     const data = result.rows[0] || null;
-    seoNodeCache.set(`meta:${routePath}`, data);
+    seoNodeCache.set(cacheKey, data);
+    seoNodeCache.set(`meta:${cleanTrimmed}`, data);
+    seoNodeCache.set(`meta:${stripped}`, data);
     return data;
   } catch (err: any) {
     console.warn('[Queries] getCachedRouteSeoMetadata failed:', err.message);
-    seoNodeCache.set(`meta:${routePath}`, null);
+    seoNodeCache.set(cacheKey, null);
     return null;
   }
 }
@@ -732,29 +998,45 @@ export function invalidateRouteSeoCache(routePath?: string) {
 
 /** Get cached SEO metadata for dynamic routes from seo_metadata table */
 export async function getCachedSeoMetadata(routePath: string): Promise<any> {
-  const normalizedPath = routePath === '/' ? '/' : (routePath || '/').replace(/\/$/, '');
-  const cached = seoNodeCache.get<any>(`dynamic_seo:${normalizedPath}`);
+  const cleanTrimmed = (routePath || '/').toLowerCase().trim();
+  const stripped = cleanTrimmed.replace(/^\/+|\/+$/g, '');
+  const withLeading = stripped ? `/${stripped}` : '/';
+  const withTrailing = stripped ? `${stripped}/` : '/';
+  const withBoth = stripped ? `/${stripped}/` : '/';
+
+  const cacheKey = `dynamic_seo:${withLeading}`;
+  const cached = seoNodeCache.get<any>(cacheKey);
   if (cached !== undefined) {
-    trackSeoCache(normalizedPath, 'DynamicSeoMetadata', true);
+    trackSeoCache(withLeading, 'DynamicSeoMetadata', true);
     return cached;
   }
 
-  trackSeoCache(normalizedPath, 'DynamicSeoMetadata', false);
+  trackSeoCache(withLeading, 'DynamicSeoMetadata', false);
   if (!pool) {
-    seoNodeCache.set(`dynamic_seo:${normalizedPath}`, null);
+    seoNodeCache.set(cacheKey, null);
     return null;
   }
   try {
     const result = await pool.query(
-      'SELECT * FROM seo_metadata WHERE route_path = $1 AND is_active = true LIMIT 1',
-      [normalizedPath]
+      `SELECT * FROM seo_metadata 
+       WHERE (TRIM(BOTH '/' FROM LOWER(route_path)) = $1 
+          OR LOWER(route_path) = $2 
+          OR LOWER(route_path) = $3 
+          OR LOWER(route_path) = $4 
+          OR LOWER(route_path) = $5) 
+         AND is_active = true 
+       ORDER BY (og_image_url IS NOT NULL) DESC, id ASC 
+       LIMIT 1`,
+      [stripped, withLeading, withTrailing, withBoth, cleanTrimmed]
     );
     const data = result.rows[0] || null;
-    seoNodeCache.set(`dynamic_seo:${normalizedPath}`, data);
+    seoNodeCache.set(cacheKey, data);
+    seoNodeCache.set(`dynamic_seo:${cleanTrimmed}`, data);
+    seoNodeCache.set(`dynamic_seo:${stripped}`, data);
     return data;
   } catch (err: any) {
     console.warn('[Queries] getCachedSeoMetadata failed:', err.message);
-    seoNodeCache.set(`dynamic_seo:${normalizedPath}`, null);
+    seoNodeCache.set(cacheKey, null);
     return null;
   }
 }

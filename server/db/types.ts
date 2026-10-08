@@ -159,7 +159,6 @@ export interface ToolOrchestrator {
   task_description: string | null;
   task_description_ar: string | null;
   is_active: boolean;
-  cost_per_usage: number;
   max_history_depth: number;
   updated_at: Date | string;
   protocol_config: any;
@@ -676,6 +675,10 @@ export interface BulletinPage {
   followers_count: number;
   ads_count: number;
   user_is_following?: boolean;
+  owner_name?: string;
+  owner_avatar?: string;
+  owner_username?: string;
+  owner_email?: string;
   managers?: string | any[] | null;
   created_at: Date | string;
   updated_at: Date | string;
@@ -759,6 +762,13 @@ export interface BulletinAd {
   boosted_until?: Date | string | null;
   boost_tier?: string | null;
   boost_price?: number;
+  boost_goal?: string | null;
+  boost_daily_budget?: number;
+  boost_settings?: any;
+  audio_url?: string | null;
+  audio_title?: string | null;
+  audio_artist?: string | null;
+  audio_track_id?: string | null;
   starts_at?: Date | string | null;
   expires_at?: Date | string | null;
   created_at: Date | string;

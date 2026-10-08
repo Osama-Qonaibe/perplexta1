@@ -35,16 +35,16 @@ export const ELEVATION = {
  * Concentric Radii Scale
  */
 export const CONCENTRIC_RADII = {
-  button: 'rounded-lg',       // 8px - buttons, inputs, menu action items
-  input: 'rounded-lg',
-  actionItem: 'rounded-lg',
-  popover: 'rounded-xl',      // 12px - popovers, modals, containers, floating cards
-  modal: 'rounded-xl',
-  container: 'rounded-xl',
-  card: 'rounded-xl',
-  badge: 'rounded-md',        // 6px - mini badges, segmented control chips
-  chip: 'rounded-md',
-  avatar: 'rounded-full',     // 9999px - live status dots, user avatars
+  button: 'rounded-[var(--radius-sm)]',       // 8px - buttons, inputs, menu action items
+  input: 'rounded-[var(--radius-sm)]',
+  actionItem: 'rounded-[var(--radius-sm)]',
+  popover: 'rounded-[var(--radius-md)]',      // 12px - popovers, modals, containers, floating cards
+  modal: 'rounded-[var(--radius-md)]',
+  container: 'rounded-[var(--radius-md)]',
+  card: 'rounded-[var(--radius-md)]',
+  badge: 'rounded-[var(--radius-xs)]',        // 4px-6px - mini badges, segmented control chips
+  chip: 'rounded-[var(--radius-xs)]',
+  avatar: 'rounded-full',                     // 9999px - live status dots, user avatars
   statusDot: 'rounded-full',
 } as const;
 
@@ -59,7 +59,7 @@ export const GLASSMORPHIC_LAYERS = {
  */
 export const GLASS_SURFACE = {
   // Popovers, Dropdowns, Floating Menus
-  popover: 'backdrop-blur-xl bg-[var(--pub-surface-container,var(--surface-card))] border border-[var(--pub-border-default,var(--border-default))] shadow-2xl ring-1 ring-black/5 dark:ring-white/10',
+  popover: 'backdrop-blur-xl bg-[var(--surface-card)] border border-[var(--border-default)] shadow-2xl ring-1 ring-black/5 dark:ring-white/10',
   // Modals & Dialogs
   modal: 'backdrop-blur-2xl bg-[var(--surface-card)] border border-[var(--border-default)] shadow-2xl ring-1 ring-black/10 dark:ring-white/15',
   // Navigation & Headers

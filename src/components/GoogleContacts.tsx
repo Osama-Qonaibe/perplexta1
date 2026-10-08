@@ -439,18 +439,16 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
       
       {/* 1. DISCONNECTED BANNER / INTRO */}
       {!isConnected ? (
-        <div className="p-8 md:p-12 rounded-[var(--radius)] border bg-[var(--surface-subtle)]/60 border-[var(--border-default)]/40 shadow-2xl relative overflow-hidden flex flex-col items-center text-center">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-gray-500/10 via-transparent to-transparent pointer-events-none" />
-          
-          <div className="w-16 h-16 rounded-[4px] bg-accent/10 flex items-center justify-center text-accent mb-6 shadow-[0_0_20px_rgba(156,163,175,0.15)] animate-pulse">
+        <div className="p-8 md:p-12 rounded-[var(--radius-md)] border bg-[var(--surface-subtle)] border-[var(--border-default)] shadow-2xl relative overflow-hidden flex flex-col items-center text-center">
+          <div className="w-16 h-16 rounded-[var(--radius-sm)] bg-[var(--surface-subtle)] border border-[var(--border-accent)] flex items-center justify-center text-[var(--fg-accent)] mb-6 animate-pulse">
             <Users size={32} />
           </div>
 
-          <h2 className="text-xl md:text-2xl font-black tracking-tight mb-3">
+          <h2 className="text-xl md:text-2xl font-black tracking-tight mb-3 text-[var(--text-primary)]">
             {isAr ? 'مركز ذكاء جهات اتصال Google' : 'Google Contacts Intelligence Hub'}
           </h2>
 
-          <p className="text-xs md:text-sm text-gray-500 max-w-xl leading-relaxed mb-8">
+          <p className="text-xs md:text-sm text-[var(--text-muted)] max-w-xl leading-relaxed mb-8">
             {isAr 
               ? 'اربط حساب Google الخاص بك لاستيراد جهات الاتصال وإدارتها ومزامنتها مباشرةً في نظام بيربليكستا الاحترافي لربط علاقات المطورين والمؤسسات بمرونة وموثوقية.' 
               : 'Connect your Google Workspace or Personal Account to import, organize, edit, and sync contacts natively in Perplexta. Seamlessly search and manage business networks with zero local storage.'
@@ -460,13 +458,13 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
           <button
             onClick={handleConnect}
             disabled={isConnecting}
-            className="gsi-material-button scale-105 active:scale-95 transition-transform duration-200 cursor-pointer shadow-lg"
+            className="gsi-material-button scale-105 active:scale-95 transition-transform duration-base cursor-pointer shadow-lg"
           >
             <div className="gsi-material-button-state"></div>
             <div className="gsi-material-button-content-wrapper">
               <div className="gsi-material-button-icon">
                 {isConnecting ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-accent" />
+                  <Loader2 className="w-5 h-5 animate-spin text-[var(--fg-accent)]" />
                 ) : (
                   <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style={{ display: "block" }}>
                     <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
@@ -485,9 +483,9 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
             </div>
           </button>
 
-          <div className="mt-8 flex items-center gap-2 text-gray-500">
-            <ShieldCheck size={14} className="text-accent" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">
+          <div className="mt-8 flex items-center gap-2 text-[var(--text-muted)]">
+            <ShieldCheck size={14} className="text-[var(--fg-accent)]" />
+            <span className="text-xs font-bold uppercase tracking-wider">
               {isAr ? 'أمان وسرية تامة لمزودي الخدمة الطرف الثالث' : 'OAuth 2.0 Secure Sandbox Pipeline'}
             </span>
           </div>
@@ -498,27 +496,27 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
         <div className="space-y-6">
           
           {/* Active Account Status Bar */}
-          <div className="flex flex-col sm:flex-row items-center justify-between p-4 rounded-xl border bg-[var(--surface-subtle)] border-[var(--border-default)] gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between p-4 rounded-shape-lg border bg-[var(--surface-subtle)] border-[var(--border-main)] gap-4">
             <div className="flex items-center gap-3">
               {googleUser?.photoURL ? (
                 <img 
                   src={googleUser.photoURL} 
                   alt="Avatar" 
-                  className="w-10 h-10 rounded-[4px] border border-accent/20 shadow-md"
+                  className="w-10 h-10 rounded-shape-xs border border-[var(--border-accent)] shadow-md"
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="w-10 h-10 rounded-[4px] bg-accent/10 flex items-center justify-center text-accent border border-accent/20">
+                <div className="w-10 h-10 rounded-shape-xs bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--fg-accent)] border border-[var(--border-accent)]">
                   <UserCheck size={18} />
                 </div>
               )}
               <div className="flex flex-col text-start">
-                <span className="text-xs font-bold text-accent flex items-center gap-1">
+                <span className="text-xs font-bold text-[var(--fg-accent)] flex items-center gap-1">
                   <UserCheck2 size={12} />
                   {isAr ? 'حساب متصل بنجاح' : 'Google Account Sync Active'}
                 </span>
-                <span className="text-sm font-black truncate max-w-xs">{googleUser?.displayName || 'Google Member'}</span>
-                <span className="text-[10px] text-gray-500 tracking-wide font-mono">{googleUser?.email}</span>
+                <span className="text-sm font-black truncate max-w-xs text-[var(--text-primary)]">{googleUser?.displayName || 'Google Member'}</span>
+                <span className="text-xs text-[var(--text-muted)] tracking-wide font-mono">{googleUser?.email}</span>
               </div>
             </div>
 
@@ -526,17 +524,17 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
               <button
                 onClick={() => fetchContacts()}
                 disabled={isLoading}
-                className="w-10 h-10 flex items-center justify-center rounded-[var(--radius)] border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-400 hover:text-accent transition-theme"
+                className="w-10 h-10 flex items-center justify-center rounded-shape-sm border border-transparent hover:bg-[var(--surface-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-theme touch-target-44"
                 title={isAr ? 'تحديث جهات الاتصال' : 'Refresh contacts'}
               >
-                <RefreshCw size={16} className={isLoading ? 'animate-spin text-accent' : ''} />
+                <RefreshCw size={16} className={isLoading ? 'animate-spin text-[var(--fg-accent)]' : ''} />
               </button>
               
-              <div className="w-px h-5 bg-gray-200 dark:bg-gray-800/80" />
+              <div className="w-px h-5 bg-[var(--border-main)]" />
 
               <button
                 onClick={handleDisconnect}
-                className="px-3 py-1.5 rounded-[var(--radius)] border border-red-500/20 hover:bg-red-500/10 text-red-500 transition-theme font-bold text-xs flex items-center gap-1"
+                className="px-3 py-1.5 rounded-shape-sm border border-red-500/20 hover:bg-red-500/10 text-red-500 transition-theme font-bold text-xs flex items-center gap-1 touch-target-44"
               >
                 <LogOut size={13} />
                 <span>{isAr ? 'قطع الاتصال' : 'Disconnect'}</span>
@@ -548,21 +546,21 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
             
             {/* Left Column: Explorer Area */}
-            <div className="lg:col-span-5 flex flex-col rounded-xl border bg-[var(--surface-subtle)] border-[var(--border-default)] overflow-hidden min-h-[500px]">
+            <div className="lg:col-span-5 flex flex-col rounded-shape-md border bg-[var(--surface-subtle)] border-[var(--border-main)] overflow-hidden min-h-[500px]">
               
               {/* Explorer Header */}
-              <div className="p-4 border-b border-[var(--border-default)]/50 flex flex-col gap-3 flex-none">
+              <div className="p-4 border-b border-[var(--border-main)] flex flex-col gap-3 flex-none">
                 
                 {/* Search Bar with Provider Selector */}
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                     <input
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder={isAr ? 'بحث بالاسم، البريد أو الهاتف...' : 'Search contacts, emails, titles...'}
-                      className="w-full pl-9 pr-4 py-2 text-xs rounded-lg bg-[var(--surface-subtle)] border border-[var(--border-default)] focus:border-accent focus:shadow-[0_0_8px_rgba(156,163,175,0.15)] outline-none transition-theme font-sans"
+                      className="w-full ps-9 pe-4 py-2 text-xs rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-main)] focus:border-[var(--border-accent)] outline-none transition-theme font-sans text-[var(--text-primary)]"
                     />
                   </div>
                   
@@ -580,7 +578,7 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
 
                 {/* Scope Toggles & Add Button */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center bg-gray-100 dark:bg-gray-800/80 p-1 rounded-lg gap-1">
+                  <div className="flex items-center bg-[var(--surface-inset)] p-1 rounded-lg gap-1 border border-[var(--border-default)]/40">
                     <button
                       onClick={() => {
                         setActiveSource('connections');
@@ -588,8 +586,8 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                       }}
                       className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-theme ${
                         activeSource === 'connections' 
-                          ? 'bg-white dark:bg-gray-700 text-accent shadow-sm' 
-                          : 'text-gray-400 hover:text-accent'
+                          ? 'bg-[var(--surface-card)] text-accent shadow-sm' 
+                          : 'text-[var(--text-muted)] hover:text-accent'
                       }`}
                     >
                       {isAr ? 'جهات اتصالي' : 'Connections'}
@@ -601,8 +599,8 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                       }}
                       className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-theme ${
                         activeSource === 'directory' 
-                          ? 'bg-white dark:bg-gray-700 text-accent shadow-sm' 
-                          : 'text-gray-400 hover:text-accent'
+                          ? 'bg-[var(--surface-card)] text-accent shadow-sm' 
+                          : 'text-[var(--text-muted)] hover:text-accent'
                       }`}
                     >
                       {isAr ? 'دليل المؤسسة' : 'Directory'}
@@ -642,7 +640,7 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                         className={`p-3 rounded-lg flex items-center justify-between cursor-pointer border transition-theme relative ${
                           isSelected 
                             ? 'bg-accent/5 border-accent/20 text-accent' 
-                            : 'border-transparent hover:bg-gray-50/50 dark:hover:bg-gray-800/10 text-gray-400'
+                            : 'border-transparent hover:bg-[var(--surface-card)] text-[var(--text-muted)]'
                         }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
@@ -650,20 +648,20 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                             <img 
                               src={contact.photoUrl} 
                               alt="Profile" 
-                              className="w-8 h-8 rounded-[4px] border border-gray-200 dark:border-gray-800"
+                              className="w-8 h-8 rounded-[var(--radius-xs)] border border-[var(--border-default)]"
                               referrerPolicy="no-referrer"
                             />
                           ) : (
-                            <div className="w-8 h-8 rounded-[4px] bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0">
+                            <div className="w-8 h-8 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] flex items-center justify-center shrink-0">
                               <span className="text-xs font-bold uppercase">{contact.name.substring(0, 2)}</span>
                             </div>
                           )}
                           <div className="flex flex-col text-start min-w-0">
-                            <span className={`text-xs font-bold truncate ${isSelected ? 'text-accent font-extrabold' : 'text-gray-200'}`}>
+                            <span className={`text-xs font-bold truncate ${isSelected ? 'text-[var(--fg-accent)] font-extrabold' : 'text-[var(--text-primary)]'}`}>
                               <HighlightText text={contact.name} query={searchQuery} />
                             </span>
                             {contact.organization && (
-                              <span className="text-[9.5px] text-gray-500 truncate mt-0.5 font-sans flex items-center gap-1">
+                              <span className="text-[9.5px] text-[var(--text-muted)] truncate mt-0.5 font-sans flex items-center gap-1">
                                 <Briefcase size={9} />
                                 <HighlightText text={contact.organization} query={searchQuery} /> {contact.jobTitle ? `- ` : ''} <HighlightText text={contact.jobTitle} query={searchQuery} />
                               </span>
@@ -673,13 +671,13 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
 
                         {/* Badges for Directory vs Connection */}
                         {contact.isDirectoryContact ? (
-                          <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-accent/10 text-accent uppercase tracking-widest">
+                          <span className="text-[8px] font-black px-1.5 py-0.5 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] text-[var(--fg-accent)] uppercase tracking-widest border border-[var(--border-accent)]">
                             {isAr ? 'مؤسسي' : 'Domain'}
                           </span>
                         ) : null}
 
                         {isSelected && (
-                          <div className={`absolute top-1/2 -translate-y-1/2 w-[3px] h-4 bg-accent ${
+                          <div className={`absolute top-1/2 -translate-y-1/2 w-[3px] h-4 bg-[var(--fg-accent)] ${
                             dir === 'rtl' ? 'right-0 rounded-l-[1.5px]' : 'left-0 rounded-r-[1.5px]'
                           }`} />
                         )}
@@ -687,8 +685,8 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                     );
                   })
                 ) : (
-                  <div className="p-12 text-center flex flex-col items-center justify-center text-gray-500">
-                    <Users size={24} className="mb-2 opacity-50 text-gray-400" />
+                  <div className="p-12 text-center flex flex-col items-center justify-center text-[var(--text-muted)]">
+                    <Users size={24} className="mb-2 opacity-50 text-[var(--text-muted)]" />
                     <span className="text-xs font-bold">
                       {activeSource === 'directory' 
                         ? (isAr ? 'ابحث في دليل المؤسسة أعلاه.' : 'Search the enterprise directory above.')
@@ -701,7 +699,7 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
             </div>
 
             {/* Right Column: Details & Actions Area */}
-            <div className="lg:col-span-7 flex flex-col rounded-xl border bg-[var(--surface-subtle)] border-[var(--border-default)] overflow-hidden min-h-[500px]">
+            <div className="lg:col-span-7 flex flex-col rounded-[var(--radius-lg)] border bg-[var(--surface-subtle)] border-[var(--border-default)] overflow-hidden min-h-[500px]">
               
               {/* Selected Contact View */}
               {selectedContact && !isEditing && !isCreating && (
@@ -709,30 +707,30 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                   <div className="space-y-6">
                     
                     {/* Header profile info */}
-                    <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4 pb-6 border-b border-[var(--border-default)]/50">
+                    <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4 pb-6 border-b border-[var(--border-default)]">
                       <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
                         {selectedContact.photoUrl ? (
                           <img 
                             src={selectedContact.photoUrl} 
                             alt="Contact Profile" 
-                            className="w-16 h-16 rounded-[4px] border-2 border-accent/20 shadow-lg object-cover"
+                            className="w-16 h-16 rounded-[var(--radius-xs)] border-2 border-[var(--border-accent)] shadow-lg object-cover"
                             referrerPolicy="no-referrer"
                           />
                         ) : (
-                          <div className="w-16 h-16 rounded-[4px] bg-accent/10 border-2 border-accent/20 text-accent flex items-center justify-center text-xl font-bold shadow-md uppercase">
+                          <div className="w-16 h-16 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] border-2 border-[var(--border-accent)] text-[var(--fg-accent)] flex items-center justify-center text-xl font-bold shadow-md uppercase">
                             {selectedContact.name.substring(0, 2)}
                           </div>
                         )}
 
                         <div className="flex flex-col text-center sm:text-start gap-1">
-                          <h3 className="text-lg font-black text-gray-100">{selectedContact.name}</h3>
+                          <h3 className="text-lg font-black text-[var(--text-primary)]">{selectedContact.name}</h3>
                           {selectedContact.jobTitle || selectedContact.organization ? (
                             <span className="text-xs font-semibold text-accent flex items-center justify-center sm:justify-start gap-1">
                               <Briefcase size={12} />
                               {selectedContact.jobTitle} {selectedContact.jobTitle && selectedContact.organization ? 'at' : ''} {selectedContact.organization}
                             </span>
                           ) : (
-                            <span className="text-xs text-gray-500 italic">{isAr ? 'عضو Google الموثق' : 'Verified Google connection'}</span>
+                            <span className="text-xs text-[var(--text-muted)] italic">{isAr ? 'عضو Google الموثق' : 'Verified Google connection'}</span>
                           )}
                         </div>
                       </div>
@@ -742,14 +740,14 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                         <div className="flex items-center gap-2 shrink-0">
                           <button
                             onClick={() => handleStartEdit(selectedContact)}
-                            className="w-10 h-10 flex items-center justify-center rounded-lg border border-[var(--border-default)] hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-400 hover:text-accent transition-theme"
+                            className="w-10 h-10 flex items-center justify-center rounded-lg border border-[var(--border-default)] hover:bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-accent transition-theme"
                             title={isAr ? 'تعديل جهة الاتصال' : 'Edit details'}
                           >
                             <Edit2 size={14} />
                           </button>
                           <button
                             onClick={() => handleDeleteTrigger(selectedContact)}
-                            className="w-10 h-10 flex items-center justify-center rounded-lg border border-red-500/10 hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-theme"
+                            className="w-10 h-10 flex items-center justify-center rounded-lg border border-red-500/10 hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-500 transition-theme"
                             title={isAr ? 'حذف جهة الاتصال' : 'Delete Contact'}
                           >
                             <Trash2 size={14} />
@@ -763,45 +761,45 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                       
                       {/* Email Card */}
                       <div className="p-4 rounded-lg bg-[var(--surface-page)] border border-[var(--border-default)]/50 space-y-1">
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1">
+                        <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-1">
                           <Mail size={11} className="text-accent" />
                           {isAr ? 'البريد الإلكتروني' : 'Email Address'}
                         </span>
-                        <p className="text-xs font-semibold truncate font-mono text-gray-200">
-                          {selectedContact.email || <span className="text-gray-500 italic">{isAr ? 'غير محدد' : 'Not specified'}</span>}
+                        <p className="text-xs font-semibold truncate font-mono text-[var(--text-primary)]">
+                          {selectedContact.email || <span className="text-[var(--text-muted)] italic">{isAr ? 'غير محدد' : 'Not specified'}</span>}
                         </p>
                       </div>
 
                       {/* Phone Card */}
                       <div className="p-4 rounded-lg bg-[var(--surface-page)] border border-[var(--border-default)]/50 space-y-1">
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1">
+                        <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-1">
                           <Phone size={11} className="text-accent" />
                           {isAr ? 'الهاتف المحمول' : 'Phone Number'}
                         </span>
-                        <p className="text-xs font-semibold truncate font-mono text-gray-200">
-                          {selectedContact.phone || <span className="text-gray-500 italic">{isAr ? 'غير محدد' : 'Not specified'}</span>}
+                        <p className="text-xs font-semibold truncate font-mono text-[var(--text-primary)]">
+                          {selectedContact.phone || <span className="text-[var(--text-muted)] italic">{isAr ? 'غير محدد' : 'Not specified'}</span>}
                         </p>
                       </div>
 
                       {/* Birthday Card */}
                       <div className="p-4 rounded-lg bg-[var(--surface-page)] border border-[var(--border-default)]/50 space-y-1">
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1">
+                        <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-1">
                           <Cake size={11} className="text-accent" />
                           {isAr ? 'تاريخ الميلاد' : 'Birthday'}
                         </span>
-                        <p className="text-xs font-semibold text-gray-200">
-                          {selectedContact.birthday || <span className="text-gray-500 italic">{isAr ? 'غير محدد' : 'Not specified'}</span>}
+                        <p className="text-xs font-semibold text-[var(--text-primary)]">
+                          {selectedContact.birthday || <span className="text-[var(--text-muted)] italic">{isAr ? 'غير محدد' : 'Not specified'}</span>}
                         </p>
                       </div>
 
                       {/* Address Card */}
                       <div className="p-4 rounded-lg bg-[var(--surface-page)] border border-[var(--border-default)]/50 space-y-1">
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1">
+                        <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-1">
                           <MapPin size={11} className="text-accent" />
                           {isAr ? 'الموقع والعنوان' : 'Location Address'}
                         </span>
-                        <p className="text-xs font-semibold text-gray-200">
-                          {selectedContact.address || <span className="text-gray-500 italic">{isAr ? 'غير محدد' : 'Not specified'}</span>}
+                        <p className="text-xs font-semibold text-[var(--text-primary)]">
+                          {selectedContact.address || <span className="text-[var(--text-muted)] italic">{isAr ? 'غير محدد' : 'Not specified'}</span>}
                         </p>
                       </div>
 
@@ -809,12 +807,12 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
 
                     {/* Biography / Notes */}
                     <div className="p-4 rounded-lg bg-[var(--surface-page)] border border-[var(--border-default)]/50 space-y-2">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1">
+                      <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-1">
                         <FileText size={11} className="text-accent" />
                         {isAr ? 'ملاحظات وسياق المهنة' : 'Biography & Professional Context'}
                       </span>
-                      <p className="text-xs leading-relaxed text-gray-300">
-                        {selectedContact.notes || <span className="text-gray-500 italic">{isAr ? 'لا توجد ملاحظات إضافية مسجلة.' : 'No descriptive notes logged.'}</span>}
+                      <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
+                        {selectedContact.notes || <span className="text-[var(--text-muted)] italic">{isAr ? 'لا توجد ملاحظات إضافية مسجلة.' : 'No descriptive notes logged.'}</span>}
                       </p>
                     </div>
 
@@ -846,7 +844,7 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                       <button
                         type="button"
                         onClick={handleCancelForm}
-                        className="w-8 h-8 flex items-center justify-center rounded-[var(--radius)] text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition-theme"
+                        className="w-8 h-8 flex items-center justify-center rounded-shape-sm text-[var(--text-muted)] hover:text-red-500 hover:bg-red-500/10 transition-theme touch-target-44"
                       >
                         <X size={14} />
                       </button>
@@ -856,74 +854,74 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                       
                       {/* Given name */}
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{isAr ? 'الاسم الأول *' : 'First Name *'}</label>
+                        <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">{isAr ? 'الاسم الأول *' : 'First Name *'}</label>
                         <input
                           type="text"
                           required
                           value={formFirstName}
                           onChange={(e) => setFormFirstName(e.target.value)}
                           placeholder={isAr ? 'أدخل الاسم الأول' : 'First name'}
-                          className="w-full px-3 py-2 text-xs rounded-lg bg-[var(--surface-subtle)] border border-[var(--border-default)] focus:border-accent focus:shadow-[0_0_8px_rgba(156,163,175,0.15)] outline-none transition-theme"
+                          className="w-full px-3 py-2 text-xs rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-main)] focus:border-[var(--border-accent)] outline-none transition-theme text-[var(--text-primary)]"
                         />
                       </div>
 
                       {/* Family Name */}
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{isAr ? 'الاسم الأخير' : 'Last Name'}</label>
+                        <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">{isAr ? 'الاسم الأخير' : 'Last Name'}</label>
                         <input
                           type="text"
                           value={formLastName}
                           onChange={(e) => setFormLastName(e.target.value)}
                           placeholder={isAr ? 'الاسم الأخير' : 'Last name'}
-                          className="w-full px-3 py-2 text-xs rounded-lg bg-[var(--surface-subtle)] border border-[var(--border-default)] focus:border-accent focus:shadow-[0_0_8px_rgba(156,163,175,0.15)] outline-none transition-theme"
+                          className="w-full px-3 py-2 text-xs rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-main)] focus:border-[var(--border-accent)] outline-none transition-theme text-[var(--text-primary)]"
                         />
                       </div>
 
                       {/* Email */}
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{isAr ? 'البريد الإلكتروني' : 'Email Address'}</label>
+                        <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">{isAr ? 'البريد الإلكتروني' : 'Email Address'}</label>
                         <input
                           type="email"
                           value={formEmail}
                           onChange={(e) => setFormEmail(e.target.value)}
                           placeholder="name@company.com"
-                          className="w-full px-3 py-2 text-xs rounded-lg bg-[var(--surface-subtle)] border border-[var(--border-default)] focus:border-accent focus:shadow-[0_0_8px_rgba(156,163,175,0.15)] outline-none transition-theme"
+                          className="w-full px-3 py-2 text-xs rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-main)] focus:border-[var(--border-accent)] outline-none transition-theme text-[var(--text-primary)]"
                         />
                       </div>
 
                       {/* Phone */}
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{isAr ? 'رقم الهاتف' : 'Phone Number'}</label>
+                        <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">{isAr ? 'رقم الهاتف' : 'Phone Number'}</label>
                         <input
                           type="tel"
                           value={formPhone}
                           onChange={(e) => setFormPhone(e.target.value)}
                           placeholder="+1 (555) 000-0000"
-                          className="w-full px-3 py-2 text-xs rounded-lg bg-[var(--surface-subtle)] border border-[var(--border-default)] focus:border-accent focus:shadow-[0_0_8px_rgba(156,163,175,0.15)] outline-none transition-theme"
+                          className="w-full px-3 py-2 text-xs rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-main)] focus:border-[var(--border-accent)] outline-none transition-theme text-[var(--text-primary)]"
                         />
                       </div>
 
                       {/* Organization */}
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{isAr ? 'الشركة / المنظمة' : 'Company / Org'}</label>
+                        <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">{isAr ? 'الشركة / المنظمة' : 'Company / Org'}</label>
                         <input
                           type="text"
                           value={formOrg}
                           onChange={(e) => setFormOrg(e.target.value)}
                           placeholder={isAr ? 'الشركة' : 'Enterprise / Org name'}
-                          className="w-full px-3 py-2 text-xs rounded-lg bg-[var(--surface-subtle)] border border-[var(--border-default)] focus:border-accent focus:shadow-[0_0_8px_rgba(156,163,175,0.15)] outline-none transition-theme"
+                          className="w-full px-3 py-2 text-xs rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-main)] focus:border-[var(--border-accent)] outline-none transition-theme text-[var(--text-primary)]"
                         />
                       </div>
 
                       {/* Job Title */}
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{isAr ? 'المسمى الوظيفي' : 'Job Title'}</label>
+                        <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">{isAr ? 'المسمى الوظيفي' : 'Job Title'}</label>
                         <input
                           type="text"
                           value={formTitle}
                           onChange={(e) => setFormTitle(e.target.value)}
                           placeholder={isAr ? 'المسمى الوظيفي' : 'Software Architect'}
-                          className="w-full px-3 py-2 text-xs rounded-lg bg-[var(--surface-subtle)] border border-[var(--border-default)] focus:border-accent focus:shadow-[0_0_8px_rgba(156,163,175,0.15)] outline-none transition-theme"
+                          className="w-full px-3 py-2 text-xs rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-main)] focus:border-[var(--border-accent)] outline-none transition-theme text-[var(--text-primary)]"
                         />
                       </div>
 
@@ -931,29 +929,29 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
 
                     {/* Notes */}
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{isAr ? 'سيرة ذاتية / ملاحظات' : 'Biography / Additional Notes'}</label>
+                      <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">{isAr ? 'سيرة ذاتية / ملاحظات' : 'Biography / Additional Notes'}</label>
                       <textarea
                         value={formNotes}
                         onChange={(e) => setFormNotes(e.target.value)}
                         placeholder={isAr ? 'ملاحظات إضافية عن الاتصال...' : 'Write notes or context regarding your connection...'}
-                        className="w-full px-3 py-2 text-xs rounded-lg bg-[var(--surface-subtle)] border border-[var(--border-default)] focus:border-accent focus:shadow-[0_0_8px_rgba(156,163,175,0.15)] outline-none h-24 resize-none transition-theme"
+                        className="w-full px-3 py-2 text-xs rounded-shape-sm bg-[var(--surface-card)] border border-[var(--border-main)] focus:border-[var(--border-accent)] outline-none h-24 resize-none transition-theme text-[var(--text-primary)]"
                       />
                     </div>
                   </div>
 
                   {/* Form Submission Buttons */}
-                  <div className="flex items-center justify-end gap-3 pt-6 border-t border-[var(--border-default)]/50 mt-6">
+                  <div className="flex items-center justify-end gap-3 pt-6 border-t border-[var(--border-main)] mt-6">
                     <button
                       type="button"
                       onClick={handleCancelForm}
-                      className="px-4 py-2 text-xs font-semibold rounded-[var(--radius)] border border-transparent hover:bg-gray-150 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-theme"
+                      className="px-4 py-2 text-xs font-semibold rounded-shape-sm border border-transparent hover:bg-[var(--surface-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-theme touch-target-44"
                     >
                       {isAr ? 'إلغاء' : 'Cancel'}
                     </button>
                     
                     <button
                       type="submit"
-                      className="px-4 py-2 text-xs font-bold bg-accent hover:bg-accent text-white rounded-[var(--radius)] shadow-[0_0_15px_rgba(156,163,175,0.3)] transition-theme"
+                      className="px-4 py-2 text-xs font-bold bg-[var(--comp-button-primary-bg)] hover:opacity-90 text-[var(--comp-button-primary-fg)] rounded-shape-sm transition-theme touch-target-44"
                     >
                       {isAr ? 'حفظ جهة الاتصال' : 'Save Connection'}
                     </button>
@@ -963,12 +961,12 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
 
               {/* Empty State Banner when nothing selected */}
               {!selectedContact && !isEditing && !isCreating && (
-                <div className="p-8 flex-1 flex flex-col items-center justify-center text-center text-gray-500">
-                  <UserCheck size={40} className="mb-4 text-gray-400 opacity-60 animate-bounce" />
-                  <h4 className="text-sm font-black mb-1">
+                <div className="p-8 flex-1 flex flex-col items-center justify-center text-center text-[var(--text-muted)]">
+                  <UserCheck size={40} className="mb-4 text-[var(--text-muted)] opacity-60 animate-bounce" />
+                  <h4 className="text-sm font-black mb-1 text-[var(--text-primary)]">
                     {isAr ? 'لم يتم تحديد جهة اتصال' : 'No Contact Selected'}
                   </h4>
-                  <p className="text-[11px] max-w-xs text-gray-500 leading-relaxed">
+                  <p className="text-xs max-w-xs text-[var(--text-muted)] leading-relaxed">
                     {isAr 
                       ? 'اختر جهة اتصال من اللوحة الجانبية لعرض بياناتها المفصلة أو تعديلها، أو اضغط على زر الإضافة لتسجيل سجل جديد.' 
                       : 'Select any profile from the connection list to view complete structural info, biography notes, or apply modifications.'
@@ -989,8 +987,8 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                 onClick={() => setShowSaveModal(false)}
               />
               
-              <div className="relative max-w-sm w-full p-6 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] text-[var(--text-primary)] shadow-2xl transition-theme z-10">
-                <div className="w-10 h-10 rounded-[4px] bg-accent/10 flex items-center justify-center text-accent mb-4">
+              <div className="relative max-w-sm w-full p-6 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-card)] text-[var(--text-primary)] shadow-2xl transition-theme z-10">
+                <div className="w-10 h-10 rounded-[var(--radius-xs)] bg-[var(--surface-subtle)] border border-[var(--border-accent)] flex items-center justify-center text-[var(--fg-accent)] mb-4">
                   <ShieldCheck size={20} />
                 </div>
 
@@ -1009,7 +1007,7 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                   <button
                     type="button"
                     onClick={() => setShowSaveModal(false)}
-                    className="px-4 py-2 text-xs font-semibold rounded-[4px] font-sans transition-theme text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]"
+                    className="px-4 py-2 text-xs font-semibold rounded-[var(--radius-xs)] font-sans transition-theme text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]"
                   >
                     {isAr ? 'إلغاء' : 'Cancel'}
                   </button>
@@ -1018,7 +1016,7 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                     type="button"
                     onClick={handleSaveConfirm}
                     disabled={isSaving}
-                    className="px-4 py-2 text-xs font-bold bg-accent hover:bg-accent text-white rounded-[4px] font-sans transition-theme flex items-center gap-1 shadow-[0_0_12px_rgba(156,163,175,0.25)]"
+                    className="px-4 py-2 text-xs font-bold bg-[var(--surface-subtle)] hover:bg-[var(--surface-page)] text-[var(--fg-accent)] border border-[var(--border-accent)] rounded-[var(--radius-xs)] font-sans transition-theme flex items-center gap-1 shadow-sm"
                   >
                     {isSaving && <Loader2 size={12} className="animate-spin" />}
                     <span>{isAr ? 'تأكيد الحفظ' : 'Confirm & Save'}</span>
@@ -1036,8 +1034,8 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                 onClick={() => setShowDeleteModal(false)}
               />
               
-              <div className="relative max-w-sm w-full p-6 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] text-[var(--text-primary)] shadow-2xl transition-theme z-10">
-                <div className="w-10 h-10 rounded-[4px] bg-red-500/10 flex items-center justify-center text-red-500 mb-4">
+              <div className="relative max-w-sm w-full p-6 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-card)] text-[var(--text-primary)] shadow-2xl transition-theme z-10">
+                <div className="w-10 h-10 rounded-[var(--radius-xs)] bg-red-500/10 flex items-center justify-center text-red-500 mb-4">
                   <AlertCircle size={20} />
                 </div>
 
@@ -1052,7 +1050,7 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                   }
                 </p>
 
-                <div className="mt-3 p-3 rounded-lg text-xs font-bold leading-relaxed break-all text-start border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)]">
+                <div className="mt-3 p-3 rounded-[var(--radius-sm)] text-xs font-bold leading-relaxed break-all text-start border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-primary)]">
                   {contactToDelete?.name} ({contactToDelete?.email || (isAr ? 'بلا بريد' : 'No Email')})
                 </div>
                 
@@ -1063,7 +1061,7 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                       setShowDeleteModal(false);
                       setContactToDelete(null);
                     }}
-                    className="px-4 py-2 text-xs font-semibold rounded-[4px] font-sans transition-theme text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]"
+                    className="px-4 py-2 text-xs font-semibold rounded-[var(--radius-xs)] font-sans transition-theme text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]"
                   >
                     {isAr ? 'إلغاء' : 'Cancel'}
                   </button>
@@ -1072,7 +1070,7 @@ export const GoogleContacts: React.FC<GoogleContactsProps> = ({ dir, theme }) =>
                     type="button"
                     onClick={handleDeleteConfirm}
                     disabled={isDeleting}
-                    className="px-4 py-2 text-xs font-bold bg-red-600 hover:bg-red-700 text-white rounded-[4px] font-sans transition-theme flex items-center gap-1 shadow-[0_0_12px_rgba(239,68,68,0.25)]"
+                    className="px-4 py-2 text-xs font-bold bg-red-600 hover:bg-red-700 text-white rounded-[var(--radius-xs)] font-sans transition-theme flex items-center gap-1 shadow-[0_0_12px_rgba(239,68,68,0.25)]"
                   >
                     {isDeleting && <Loader2 size={12} className="animate-spin" />}
                     <span>{isAr ? 'تأكيد الحذف' : 'Confirm & Delete'}</span>

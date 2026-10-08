@@ -12,7 +12,9 @@ export type Theme = 'dark' | 'light' | 'system';
 import { ThemeSync } from '../utils/ThemeSync';
 import { applyLanguageFont, FontLoadingConfig, FontLanguageConfig } from '../utils/fontLoader';
 import { resolveImageUrl } from '../utils/imageResolver';
+import { updateDocumentHeadIcons } from '../utils/assetManager';
 import { trackLoginEvent, trackSignUpEvent } from '../utils/analytics';
+import { detectStandaloneWebview, StandaloneWebviewDetection } from '../hooks/usePwaInstall';
 
 type Language = 'ar' | 'en';
 
@@ -21,6 +23,25 @@ export interface User {
   name: string;
   email: string;
   avatar?: string;
+  cover_image?: string | null;
+  bio?: string;
+  occupation?: string;
+  location?: string;
+  website_url?: string;
+  custom_domain?: string;
+  is_domain_verified?: boolean;
+  social_links?: {
+    facebook?: string;
+    instagram?: string;
+    linkedin?: string;
+    twitter?: string;
+    whatsapp?: string;
+    youtube?: string;
+    github?: string;
+    website?: string;
+    [key: string]: string | undefined;
+  };
+  verified_links?: string[];
   role?: string;
   kyc_required?: boolean;
   kyc_status?: 'pending' | 'verified' | 'rejected' | 'none';
@@ -28,8 +49,11 @@ export interface User {
   custom_instructions?: string;
   referral_code?: string;
   memory?: string;
+  points?: number;
+  balance?: number;
   email_notifications?: boolean;
   media_muted?: boolean;
+  data_saver?: boolean;
   subscription?: {
     plan_id: string;
     status: string;
@@ -39,6 +63,10 @@ export interface User {
     plan_name_en: string;
     plan_name_ar?: string;
     billing_period?: string;
+    cycle_credits?: number;
+    used_credits?: number;
+    remaining_credits?: number;
+    usage_percentage?: number;
     limits: any;
     plan_color?: string;
   } | null;
@@ -100,8 +128,8 @@ interface AppContextType {
   setSiteSettings: (settings: SiteSettings) => void;
   economySettings: any;
   setEconomySettings: (settings: any) => void;
-  payWithBalance: (planId: string, billingCycle: 'monthly' | 'annual') => Promise<{ success: boolean, message?: string, error?: string }>;
-  stripeCheckout: (planId: string, billingCycle: 'monthly' | 'annual') => Promise<{ url?: string, error?: string }>;
+  payWithBalance: (planId: string, billingCycle: 'monthly' | 'annual' | 'daily') => Promise<{ success: boolean, message?: string, error?: string }>;
+  stripeCheckout: (planId: string, billingCycle: 'monthly' | 'annual' | 'daily') => Promise<{ url?: string, error?: string }>;
   refreshUser: () => Promise<any>;
   notifications: any[];
   setNotifications: (notifications: any[]) => void;
@@ -115,6 +143,10 @@ interface AppContextType {
   setMilestoneData: (data: any) => void;
   isMobile: boolean;
   isIOS: boolean;
+  isStandaloneWebview: boolean;
+  isWebview: boolean;
+  isPwaStandalone: boolean;
+  isStandardBrowser: boolean;
   rememberMe: boolean;
   isOperationPending: boolean;
   setIsOperationPending: (val: boolean) => void;
@@ -174,22 +206,21 @@ const translations = {
     chat_reasoning: 'نمط التفكير العميق',
     sovereign_search: 'البحوث والدراسات',
     sovereign_search_desc: 'تفكيك وتركيب البحوث والدراسات الأكاديمية والمراجعة المنهجية.',
-    perplexta_analysis: 'تحليل',
-    perplexta_analysis_desc: 'تحليل وتدقيق المستندات والملفات والصور',
+    perplexta_analysis: 'تحليل وتدقيق',
+    perplexta_analysis_desc: 'تحليل وتدقيق المستندات والملفات والصور والبيانات.',
     ads_copilot: 'مساعد الإعلانات',
     ads_copilot_desc: 'تخطيط وصياغة الحملات الإعلانية واستراتيجيات النمو التجاري لمنصة فيرال بوك والمنصات العالمية.',
-    image: 'صورة',
-    video: 'فيديو',
-    stt: 'تحويل الصوت الى نص',
-    tts: 'تحويل النص الى صوت',
-    code: 'كود',
-    canvas: 'استوديو الصوت',
-    perplexta_music: 'الموسيقى والأغاني',
+    image: 'توليد الصور',
+    video: 'توليد الفيديو',
+    code: 'استوديو الكود (IDE)',
+    audio_studio: 'استوديو الصوت والإنتاج',
+    audio_studio_desc: 'تأليف وإنتاج الأصوات والموسيقى المتقدمة.',
+    stt: 'تحويل الصوت الى نص (STT)',
+    tts: 'تحويل النص الى صوت (TTS)',
+    perplexta_music: 'التأليف الموسيقي',
     perplexta_music_desc: 'التأليف الصوتي المتقدم والتركيب الموسيقي الهيكلي.',
     storage_mb: 'مساحة التخزين (MB)',
-    sovereign_memory: 'الذاكرة المعرفية',
-    sovereign_memory_desc: 'التكامل المعرفي والاحتفاظ بالسياق والمعارف على المدى الطويل لتقديم تجربة تحليل دقيقة.',
-    x402_api: 'بوابة الـ API (x402)',
+    x402_api: 'بوابة المطورين (x402 API)',
     x402_api_desc: 'تحسين توجيه النماذج الذكية والتحليلات الديناميكية المحمية ببروتوكول x402 للوكلاء البرمجيين.',
     newBadge: 'جديد',
     commandCenter: 'مركز القيادة',
@@ -279,7 +310,7 @@ const translations = {
     add: 'إضافة',
     edit: 'تعديل',
     delete: 'حذف',
-    appName: '',
+    appName: 'بيربليكستا',
     home: 'الرئيسية',
     save: 'حفظ',
     avatar: 'الصورة الشخصية',
@@ -592,6 +623,7 @@ const translations = {
     stableOperationalProtocol: 'بروتوكول تشغيل مستقر',
     financialRadarSubtitle: 'بروتوكول مراقبة الاقتصاد المباشر وتدقيق السجلات',
     searchTxPlaceholder: 'بحث في الحركات...',
+    searchActivityPlaceholder: 'بحث في سجل العمليات والأنشطة...',
     walletAlertsEmpty: 'لا توجد تنبيهات حرجة للمحفظة.',
     ledgerExpectation: 'توقعات السجل',
     noDiscrepancies: 'لم يتم الكشف عن أي تناقضات مالية.',
@@ -638,7 +670,7 @@ const translations = {
     syncUsageLimits: 'مزامنة حدود الحصص',
     ollamaUrlLabel: 'رابط الاتصال السحابي (Endpoint URL)',
     ollamaCloudHint: 'ملاحظة: أدخل رابط Ollama Cloud الخاص بك هنا. يتم استخدام Localhost كخيار احتياطي فقط.',
-    dbOrchestrationTitle: 'أوركسترا قواعد البيانات',
+    dbOrchestrationTitle: 'قواعد البيانات',
     dbOrchestrationDesc: 'إدارة التوازن والربط بين قواعد البيانات الأساسية والمالية بنظام التشفير المحلي الشامل.',
     coreDbTitle: 'قاعدة البيانات الأساسية',
     externalDbTitle: 'قاعدة الأقسام الخارجية',
@@ -701,7 +733,6 @@ const translations = {
     fallback2: 'احتياطي 2',
     fallback3: 'احتياطي 3',
     orchestratorSave: 'حفظ',
-    costPerUsage: 'التكلفة لكل طلب',
     toolCode: 'كود',
     toolCodeDesc: 'أداة كتابة ومراجعة الأكواد البرمجية',
     withdrawableBalance: 'الرصيد القابل للسحب',
@@ -811,17 +842,17 @@ const translations = {
     alert_ledger_discrepancy: 'تنبيه مالي: خطأ في السجل',
     alert_unauthorized_access: 'دخول غير مصرح به',
     alert_failed_login: 'فشل تسجيل دخول متكرر',
-    toastKeySaveSuccess: 'تم حفظ المفتاح بنجاح!',
-    toastKeySaveError: 'خطأ في حفظ المفتاح: {error}',
-    toastKeyDeleteSuccess: 'تم حذف المفتاح بنجاح',
-    toastKeyDeleteError: 'فشل في حذف المفتاح',
+    toastKeySaveSuccess: 'تم الحفظ',
+    toastKeySaveError: 'فشل الحفظ: {error}',
+    toastKeyDeleteSuccess: 'تم الحذف',
+    toastKeyDeleteError: 'فشل الحذف',
     keyDeleteConfirm: 'هل أنت متأكد من حذف مفتاح {provider}؟ سيؤدي هذا إلى إيقاف الأدوات المرتبطة به.',
-    toastDbTestSuccess: 'تم الاتصال بقاعدة البيانات بنجاح!',
-    toastDbTestFailed: 'فشل الاتصال بقاعدة البيانات: {error}',
-    toastDbSaveSuccess: 'تم حفظ إعدادات القاعدة بنجاح',
-    toastPlanSaveSuccess: 'تم حفظ الخطة بنجاح',
-    toastEconomySaveSuccess: 'تم حفظ إعدادات الاقتصاد بنجاح',
-    toastStripeSaveSuccess: 'تم حفظ إعدادات Stripe بنجاح',
+    toastDbTestSuccess: 'تم الاتصال بنجاح',
+    toastDbTestFailed: 'فشل الاتصال: {error}',
+    toastDbSaveSuccess: 'تم الحفظ',
+    toastPlanSaveSuccess: 'تم الحفظ',
+    toastEconomySaveSuccess: 'تم الحفظ',
+    toastStripeSaveSuccess: 'تم الحفظ',
     toastAllFieldsRequired: 'جميع حقول الترجمة مطلوبة (الأسماء والأوصاف)',
     toastPricingRequired: 'حقول التسعير مطلوبة',
     toastFeatureRequired: 'مطلوب ميزة واحدة على الأقل',
@@ -858,6 +889,29 @@ const translations = {
     mood: 'الحالة',
     vocalType: 'نوع الصوت',
     audioDuration: 'المدة',
+    howCanIHelp: 'كيف يمكنني مساعدتك اليوم؟',
+    navVisualIdentity: 'الهوية البصرية',
+    saveNewPlan: 'حفظ الخطة الجديدة',
+    favicon: 'أيقونة Favicon',
+    pendingBroadcastHistory: 'سجل البث المعلق',
+    failedOrBlocked: 'فاشل أو محظور',
+    category: 'الفئة',
+    activePlan: 'الخطة النشطة',
+    noPlan: 'لا توجد خطة',
+    retry: 'إعادة المحاولة',
+    logDeleted: 'تم حذف السجل',
+    dbActivateSuccess: 'تم تفعيل قاعدة البيانات بنجاح',
+    dbDeactivateSuccess: 'تم إيقاف قاعدة البيانات بنجاح',
+    environment: 'البيئة',
+    allFieldsRequired: 'جميع الحقول مطلوبة',
+    discover: 'استكشف',
+    studio: 'الاستوديو',
+    subscriptions: 'الاشتراكات',
+    invalidRequest: 'طلب غير صالح',
+    backToHome: 'العودة للرئيسية',
+    type: 'النوع',
+    description: 'الوصف',
+    loadMore: 'تحميل المزيد',
   },
   en: {
     rewards: 'Rewards',
@@ -888,21 +942,20 @@ const translations = {
     chat_reasoning: 'Reasoning Mode',
     sovereign_search: 'Research & Studies',
     sovereign_search_desc: 'Comprehensive research synthesis, methodological deconstruction, and literature reviews.',
-    perplexta_analysis: 'Analysis',
+    perplexta_analysis: 'Analysis & Forensics',
     perplexta_analysis_desc: 'Document, File & Vision Forensic Analysis',
     ads_copilot: 'Ads Copilot',
     ads_copilot_desc: 'Strategic campaign design, ad copywriting, and growth optimization for ViralBook and global platforms.',
-    image: 'Image',
-    video: 'Video',
-    stt: 'Speech to Text',
-    tts: 'Text to Speech',
-    code: 'Code',
-    canvas: 'Audio Studio',
-    perplexta_music: 'Music & Songs',
+    image: 'Image Generation',
+    video: 'Video Generation',
+    code: 'Code Studio (IDE)',
+    audio_studio: 'Audio Studio',
+    audio_studio_desc: 'State-of-the-art vocal synthesis, speech transcribing, and orchestral music composition.',
+    stt: 'Speech to Text (STT)',
+    tts: 'Text to Speech (TTS)',
+    perplexta_music: 'Music Composition',
     perplexta_music_desc: 'Advanced acoustic composition and structural music synthesis.',
     storage_mb: 'Storage Space (MB)',
-    sovereign_memory: 'Knowledge Memory',
-    sovereign_memory_desc: 'Long-term knowledge retention and contextual mapping for accurate analysis.',
     x402_api: 'Agent Gateway (x402 API)',
     x402_api_desc: 'Dynamic high-fidelity artificial intelligence analytics gateway for programmatic developer clients protected via x402 protocol.',
     newBadge: 'NEW',
@@ -1019,7 +1072,7 @@ const translations = {
     add: 'Add',
     edit: 'Edit',
     delete: 'Delete',
-    appName: '',
+    appName: 'Perplexta',
     home: 'Home',
     save: 'Save',
     avatar: 'Avatar',
@@ -1276,6 +1329,7 @@ const translations = {
     stableOperationalProtocol: 'Stable Operational Protocol',
     financialRadarSubtitle: 'Live Economic Surveillance & Ledger Audit Protocol',
     searchTxPlaceholder: 'Search transactions...',
+    searchActivityPlaceholder: 'Search activity stream & logs...',
     walletAlertsEmpty: 'No critical wallet alerts.',
     ledgerExpectation: 'Ledger Expectation',
     noDiscrepancies: 'No financial discrepancies detected.',
@@ -1322,7 +1376,7 @@ const translations = {
     syncUsageLimits: 'Sync Usage Limits',
     ollamaUrlLabel: 'Ollama Cloud Hub Endpoint',
     ollamaCloudHint: 'Note: Enter your full Ollama Cloud instance URL here. Localhost is used as fallback only.',
-    dbOrchestrationTitle: 'Database Orchestration',
+    dbOrchestrationTitle: 'Databases',
     dbOrchestrationDesc: 'Manage core and ledger database connections. Credentials are encrypted locally for maximum security and separation of concerns.',
     coreDbTitle: 'Core Database',
     externalDbTitle: 'External Categories Database',
@@ -1386,7 +1440,6 @@ const translations = {
     fallback3: 'Fallback 3',
     orchestratorSave: 'Save',
     tools: 'Tools',
-    costPerUsage: 'Cost Per Usage',
     toolCode: 'Code',
     toolCodeDesc: 'Tool for writing and reviewing code',
     withdrawableBalance: 'Withdrawable Balance',
@@ -1510,17 +1563,17 @@ const translations = {
     alert_ledger_discrepancy: 'Finance Alert: Ledger Mismatch',
     alert_unauthorized_access: 'Unauthorized Access Attempt',
     alert_failed_login: 'Multiple Failed Logins',
-    toastKeySaveSuccess: 'Key saved successfully!',
-    toastKeySaveError: 'Error saving key: {error}',
-    toastKeyDeleteSuccess: 'Key deleted successfully',
-    toastKeyDeleteError: 'Failed to delete key',
+    toastKeySaveSuccess: 'Saved',
+    toastKeySaveError: 'Save failed: {error}',
+    toastKeyDeleteSuccess: 'Deleted',
+    toastKeyDeleteError: 'Delete failed',
     keyDeleteConfirm: 'Are you sure you want to delete the {provider} key? This will stop the associated tools.',
-    toastDbTestSuccess: 'Database connection successful!',
-    toastDbTestFailed: 'Database connection failed: {error}',
-    toastDbSaveSuccess: 'Database configuration saved',
-    toastPlanSaveSuccess: 'Plan saved successfully',
-    toastEconomySaveSuccess: 'Economy settings saved successfully',
-    toastStripeSaveSuccess: 'Stripe configuration saved successfully',
+    toastDbTestSuccess: 'Connected',
+    toastDbTestFailed: 'Connection failed: {error}',
+    toastDbSaveSuccess: 'Saved',
+    toastPlanSaveSuccess: 'Saved',
+    toastEconomySaveSuccess: 'Saved',
+    toastStripeSaveSuccess: 'Saved',
     toastAllFieldsRequired: 'All translation fields (Names & Descriptions) are required',
     toastPricingRequired: 'Pricing fields are required',
     toastFeatureRequired: 'At least one feature is required',
@@ -1574,6 +1627,29 @@ const translations = {
     mood: 'Mood',
     vocalType: 'Vocal Type',
     audioDuration: 'Duration',
+    testConnection: 'Test Connection',
+    siteFavicon: 'Favicon',
+    engineHealth: 'Engine Health',
+    utilizationRate: 'Utilization Rate',
+    pendingHistory: 'Pending History',
+    failedStatus: 'Failed Status',
+    category: 'Category',
+    activePlan: 'Active Plan',
+    noPlan: 'No Plan',
+    retry: 'Retry',
+    logDeleted: 'Log Deleted',
+    dbActivateSuccess: 'Database activated successfully',
+    dbDeactivateSuccess: 'Database deactivated successfully',
+    environment: 'Environment',
+    allFieldsRequired: 'All fields are required',
+    discover: 'Discover',
+    studio: 'Studio',
+    subscriptions: 'Subscriptions',
+    invalidRequest: 'Invalid Request',
+    backToHome: 'Back to Home',
+    type: 'Type',
+    description: 'Description',
+    loadMore: 'Load More',
   }
 };
 
@@ -1667,9 +1743,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const userRef = useRef<User | null>(user);
   const isSyncingAuth = useRef(false);
+  const lastSessionStartRef = useRef<{ path: string; time: number } | null>(null);
 
   const logUserActivity = useCallback(async (eventType: string, eventDetails?: any) => {
     try {
+      if (eventType === 'SESSION_START') {
+        const currentPath = eventDetails?.path || (typeof window !== 'undefined' ? window.location.pathname : '');
+        const now = Date.now();
+        if (
+          lastSessionStartRef.current &&
+          lastSessionStartRef.current.path === currentPath &&
+          now - lastSessionStartRef.current.time < 30000
+        ) {
+          return; // Throttled duplicate session start within 30 seconds
+        }
+        lastSessionStartRef.current = { path: currentPath, time: now };
+      }
+
       const rawId = userRef.current?.id;
       const numericUserId = typeof rawId === 'number' && rawId > 0
         ? rawId
@@ -1705,13 +1795,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [user]);
 
+  const isJwtExpired = (jwtToken: string | null): boolean => {
+    if (!jwtToken || jwtToken === 'null' || jwtToken === 'undefined' || jwtToken === '') return true;
+    try {
+      const parts = jwtToken.split('.');
+      if (parts.length !== 3) return false;
+      const base64Url = parts[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      const parsed = JSON.parse(jsonPayload);
+      if (!parsed || !parsed.exp) return false;
+      return (parsed.exp * 1000) <= (Date.now() + 5000);
+    } catch {
+      return false;
+    }
+  };
+
   const [token, setToken] = useState<string | null>(() => {
     try {
       const rawToken = secureStorage.getSync('app_token');
       if (!rawToken || rawToken === 'null' || rawToken === 'undefined' || rawToken === '') return null;
+      if (isJwtExpired(rawToken)) {
+        secureStorage.remove('app_token');
+        secureStorage.remove('app_refresh_token');
+        return null;
+      }
       return rawToken;
     } catch (e) {
-
       return null;
     }
   });
@@ -1773,6 +1888,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   });
+  const [standaloneWebviewState, setStandaloneWebviewState] = useState<StandaloneWebviewDetection>(detectStandaloneWebview());
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleDetectionUpdate = () => {
+      setStandaloneWebviewState(detectStandaloneWebview());
+    };
+
+    handleDetectionUpdate();
+    window.addEventListener('resize', handleDetectionUpdate);
+    const mql = window.matchMedia('(display-mode: standalone)');
+    mql.addEventListener?.('change', handleDetectionUpdate);
+
+    return () => {
+      window.removeEventListener('resize', handleDetectionUpdate);
+      mql.removeEventListener?.('change', handleDetectionUpdate);
+    };
+  }, []);
   const [isOperationPending, setIsOperationPending] = useState(false);
 
   const [economySettings, setEconomySettings] = useState<any>(() => {
@@ -2126,6 +2259,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const customFetch = async (...args: any[]) => {
       let [resource, config] = args;
 
+      const isDataSaver = userRef.current?.data_saver || localStorage.getItem('data_saver_enabled') === 'true';
+      if (isDataSaver) {
+        if (resource instanceof Request) {
+          resource.headers.set('Save-Data', 'on');
+          resource.headers.set('X-Data-Saver', 'true');
+        } else {
+          if (!config) config = {};
+          if (!config.headers) config.headers = {};
+          if (config.headers instanceof Headers) {
+            config.headers.set('Save-Data', 'on');
+            config.headers.set('X-Data-Saver', 'true');
+          } else if (Array.isArray(config.headers)) {
+            config.headers.push(['Save-Data', 'on'], ['X-Data-Saver', 'true']);
+          } else {
+            config.headers['Save-Data'] = 'on';
+            config.headers['X-Data-Saver'] = 'true';
+          }
+        }
+      }
+
       const urlStr = typeof resource === 'string' 
         ? resource 
         : (resource instanceof Request ? resource.url : '');
@@ -2235,6 +2388,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         throw new Error(`HTTP error! status: ${res.status}`);
       }
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('text/html')) {
+        if (retries > 0) {
+          await new Promise(r => setTimeout(r, backoff));
+          return fetchWithRetry(url, options, retries - 1, backoff * 1.5);
+        }
+        throw new Error(`Received HTML response instead of JSON from ${url}`);
+      }
       return await res.json();
     } catch (err) {
       if (retries > 0) {
@@ -2255,7 +2416,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [isAuthReady]);
 
   const fetchUserProfile = async (retryCount = 0) => {
-    if (!token) {
+    if (!token || isJwtExpired(token)) {
+      if (token && isJwtExpired(token)) {
+        purgeSession(false);
+      }
       completeBoot();
       return;
     }
@@ -2537,6 +2701,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (e) {}
     }
 
+    userRef.current = null;
+    profileFetched.current = false;
+    isSyncingAuth.current = false;
+
     setIsAuthModalOpen(false);
     setSocket(null);
     setToken(null);
@@ -2546,7 +2714,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBalanceUSD(0);
     setNotifications([]);
     setMilestoneData(null);
-    isSyncingAuth.current = false;
 
     SessionPurge.purgeAll({
       queryClient,
@@ -2555,7 +2722,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     if (forceRedirect) {
-      secureStorage.set('app_logged_out_toast', '1');
+      try {
+        secureStorage.set('app_logged_out_toast', '1');
+      } catch {}
+      // Perform clean hard reload / redirect to reset all background hooks and memory state
       window.location.replace('/');
     } else {
       secureStorage.remove('app_loader_type');
@@ -2563,24 +2733,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [socket, queryClient]);
 
   const logout = async (forceRedirect = true) => {
-    logUserActivity('LOGOUT');
-    if (!token && !user) {
-      purgeSession(forceRedirect);
-      return;
+    const hasActiveSession = !!(token || userRef.current || user);
+    if (hasActiveSession) {
+      try {
+        logUserActivity('LOGOUT');
+      } catch {}
     }
 
-    const storedToken = token;
+    const storedToken = token || secureStorage.getSync('app_token');
     const storedRefreshToken = secureStorage.getSync('app_refresh_token');
 
-    if (storedToken) {
-      fetch(`${API_BASE_URL}/api/auth/logout`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${storedToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ refreshToken: storedRefreshToken })
-      }).catch(() => {});
+    // Notify server to revoke all sessions and blacklist tokens
+    if ((storedToken && !isJwtExpired(storedToken)) || storedRefreshToken) {
+      try {
+        const logoutPromise = fetch(`${API_BASE_URL}/api/auth/logout`, {
+          method: 'POST',
+          headers: { 
+            ...(storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {}),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ refreshToken: storedRefreshToken, token: storedToken }),
+          keepalive: true
+        });
+
+        // Give server request a quick window to finish or dispatch without freezing UI
+        await Promise.race([
+          logoutPromise,
+          new Promise(resolve => setTimeout(resolve, 350))
+        ]).catch(() => {});
+      } catch (e) {}
     }
 
     purgeSession(forceRedirect);
@@ -2888,6 +3069,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     newSocket.on('subscription_canceled', handleUserProfileOrWalletChange);
     newSocket.on('quota_reset', handleUserProfileOrWalletChange);
 
+    newSocket.on('credit_usage_updated', (data: any) => {
+      setUser(prev => {
+        if (!prev || !prev.subscription) return prev;
+        const cycle = data.cycle_credits ?? prev.subscription.cycle_credits ?? 0;
+        const used = data.used_credits ?? prev.subscription.used_credits ?? 0;
+        const rem = data.remaining_credits ?? Math.max(0, cycle - used);
+        const pct = cycle > 0 ? Math.min(100, Math.round((used / cycle) * 100)) : 0;
+        return {
+          ...prev,
+          subscription: {
+            ...prev.subscription,
+            cycle_credits: cycle,
+            used_credits: used,
+            remaining_credits: rem,
+            usage_percentage: pct
+          }
+        };
+      });
+    });
+
     newSocket.on('usage_update', (data: { toolId: string; usageCount: number }) => {
       setUser(prev => {
         if (!prev) return prev;
@@ -2941,7 +3142,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [token, language, t]);
 
   const markAsRead = async (id: number) => {
-    if (!token) return;
+    if (!token || isJwtExpired(token)) return;
     try {
       const res = await fetch(`/api/notifications/${id}/read`, {
         method: 'PATCH',
@@ -2956,7 +3157,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const markAllAsRead = async () => {
-    if (!token) return;
+    if (!token || isJwtExpired(token)) return;
     try {
       const res = await fetch('/api/notifications/read-all', {
         method: 'PATCH',
@@ -2971,7 +3172,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteNotification = async (id: number) => {
-    if (!token) return;
+    if (!token || isJwtExpired(token)) return;
     try {
       const res = await fetch(`/api/notifications/${id}`, {
         method: 'DELETE',
@@ -2986,7 +3187,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const clearAllNotifications = async () => {
-    if (!token) return;
+    if (!token || isJwtExpired(token)) return;
     try {
       const res = await fetch('/api/notifications/all', {
         method: 'DELETE',
@@ -3001,7 +3202,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || isJwtExpired(token)) return;
 
     let isMounted = true;
     let timeoutId: any = null;
@@ -3018,7 +3219,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     const fetchNotificationsSecure = async () => {
-      if (!isMounted) return;
+      if (!isMounted || !token || isJwtExpired(token)) return;
       if (isFetching) return;
 
       if (document.visibilityState === 'hidden') {
@@ -3092,7 +3293,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [token]);
 
   const refreshUser = async () => {
-    if (!token) return;
+    if (!token || isJwtExpired(token)) {
+      if (token && isJwtExpired(token)) {
+        purgeSession(false);
+      }
+      return null;
+    }
     try {
       const res = await fetch(`/api/user/me`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -3119,7 +3325,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return null;
   };
 
-  const payWithBalance = async (planId: string, billingCycle: 'monthly' | 'annual') => {
+  const payWithBalance = async (planId: string, billingCycle: 'monthly' | 'annual' | 'daily') => {
     if (!token) {
       setIsAuthModalOpen(true);
       return { success: false, error: 'Auth required' };
@@ -3140,7 +3346,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (typeof window !== 'undefined' && (window as any).gtag) {
           (window as any).gtag('event', 'purchase', {
             transaction_id: `bal_${Date.now()}`,
-            value: billingCycle === 'annual' ? 99.0 : 9.9, 
+            value: billingCycle === 'annual' ? 99.0 : (billingCycle === 'daily' ? 4.9 : 9.9), 
             currency: 'USD',
             items: [{ item_id: planId, item_name: `Plan_${planId}`, item_category: 'subscription' }],
             method: 'balance'
@@ -3155,7 +3361,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const stripeCheckout = async (planId: string, billingCycle: 'monthly' | 'annual') => {
+  const stripeCheckout = async (planId: string, billingCycle: 'monthly' | 'annual' | 'daily') => {
     if (!token) {
       setIsAuthModalOpen(true);
       return { error: 'Auth required' };
@@ -3174,7 +3380,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         if (typeof window !== 'undefined' && (window as any).gtag) {
           (window as any).gtag('event', 'begin_checkout', {
-            value: billingCycle === 'annual' ? 99.0 : 9.9,
+            value: billingCycle === 'annual' ? 99.0 : (billingCycle === 'daily' ? 4.9 : 9.9),
             currency: 'USD',
             items: [{ item_id: planId, item_name: `Plan_${planId}`, item_category: 'subscription' }]
           });
@@ -3195,7 +3401,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const fetchSettings = async () => {
         try {
-          const settingsData = await fetchWithRetry('/api/system/settings', options, 1, 300);
+          const settingsData = await fetchWithRetry('/api/system/settings', options, 2, 400);
+          if (!settingsData || typeof settingsData !== 'object') return;
           let parsedFontConfig: FontLoadingConfig | null = null;
           let parsedAr: FontLanguageConfig | null = null;
           let parsedEn: FontLanguageConfig | null = null;
@@ -3289,9 +3496,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               discount: p.discount || 0,
               isActive: p.is_active ?? true,
               isVisible: p.is_visible ?? true,
-              hideTools: p.hide_tools ?? false,
+              hideTools: Boolean(p.hide_tools === true || p.hide_tools === 'true'),
               monthlyPrice: parseFloat(p.monthly_price || 0),
               annualPrice: parseFloat(p.annual_price || 0),
+              isMonthlyEnabled: p.is_monthly_enabled !== false,
+              isAnnualEnabled: p.is_annual_enabled !== false,
+              isDailyEnabled: Boolean(p.is_daily_enabled),
+              dailyPrice: parseFloat(p.daily_price || 0),
+              dailyDays: parseInt(p.daily_days || 7, 10),
               color: p.color || '#334155',
               planType: p.plan_type || 'user',
               features,
@@ -3335,16 +3547,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [languageTransitioning]);
 
   useEffect(() => {
-    if (siteSettings.faviconBase64) {
-      let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
-      if (!link) {
-        link = document.createElement('link');
-        link.rel = 'icon';
-        document.head.appendChild(link);
-      }
-      link.href = resolveImageUrl(siteSettings.faviconBase64, 'general');
+    const iconSource = siteSettings.faviconBase64 || siteSettings.logoBase64;
+    if (iconSource) {
+      updateDocumentHeadIcons(resolveImageUrl(iconSource, 'general'));
+    } else {
+      updateDocumentHeadIcons(null);
     }
-  }, [siteSettings.faviconBase64]);
+  }, [siteSettings.faviconBase64, siteSettings.logoBase64]);
 
   return (
     <AppContext.Provider value={{ 
@@ -3370,6 +3579,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setMilestoneData,
       isMobile,
       isIOS,
+      isStandaloneWebview: standaloneWebviewState.isStandaloneWebview,
+      isWebview: standaloneWebviewState.isWebview,
+      isPwaStandalone: standaloneWebviewState.isStandalone,
+      isStandardBrowser: standaloneWebviewState.isStandardBrowser,
       rememberMe,
       setRememberMe,
       isOperationPending,

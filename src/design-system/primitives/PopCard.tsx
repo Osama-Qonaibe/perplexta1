@@ -1,12 +1,12 @@
 /**
- * 🪟 PERPLEXTA DESIGN SYSTEM — POP CARD PRIMITIVE
+ * 🪟 PERPLEXTA DESIGN SYSTEM — POP CARD PRIMITIVE (v4.0.0)
  * 
- * Auto-fitting, frosted-glass container shell for floating menus, dropdowns,
- * context menus, and toolbars.
- * 
- * Zero Dead-Space Protocol:
- * - Auto-fitting container: w-max min-w-[170px] max-w-[260px] p-1.5
- * - Surface style: bg-[#0d131f]/95 border border-slate-800/90 rounded-xl shadow-2xl backdrop-blur-md ring-1 ring-white/5 space-y-0.5 transform-gpu
+ * Auto-fitting popover shell for menus, dropdowns, and toolbars.
+ * Features:
+ * - Surface: var(--popover)
+ * - Border: 1px solid var(--border)
+ * - Shadow: 0 12px 32px -8px rgba(0,0,0,0.5), 0 4px 12px -2px rgba(0,0,0,0.25), inset 0 1px 0 0 color-mix(in oklab, var(--foreground) 5%, transparent)
+ * - Corner radius: 12px (var(--radius-md))
  */
 
 import React, { forwardRef, useEffect, useRef, useImperativeHandle } from 'react';
@@ -75,17 +75,17 @@ export const PopCard = forwardRef<HTMLDivElement, PopCardProps>(({
       animate="open"
       exit="closed"
       className={`
-        ${className.includes('w-full') ? 'w-full min-w-full max-w-full' : 'w-max min-w-[170px] max-w-[260px]'} p-1.5
-        rounded-xl border border-slate-800/90 bg-[#0d131f]/95
-        shadow-2xl backdrop-blur-md ring-1 ring-white/5
-        space-y-0.5 transform-gpu flex flex-col select-none text-slate-100
+        ${className.includes('w-full') ? 'w-full min-w-full max-w-full' : 'w-max min-w-[170px] max-w-[280px]'} p-1.5
+        rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-card)] text-[var(--text-primary)]
+        shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5),0_4px_12px_-2px_rgba(0,0,0,0.25),inset_0_1px_0_0_color-mix(in_oklab,var(--text-primary)_5%,transparent)]
+        space-y-0.5 transform-gpu flex flex-col select-none
         custom-scrollbar overflow-hidden ${originClass}
         ${className}
       `}
       {...motionProps}
     >
       {header && (
-        <div className="px-2 py-1 border-b border-slate-800/80 text-xs font-semibold text-slate-400">
+        <div className="px-2.5 py-1.5 border-b border-[var(--border-default)] text-xs font-semibold text-[var(--text-muted)]">
           {header}
         </div>
       )}
@@ -95,7 +95,7 @@ export const PopCard = forwardRef<HTMLDivElement, PopCardProps>(({
       </div>
 
       {footer && (
-        <div className="pt-1 mt-0.5 border-t border-slate-800/60 px-1 text-[11px] text-slate-400">
+        <div className="pt-1.5 mt-0.5 border-t border-[var(--border-default)] px-2 text-[11px] text-[var(--text-muted)]">
           {footer}
         </div>
       )}

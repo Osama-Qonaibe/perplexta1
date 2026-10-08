@@ -2,7 +2,7 @@ import { safeStorageGet } from "@/utils/safeStorage";
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { toast } from '@/design-system';
+import { toast, SelectDropdown } from '@/design-system';
 import { 
   Wallet, 
   Gift, 
@@ -28,14 +28,15 @@ import {
 } from 'lucide-react';
 
 import { useSwipeToClose } from '../utils/swipe';
+import { triggerRewardConfetti } from '../utils/confetti';
 
 const getTxTypeBadgeClass = (type: string, points: number, amount: number) => {
   const isPositive = points > 0 || (points === 0 && amount > 0);
   if (type === 'welcome_bonus' || type === 'referral_bonus') {
-    return 'bg-accent/10 text-accent border border-accent/20';
+    return 'bg-[var(--surface-inset)] text-[var(--fg-accent)] border border-[var(--border-default)]';
   }
   if (type === 'deposit') {
-    return 'bg-accent/10 text-accent border border-accent/20';
+    return 'bg-[var(--surface-inset)] text-[var(--fg-accent)] border border-[var(--border-default)]';
   }
   if (type === 'withdrawal') {
     return 'bg-rose-500/10 text-rose-500 border border-rose-500/20';
@@ -45,7 +46,7 @@ const getTxTypeBadgeClass = (type: string, points: number, amount: number) => {
   }
   if (type === 'tool_usage_reconcile') {
     return isPositive 
-      ? 'bg-accent/10 text-accent border border-accent/20'
+      ? 'bg-[var(--surface-inset)] text-[var(--fg-accent)] border border-[var(--border-default)]'
       : 'bg-rose-500/10 text-rose-500 border border-rose-500/20';
   }
   if (type === 'admin_adjustment') {
@@ -54,7 +55,7 @@ const getTxTypeBadgeClass = (type: string, points: number, amount: number) => {
       : 'bg-rose-500/10 text-rose-500 border border-rose-500/20';
   }
   return isPositive 
-    ? 'bg-accent/10 text-accent border border-accent/20' 
+    ? 'bg-[var(--surface-inset)] text-[var(--fg-accent)] border border-[var(--border-default)]' 
     : 'bg-rose-500/10 text-rose-500 border border-rose-500/20';
 };
 
@@ -316,6 +317,7 @@ export const RewardsPage: React.FC = () => {
       const data = await res.json();
       
       if (res.ok) {
+        triggerRewardConfetti();
         toast.success(dir === 'rtl' ? `تم تحويل النقاط بنجاح! الرصيد الجديد: $${Number(data.usdAmount).toFixed(2)}` : `Points converted successfully! New Balance: $${Number(data.usdAmount).toFixed(2)}`);
         setIsConvertModalOpen(false);
         setConvertAmount('1000');
@@ -503,6 +505,7 @@ export const RewardsPage: React.FC = () => {
       });
 
       if (res.ok) {
+        triggerRewardConfetti();
         toast.success(
           dir === 'rtl'
             ? 'تم إرسال طلب تفعيل نظام الأرباح الخاص بك بنجاح! سيقوم المشرف بالتحقق من الإيداع وقبوله فوراً.'
@@ -745,7 +748,7 @@ export const RewardsPage: React.FC = () => {
           <div className="flex items-center gap-3 md:gap-4">
             <button 
               onClick={() => navigate(-1)}
-              className="w-8 h-8 rounded-[8px] flex items-center justify-center transition-all duration-200 bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-secondary)] hover:text-accent hover:border-accent/40 active:scale-95 cursor-pointer"
+              className="w-8 h-8 rounded-[var(--radius-sm)] flex items-center justify-center transition-all duration-200 bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--fg-accent)] hover:border-[var(--border-accent)] active:scale-95 cursor-pointer"
               title={dir === 'rtl' ? 'رجوع' : 'Back'}
             >
               {dir === 'rtl' ? <ChevronRight size={16} className="transition-transform" /> : <ChevronLeft size={16} className="transition-transform" />}
@@ -753,8 +756,8 @@ export const RewardsPage: React.FC = () => {
             <div className="flex items-center gap-2 md:gap-3">
               <h1 className="text-xl md:text-2xl font-black tracking-tight text-[var(--text-primary)] uppercase">{t('rewards')}</h1>
               {contextUser?.kyc_status === 'verified' && (
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-[8px] bg-[var(--surface-inset)] border border-[var(--border-default)] text-[var(--text-primary)]">
-                  <CheckCircle2 size={12} className="md:w-3.5 md:h-3.5 text-accent" />
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-[var(--radius-sm)] bg-[var(--surface-inset)] border border-[var(--border-default)] text-[var(--text-primary)]">
+                  <CheckCircle2 size={12} className="md:w-3.5 md:h-3.5 text-[var(--fg-accent)]" />
                   <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest">{t('verified')}</span>
                 </div>
               )}
@@ -764,15 +767,15 @@ export const RewardsPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <button 
               onClick={() => navigate('/settings/wallet')}
-              className="flex items-center gap-2 h-8 px-3 rounded-[8px] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-subtle)] text-[var(--text-primary)] transition-all duration-200 cursor-pointer shadow-sm text-xs font-bold"
+              className="flex items-center gap-2 h-8 px-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-subtle)] text-[var(--text-primary)] transition-all duration-200 cursor-pointer shadow-sm text-xs font-bold"
             >
-              <Landmark size={14} className="text-accent transition-all duration-300" />
+              <Landmark size={14} className="text-[var(--fg-accent)] transition-all duration-300" />
               <span className="text-[10px] font-black uppercase tracking-tighter">
                 {dir === 'rtl' ? 'إيداع أموال' : 'Deposit Funds'}
               </span>
             </button>
-            <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-[4px] border bg-[var(--surface-subtle)] border-[var(--border-default)]">
-               <Landmark size={14} className="text-accent" />
+            <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-[var(--radius-xs)] border bg-[var(--surface-subtle)] border-[var(--border-default)]">
+               <Landmark size={14} className="text-[var(--fg-accent)]" />
                <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-tighter">{dir === 'rtl' ? 'المحفظة والسجلات' : 'LEDGER'}</span>
             </div>
           </div>
@@ -783,7 +786,7 @@ export const RewardsPage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         
         {/* Withdrawable Balance Card */}
-        <div className="relative overflow-hidden rounded-[var(--radius)] p-5 md:p-8 border bg-[var(--surface-subtle)] border-[var(--border-default)] flex flex-col items-center justify-center text-center min-h-[180px] md:min-h-[240px]">
+        <div className="relative overflow-hidden rounded-[var(--radius-md)] p-5 md:p-8 border bg-[var(--surface-subtle)] border-[var(--border-default)] flex flex-col items-center justify-center text-center min-h-[180px] md:min-h-[240px]">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[120px] md:text-[180px] font-bold text-[var(--text-muted)] opacity-10 select-none pointer-events-none">
             $
           </div>
@@ -795,16 +798,16 @@ export const RewardsPage: React.FC = () => {
             </div>
             <button 
               onClick={() => navigate('/settings/wallet')}
-              className="mt-2 md:mt-6 flex items-center justify-center gap-2 mx-auto px-5 py-2.5 md:px-6 md:py-3 rounded-lg bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] border border-[var(--border-default)] text-xs md:text-sm font-extrabold transition-all duration-200 cursor-pointer group shadow-md active:scale-95"
+              className="mt-2 md:mt-6 flex items-center justify-center gap-2 mx-auto px-5 py-2.5 md:px-6 md:py-3 rounded-[var(--radius-sm)] bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] border border-[var(--border-default)] text-xs md:text-sm font-extrabold transition-all duration-200 cursor-pointer group shadow-md active:scale-95"
             >
-              <Wallet size={16} className="md:w-[18px] md:h-[18px] text-accent transition-all duration-300" />
+              <Wallet size={16} className="md:w-[18px] md:h-[18px] text-[var(--fg-accent)] transition-all duration-300" />
               <span>{t('requestWithdrawal')}</span>
             </button>
           </div>
         </div>
 
         {/* Points Balance Card */}
-        <div className="relative overflow-hidden rounded-[var(--radius)] p-5 md:p-8 border bg-[var(--surface-subtle)] border-[var(--border-default)] flex flex-col items-center justify-center text-center min-h-[180px] md:min-h-[240px]">
+        <div className="relative overflow-hidden rounded-[var(--radius-md)] p-5 md:p-8 border bg-[var(--surface-subtle)] border-[var(--border-default)] flex flex-col items-center justify-center text-center min-h-[180px] md:min-h-[240px]">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 select-none pointer-events-none opacity-5">
             <Gift className="text-[var(--text-muted)] w-[140px] h-[140px] md:w-[200px] md:h-[200px]" />
           </div>
@@ -819,9 +822,9 @@ export const RewardsPage: React.FC = () => {
             </div>
             <button 
               onClick={() => setIsConvertModalOpen(true)}
-              className="mt-2 md:mt-6 flex items-center justify-center gap-2 mx-auto px-5 py-2.5 md:px-6 md:py-3 rounded-lg bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] border border-[var(--border-default)] text-xs md:text-sm font-extrabold transition-all duration-200 cursor-pointer group shadow-md active:scale-95"
+              className="mt-2 md:mt-6 flex items-center justify-center gap-2 mx-auto px-5 py-2.5 md:px-6 md:py-3 rounded-[var(--radius-sm)] bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] border border-[var(--border-default)] text-xs md:text-sm font-extrabold transition-all duration-200 cursor-pointer group shadow-md active:scale-95"
             >
-              <Zap size={16} className="md:w-[18px] md:h-[18px] text-accent transition-all duration-300" />
+              <Zap size={16} className="md:w-[18px] md:h-[18px] text-[var(--fg-accent)] transition-all duration-300" />
               <span>{t('convertPointsToBalance')}</span>
             </button>
           </div>
@@ -833,16 +836,16 @@ export const RewardsPage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         
         {/* How it works */}
-        <div className="rounded-[var(--radius)] p-5 md:p-8 border bg-[var(--surface-subtle)] border-[var(--border-default)] transition-theme hover:border-[var(--border-default)]">
+        <div className="rounded-[var(--radius-md)] p-5 md:p-8 border bg-[var(--surface-subtle)] border-[var(--border-default)] transition-theme hover:border-[var(--border-default)]">
           <h3 className="text-lg md:text-xl font-bold text-[var(--text-primary)] mb-6 md:mb-8 text-center flex items-center justify-center gap-2">
-            <Zap size={20} className="text-accent" />
+            <Zap size={20} className="text-[var(--fg-accent)]" />
             <span>{t('howSystemWorks')}</span>
           </h3>
           
           <div className="space-y-6 md:space-y-8">
             {/* Step 1 */}
             <div className="flex items-start gap-3 md:gap-4 group">
-              <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-[4px] bg-[var(--surface-inset)] border border-[var(--border-default)] flex items-center justify-center text-[var(--text-primary)] text-sm md:text-lg font-bold group-hover:bg-[var(--surface-page)] transition-all duration-300">
+              <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-[var(--radius-xs)] bg-[var(--surface-inset)] border border-[var(--border-default)] flex items-center justify-center text-[var(--text-primary)] text-sm md:text-lg font-bold group-hover:bg-[var(--surface-page)] transition-all duration-300">
                 1
               </div>
               <div>
@@ -853,7 +856,7 @@ export const RewardsPage: React.FC = () => {
             
             {/* Step 2 */}
             <div className="flex items-start gap-3 md:gap-4 group">
-              <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-[4px] bg-[var(--surface-inset)] border border-[var(--border-default)] flex items-center justify-center text-[var(--text-primary)] text-sm md:text-lg font-bold group-hover:bg-[var(--surface-page)] transition-all duration-300">
+              <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-[var(--radius-xs)] bg-[var(--surface-inset)] border border-[var(--border-default)] flex items-center justify-center text-[var(--text-primary)] text-sm md:text-lg font-bold group-hover:bg-[var(--surface-page)] transition-all duration-300">
                 2
               </div>
               <div>
@@ -864,7 +867,7 @@ export const RewardsPage: React.FC = () => {
 
             {/* Step 3 */}
             <div className="flex items-start gap-3 md:gap-4 group">
-              <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-[4px] bg-[var(--surface-inset)] border border-[var(--border-default)] flex items-center justify-center text-[var(--text-primary)] text-sm md:text-lg font-bold group-hover:bg-[var(--surface-page)] transition-all duration-300">
+              <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-[var(--radius-xs)] bg-[var(--surface-inset)] border border-[var(--border-default)] flex items-center justify-center text-[var(--text-primary)] text-sm md:text-lg font-bold group-hover:bg-[var(--surface-page)] transition-all duration-300">
                 3
               </div>
               <div>
@@ -876,10 +879,10 @@ export const RewardsPage: React.FC = () => {
         </div>
 
         {/* Invite Friends */}
-        <div className="rounded-[var(--radius)] p-5 md:p-8 border bg-[var(--surface-subtle)] border-[var(--border-default)] flex flex-col transition-theme hover:border-[var(--border-default)]">
+        <div className="rounded-[var(--radius-md)] p-5 md:p-8 border bg-[var(--surface-subtle)] border-[var(--border-default)] flex flex-col transition-theme hover:border-[var(--border-default)]">
           <div className="text-center mb-6 md:mb-8">
             <h3 className="text-lg md:text-xl font-bold text-[var(--text-primary)] flex items-center justify-center gap-2">
-              <Zap size={18} className="text-accent" />
+              <Zap size={18} className="text-[var(--fg-accent)]" />
               <span>{t('inviteFriendsAndEarn')}</span>
             </h3>
             <p className="text-[11px] md:text-sm text-[var(--text-secondary)] mt-1.5 md:mt-2 max-w-sm mx-auto font-medium leading-relaxed">
@@ -889,11 +892,11 @@ export const RewardsPage: React.FC = () => {
 
           <div className="mt-auto space-y-4 md:space-y-6">
             {!wallet?.referral_activated ? (
-              <div className="p-4 md:p-6 rounded-[var(--radius)] border border-[var(--border-default)] bg-[var(--surface-page)] flex flex-col gap-4 text-center">
+              <div className="p-4 md:p-6 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-page)] flex flex-col gap-4 text-center">
                 {!showActivationForm ? (
                   <>
-                    <div className="w-10 h-10 rounded-[4px] bg-[var(--surface-inset)] flex items-center justify-center text-[var(--text-primary)] mx-auto border border-[var(--border-default)]">
-                      <Zap size={18} className="text-accent" />
+                    <div className="w-10 h-10 rounded-[var(--radius-xs)] bg-[var(--surface-inset)] flex items-center justify-center text-[var(--text-primary)] mx-auto border border-[var(--border-default)]">
+                      <Zap size={18} className="text-[var(--fg-accent)]" />
                     </div>
                     <div className="space-y-1.5">
                       <h4 className="text-xs md:text-sm font-extrabold text-[var(--text-primary)] uppercase tracking-wider">
@@ -916,9 +919,9 @@ export const RewardsPage: React.FC = () => {
                           setActivationMethod('stripe');
                         }
                       }}
-                      className="w-full flex items-center justify-center gap-2 py-3 rounded-[4px] bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-extrabold text-[11px] md:text-xs uppercase tracking-wider transition-all duration-300 border border-[var(--border-default)] cursor-pointer shadow-sm group"
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-[var(--radius-xs)] bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-extrabold text-[11px] md:text-xs uppercase tracking-wider transition-all duration-300 border border-[var(--border-default)] cursor-pointer shadow-sm group"
                     >
-                      <Zap size={14} className="text-accent transition-all duration-300" />
+                      <Zap size={14} className="text-[var(--fg-accent)] transition-all duration-300" />
                       <span>{dir === 'rtl' ? 'تفعيل نظام الأرباح الآن' : 'Activate Earnings Now'}</span>
                     </button>
                   </>
@@ -926,7 +929,7 @@ export const RewardsPage: React.FC = () => {
                   <form onSubmit={handleActivateWithDeposit} className="text-left space-y-4">
                     <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-2 mb-2">
                       <span className="text-xs font-black text-[var(--text-primary)] uppercase tracking-widest flex items-center gap-1.5">
-                        <Zap size={14} className="text-accent" />
+                        <Zap size={14} className="text-[var(--fg-accent)]" />
                         {dir === 'rtl' ? 'تفعيل حساب الإحالات والعمولات' : 'Referral Activation Hub'}
                       </span>
                       <button
@@ -939,11 +942,11 @@ export const RewardsPage: React.FC = () => {
                     </div>
 
                     {/* Method Selector Tabs */}
-                    <div className="grid grid-cols-5 gap-1 bg-[var(--surface-page)] p-0.5 rounded-[4px] border border-[var(--border-default)]">
+                    <div className="grid grid-cols-5 gap-1 bg-[var(--surface-page)] p-0.5 rounded-[var(--radius-xs)] border border-[var(--border-default)]">
                       <button
                         type="button"
                         onClick={() => setActivationMethod('balance')}
-                        className={`py-1.5 rounded-[4px] text-[9px] font-black uppercase text-center transition-all duration-300 cursor-pointer ${
+                        className={`py-1.5 rounded-[var(--radius-xs)] text-[9px] font-black uppercase text-center transition-all duration-300 cursor-pointer ${
                           activationMethod === 'balance'
                             ? 'bg-[var(--surface-inset)] text-[var(--text-primary)] border border-[var(--border-default)] font-extrabold'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
@@ -955,7 +958,7 @@ export const RewardsPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setActivationMethod('stripe')}
-                        className={`py-1.5 rounded-[4px] text-[9px] font-black uppercase text-center transition-all duration-300 cursor-pointer ${
+                        className={`py-1.5 rounded-[var(--radius-xs)] text-[9px] font-black uppercase text-center transition-all duration-300 cursor-pointer ${
                           activationMethod === 'stripe'
                             ? 'bg-[var(--surface-inset)] text-[var(--text-primary)] border border-[var(--border-default)] font-extrabold'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
@@ -967,7 +970,7 @@ export const RewardsPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setActivationMethod('crypto')}
-                        className={`py-1.5 rounded-[4px] text-[9px] font-black uppercase text-center transition-all duration-300 cursor-pointer ${
+                        className={`py-1.5 rounded-[var(--radius-xs)] text-[9px] font-black uppercase text-center transition-all duration-300 cursor-pointer ${
                           activationMethod === 'crypto'
                             ? 'bg-[var(--surface-inset)] text-[var(--text-primary)] border border-[var(--border-default)] font-extrabold'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
@@ -979,7 +982,7 @@ export const RewardsPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setActivationMethod('paypal')}
-                        className={`py-1.5 rounded-[4px] text-[9px] font-black uppercase text-center transition-all duration-300 cursor-pointer ${
+                        className={`py-1.5 rounded-[var(--radius-xs)] text-[9px] font-black uppercase text-center transition-all duration-300 cursor-pointer ${
                           activationMethod === 'paypal'
                             ? 'bg-[var(--surface-inset)] text-[var(--text-primary)] border border-[var(--border-default)] font-extrabold'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
@@ -991,7 +994,7 @@ export const RewardsPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setActivationMethod('bank')}
-                        className={`py-1.5 rounded-[4px] text-[9px] font-black uppercase text-center transition-all duration-300 cursor-pointer ${
+                        className={`py-1.5 rounded-[var(--radius-xs)] text-[9px] font-black uppercase text-center transition-all duration-300 cursor-pointer ${
                           activationMethod === 'bank'
                             ? 'bg-[var(--surface-inset)] text-[var(--text-primary)] border border-[var(--border-default)] font-extrabold'
                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
@@ -1011,11 +1014,11 @@ export const RewardsPage: React.FC = () => {
                               ? `يمكنك تفعيل حساب الأرباح فوراً باستخدام رصيدك المتوفر حالياً في المحفظة التقنية.`
                               : `Directly activate your referrals and earnings using your available tech wallet balance.`}
                           </p>
-                          <div className="flex items-center justify-between bg-[var(--surface-inset)] border border-[var(--border-default)] p-2 rounded-[4px] text-[11px] font-black">
+                          <div className="flex items-center justify-between bg-[var(--surface-inset)] border border-[var(--border-default)] p-2 rounded-[var(--radius-xs)] text-[11px] font-black">
                             <span className="text-[var(--text-secondary)]">{dir === 'rtl' ? 'الرصيد المتاح:' : 'Available Balance:'}</span>
                             <span className="text-[var(--text-primary)] font-mono">${wallet?.balance || 0}</span>
                           </div>
-                          <div className="flex items-center justify-between bg-[var(--surface-inset)] border border-[var(--border-default)] p-2 rounded-[4px] text-[11px] font-black">
+                          <div className="flex items-center justify-between bg-[var(--surface-inset)] border border-[var(--border-default)] p-2 rounded-[var(--radius-xs)] text-[11px] font-black">
                             <span className="text-[var(--text-secondary)]">{dir === 'rtl' ? 'رسوم التفعيل:' : 'Activation Fee:'}</span>
                             <span className="text-[var(--text-primary)] font-mono">${economySettings?.referral_activation_min_deposit || 10}</span>
                           </div>
@@ -1024,17 +1027,17 @@ export const RewardsPage: React.FC = () => {
                               type="button"
                               disabled={isActivating}
                               onClick={handleActivateWithBalance}
-                              className="w-full py-2 bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-extrabold text-[10px] uppercase tracking-wider rounded-[4px] flex items-center justify-center gap-1.5 transition-all duration-300 cursor-pointer group"
+                              className="w-full py-2 bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-extrabold text-[10px] uppercase tracking-wider rounded-[var(--radius-xs)] flex items-center justify-center gap-1.5 transition-all duration-300 cursor-pointer group"
                             >
                               {isActivating ? (
-                                <RefreshCw size={12} className="animate-spin text-accent" />
+                                <RefreshCw size={12} className="animate-spin text-[var(--fg-accent)]" />
                               ) : (
-                                <ShieldCheck size={12} className="text-accent" />
+                                <ShieldCheck size={12} className="text-[var(--fg-accent)]" />
                               )}
                               <span>{dir === 'rtl' ? 'تفعيل فوري وخصم من الرصيد' : 'Deduct Balance & Activate Now'}</span>
                             </button>
                           ) : (
-                            <div className="p-2 border border-rose-500/10 bg-rose-500/[0.02] rounded-[4px] text-[9px] text-rose-500 font-bold leading-relaxed flex items-center gap-2">
+                            <div className="p-2 border border-rose-500/10 bg-rose-500/[0.02] rounded-[var(--radius-xs)] text-[9px] text-rose-500 font-bold leading-relaxed flex items-center gap-2">
                               <AlertTriangle size={12} className="flex-shrink-0" />
                               <span>
                                 {dir === 'rtl'
@@ -1056,12 +1059,12 @@ export const RewardsPage: React.FC = () => {
                           <button
                             type="submit"
                             disabled={isActivating}
-                            className="w-full py-2 bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-extrabold text-[10px] uppercase tracking-wider rounded-[4px] flex items-center justify-center gap-1.5 transition-all duration-300 cursor-pointer group"
+                            className="w-full py-2 bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-extrabold text-[10px] uppercase tracking-wider rounded-[var(--radius-xs)] flex items-center justify-center gap-1.5 transition-all duration-300 cursor-pointer group"
                           >
                             {isActivating ? (
-                              <RefreshCw size={12} className="animate-spin text-accent" />
+                              <RefreshCw size={12} className="animate-spin text-[var(--fg-accent)]" />
                             ) : (
-                              <CreditCard size={12} className="text-accent" />
+                              <CreditCard size={12} className="text-[var(--fg-accent)]" />
                             )}
                             <span>{dir === 'rtl' ? 'الدفع الآمن بالبطاقة والتفعيل الفوري' : 'Pay Safely & Activate Instantly'}</span>
                           </button>
@@ -1071,10 +1074,10 @@ export const RewardsPage: React.FC = () => {
                       {/* Manual USDT Deposit Channel */}
                       {activationMethod === 'crypto' && (
                         <div className="space-y-3.5 text-left">
-                          <div className="p-2 border border-[var(--border-default)] bg-[var(--surface-inset)] rounded-[4px] space-y-1.5">
+                          <div className="p-2 border border-[var(--border-default)] bg-[var(--surface-inset)] rounded-[var(--radius-xs)] space-y-1.5">
                             <span className="text-[9px] uppercase font-black text-[var(--text-primary)] tracking-wider block">USDT TRC-20 Address</span>
                             <div className="flex items-center gap-2">
-                              <span className="font-mono text-[9px] text-[var(--text-primary)] select-all truncate block flex-1 bg-[var(--surface-subtle)] p-1 border border-[var(--border-default)] py-1 shadow-inner rounded-[3px]">
+                              <span className="font-mono text-[9px] text-[var(--text-primary)] select-all truncate block flex-1 bg-[var(--surface-subtle)] p-1 border border-[var(--border-default)] py-1 shadow-inner rounded-[var(--radius-xs)]">
                                 {economySettings?.crypto_address || 'No Address available'}
                               </span>
                               <button
@@ -1085,7 +1088,7 @@ export const RewardsPage: React.FC = () => {
                                     toast.success(dir === 'rtl' ? 'تم نسخ العنوان بنجاح!' : 'USDT TRC-20 Address Copied!');
                                   }
                                 }}
-                                className="px-2 py-1 bg-[var(--surface-subtle)] hover:bg-[var(--surface-page)] text-[var(--text-primary)] rounded-[3px] text-[9px] font-black cursor-pointer transition-all duration-300 border border-[var(--border-default)]"
+                                className="px-2 py-1 bg-[var(--surface-subtle)] hover:bg-[var(--surface-page)] text-[var(--text-primary)] rounded-[var(--radius-xs)] text-[9px] font-black cursor-pointer transition-all duration-300 border border-[var(--border-default)]"
                               >
                                 {dir === 'rtl' ? 'نسخ' : 'Copy'}
                               </button>
@@ -1102,7 +1105,7 @@ export const RewardsPage: React.FC = () => {
                               value={activationRefId}
                               onChange={(e) => setActivationRefId(e.target.value)}
                               placeholder="e.g. 0x82c1f301ae9f..."
-                              className="w-full px-2.5 py-1.5 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[4px] text-[10px] font-bold font-mono focus:outline-none focus:border-accent transition-all duration-300 text-[var(--text-primary)]"
+                              className="w-full px-2.5 py-1.5 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-xs)] text-[10px] font-bold font-mono focus:outline-none focus:border-[var(--border-accent)] transition-all duration-300 text-[var(--text-primary)]"
                             />
                           </div>
 
@@ -1122,7 +1125,7 @@ export const RewardsPage: React.FC = () => {
                             />
                             <div
                               onClick={() => activationFileInputRef.current?.click()}
-                              className="border border-dashed border-[var(--border-default)] hover:border-accent p-2 py-3 rounded-[4px] flex flex-col items-center justify-center gap-1 bg-[var(--surface-subtle)] cursor-pointer text-center text-[9px] text-[var(--text-secondary)] group hover:text-[var(--text-primary)] transition-all duration-300"
+                              className="border border-dashed border-[var(--border-default)] hover:border-[var(--border-accent)] p-2 py-3 rounded-[var(--radius-xs)] flex flex-col items-center justify-center gap-1 bg-[var(--surface-subtle)] cursor-pointer text-center text-[9px] text-[var(--text-secondary)] group hover:text-[var(--text-primary)] transition-all duration-300"
                             >
                               <Camera size={14} className="text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-all duration-300" />
                               <span className="font-semibold select-none">
@@ -1134,16 +1137,16 @@ export const RewardsPage: React.FC = () => {
                           <button
                             type="submit"
                             disabled={isActivating}
-                            className="w-full py-2 bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-extrabold text-[10px] uppercase tracking-wider rounded-[4px] flex items-center justify-center gap-1.5 transition-all duration-300 cursor-pointer group"
+                            className="w-full py-2 bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-extrabold text-[10px] uppercase tracking-wider rounded-[var(--radius-xs)] flex items-center justify-center gap-1.5 transition-all duration-300 cursor-pointer group"
                           >
                             {isActivating ? (
                               <span className="flex items-center gap-1.5 text-[9px]">
-                                <RefreshCw size={11} className="animate-spin text-accent" />
+                                <RefreshCw size={11} className="animate-spin text-[var(--fg-accent)]" />
                                 {activationStep === 1 ? (dir === 'rtl' ? 'جاري رفع الملف...' : 'Uploading proof...') : (dir === 'rtl' ? 'جاري التقييد والمزامنة...' : 'Validating request...')}
                               </span>
                             ) : (
                               <>
-                                <Send size={11} className="text-accent" />
+                                <Send size={11} className="text-[var(--fg-accent)]" />
                                 <span>{dir === 'rtl' ? 'إرسال الإثبات وتفعيل الحساب' : 'Submit Proof & Request Activation'}</span>
                               </>
                             )}
@@ -1154,10 +1157,10 @@ export const RewardsPage: React.FC = () => {
                       {/* Manual PayPal Channel */}
                       {activationMethod === 'paypal' && (
                         <div className="space-y-3.5 text-left">
-                          <div className="p-2 border border-[var(--border-default)] bg-[var(--surface-inset)] rounded-[4px] space-y-1.5">
+                          <div className="p-2 border border-[var(--border-default)] bg-[var(--surface-inset)] rounded-[var(--radius-xs)] space-y-1.5">
                             <span className="text-[9px] uppercase font-black text-[var(--text-primary)] tracking-wider block">PayPal Recipient Email</span>
                             <div className="flex items-center gap-2">
-                              <span className="font-mono text-[9px] text-[var(--text-primary)] select-all truncate block flex-1 bg-[var(--surface-subtle)] p-1 border border-[var(--border-default)] py-1 shadow-inner rounded-[3px]">
+                              <span className="font-mono text-[9px] text-[var(--text-primary)] select-all truncate block flex-1 bg-[var(--surface-subtle)] p-1 border border-[var(--border-default)] py-1 shadow-inner rounded-[var(--radius-xs)]">
                                 {economySettings?.paypal_email || 'No email configured'}
                               </span>
                               <button
@@ -1168,7 +1171,7 @@ export const RewardsPage: React.FC = () => {
                                     toast.success(dir === 'rtl' ? 'تم نسخ ايميل بايبال!' : 'PayPal Email Copied!');
                                   }
                                 }}
-                                className="px-2 py-1 bg-[var(--surface-subtle)] hover:bg-[var(--surface-page)] text-[var(--text-primary)] rounded-[3px] text-[9px] font-black cursor-pointer transition-all duration-300 border border-[var(--border-default)]"
+                                className="px-2 py-1 bg-[var(--surface-subtle)] hover:bg-[var(--surface-page)] text-[var(--text-primary)] rounded-[var(--radius-xs)] text-[9px] font-black cursor-pointer transition-all duration-300 border border-[var(--border-default)]"
                               >
                                 {dir === 'rtl' ? 'نسخ' : 'Copy'}
                               </button>
@@ -1185,7 +1188,7 @@ export const RewardsPage: React.FC = () => {
                               value={activationRefId}
                               onChange={(e) => setActivationRefId(e.target.value)}
                               placeholder="e.g. PP-581023 or sender@example.com"
-                              className="w-full px-2.5 py-1.5 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[4px] text-[10px] font-bold font-mono focus:outline-none focus:border-accent transition-all duration-300 text-[var(--text-primary)]"
+                              className="w-full px-2.5 py-1.5 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-xs)] text-[10px] font-bold font-mono focus:outline-none focus:border-[var(--border-accent)] transition-all duration-300 text-[var(--text-primary)]"
                             />
                           </div>
 
@@ -1205,7 +1208,7 @@ export const RewardsPage: React.FC = () => {
                             />
                             <div
                               onClick={() => activationFileInputRef.current?.click()}
-                              className="border border-dashed border-[var(--border-default)] hover:border-accent p-2 py-3 rounded-[4px] flex flex-col items-center justify-center gap-1 bg-[var(--surface-subtle)] cursor-pointer text-center text-[9px] text-[var(--text-secondary)] group hover:text-[var(--text-primary)] transition-all duration-300"
+                              className="border border-dashed border-[var(--border-default)] hover:border-[var(--border-accent)] p-2 py-3 rounded-[var(--radius-xs)] flex flex-col items-center justify-center gap-1 bg-[var(--surface-subtle)] cursor-pointer text-center text-[9px] text-[var(--text-secondary)] group hover:text-[var(--text-primary)] transition-all duration-300"
                             >
                               <Camera size={14} className="text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-all duration-300" />
                               <span className="font-semibold select-none">
@@ -1217,16 +1220,16 @@ export const RewardsPage: React.FC = () => {
                           <button
                             type="submit"
                             disabled={isActivating}
-                            className="w-full py-2 bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-extrabold text-[10px] uppercase tracking-wider rounded-[4px] flex items-center justify-center gap-1.5 transition-all duration-300 cursor-pointer group"
+                            className="w-full py-2 bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-extrabold text-[10px] uppercase tracking-wider rounded-[var(--radius-xs)] flex items-center justify-center gap-1.5 transition-all duration-300 cursor-pointer group"
                           >
                             {isActivating ? (
                               <span className="flex items-center gap-1.5 text-[9px]">
-                                <RefreshCw size={11} className="animate-spin text-accent" />
+                                <RefreshCw size={11} className="animate-spin text-[var(--fg-accent)]" />
                                 {activationStep === 1 ? (dir === 'rtl' ? 'جاري رفع الملف...' : 'Uploading proof...') : (dir === 'rtl' ? 'جاري التقييد والمزامنة...' : 'Validating request...')}
                               </span>
                             ) : (
                               <>
-                                <Send size={11} className="text-accent" />
+                                <Send size={11} className="text-[var(--fg-accent)]" />
                                 <span>{dir === 'rtl' ? 'إرسال الإثبات وتفعيل الحساب' : 'Submit Proof & Request Activation'}</span>
                               </>
                             )}
@@ -1237,7 +1240,7 @@ export const RewardsPage: React.FC = () => {
                       {/* Manual Bank Transfer Channel */}
                       {activationMethod === 'bank' && (
                         <div className="space-y-3 text-left">
-                          <div className="p-2 border border-[var(--border-default)] bg-[var(--surface-inset)] rounded-[4px] space-y-2 text-[9px] font-bold">
+                          <div className="p-2 border border-[var(--border-default)] bg-[var(--surface-inset)] rounded-[var(--radius-xs)] space-y-2 text-[9px] font-bold">
                             <span className="text-[9px] uppercase font-black text-[var(--text-primary)] tracking-wider block">Official Bank Details</span>
                             <div className="grid grid-cols-2 gap-2 text-[9px]">
                               <div>
@@ -1250,12 +1253,12 @@ export const RewardsPage: React.FC = () => {
                               </div>
                               <div className="col-span-2">
                                 <span className="text-[var(--text-secondary)] block">IBAN Number:</span>
-                                <span className="text-[var(--text-primary)] font-mono block font-black select-all whitespace-normal bg-[var(--surface-subtle)] p-1 border border-[var(--border-default)] mb-1 rounded-[3px]">{economySettings?.bank_iban || 'SA0380000000000'}</span>
+                                <span className="text-[var(--text-primary)] font-mono block font-black select-all whitespace-normal bg-[var(--surface-subtle)] p-1 border border-[var(--border-default)] mb-1 rounded-[var(--radius-xs)]">{economySettings?.bank_iban || 'SA0380000000000'}</span>
                               </div>
                               {economySettings?.bank_swift && (
                                 <div className="col-span-2">
                                   <span className="text-[var(--text-secondary)] block">Bank SWIFT / BIC:</span>
-                                  <span className="text-[var(--text-primary)] font-mono block font-black select-all bg-[var(--surface-subtle)] p-1 border border-[var(--border-default)] rounded-[3px]">{economySettings.bank_swift}</span>
+                                  <span className="text-[var(--text-primary)] font-mono block font-black select-all bg-[var(--surface-subtle)] p-1 border border-[var(--border-default)] rounded-[var(--radius-xs)]">{economySettings.bank_swift}</span>
                                 </div>
                               )}
                             </div>
@@ -1271,7 +1274,7 @@ export const RewardsPage: React.FC = () => {
                               value={activationRefId}
                               onChange={(e) => setActivationRefId(e.target.value)}
                               placeholder={dir === 'rtl' ? 'مثل: محمد أحمد أحمد / كود 58210' : 'e.g. John Doe / Ref ID 9821a'}
-                              className="w-full px-2.5 py-1.5 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[4px] text-[10px] font-bold focus:outline-none focus:border-accent transition-all duration-300 text-[var(--text-primary)]"
+                              className="w-full px-2.5 py-1.5 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-[var(--radius-xs)] text-[10px] font-bold focus:outline-none focus:border-[var(--border-accent)] transition-all duration-300 text-[var(--text-primary)]"
                             />
                           </div>
 
@@ -1291,7 +1294,7 @@ export const RewardsPage: React.FC = () => {
                             />
                             <div
                               onClick={() => activationFileInputRef.current?.click()}
-                              className="border border-dashed border-[var(--border-default)] hover:border-accent p-2 py-3 rounded-[4px] flex flex-col items-center justify-center gap-1 bg-[var(--surface-subtle)] cursor-pointer text-center text-[9px] text-[var(--text-secondary)] group hover:text-[var(--text-primary)] transition-all duration-300"
+                              className="border border-dashed border-[var(--border-default)] hover:border-[var(--border-accent)] p-2 py-3 rounded-[var(--radius-xs)] flex flex-col items-center justify-center gap-1 bg-[var(--surface-subtle)] cursor-pointer text-center text-[9px] text-[var(--text-secondary)] group hover:text-[var(--text-primary)] transition-all duration-300"
                             >
                               <Camera size={14} className="text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-all duration-300" />
                               <span className="font-semibold select-none">
@@ -1303,16 +1306,16 @@ export const RewardsPage: React.FC = () => {
                           <button
                             type="submit"
                             disabled={isActivating}
-                            className="w-full py-2 bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-extrabold text-[10px] uppercase tracking-wider rounded-[4px] flex items-center justify-center gap-1.5 transition-all duration-300 cursor-pointer group"
+                            className="w-full py-2 bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-extrabold text-[10px] uppercase tracking-wider rounded-[var(--radius-xs)] flex items-center justify-center gap-1.5 transition-all duration-300 cursor-pointer group"
                           >
                             {isActivating ? (
                               <span className="flex items-center gap-1.5 text-[9px]">
-                                <RefreshCw size={11} className="animate-spin text-accent" />
+                                <RefreshCw size={11} className="animate-spin text-[var(--fg-accent)]" />
                                 {activationStep === 1 ? (dir === 'rtl' ? 'جاري رفع الملف...' : 'Uploading proof...') : (dir === 'rtl' ? 'جاري التقييد والمزامنة...' : 'Validating request...')}
                               </span>
                             ) : (
                               <>
-                                <Send size={11} className="text-accent" />
+                                <Send size={11} className="text-[var(--fg-accent)]" />
                                 <span>{dir === 'rtl' ? 'إرسال الإثبات وتفعيل الحساب' : 'Submit Proof & Request Activation'}</span>
                               </>
                             )}
@@ -1327,18 +1330,18 @@ export const RewardsPage: React.FC = () => {
               <div className="space-y-1.5 md:space-y-2">
                 <label className="text-xs md:text-sm text-[var(--text-secondary)] font-bold uppercase tracking-widest">{t('yourReferralLink')}</label>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 p-2.5 md:p-3 rounded-[4px] border bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-primary)] font-mono text-[11px] md:text-xs overflow-hidden text-ellipsis whitespace-nowrap shadow-inner">
+                  <div className="flex-1 p-2.5 md:p-3 rounded-[var(--radius-xs)] border bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-primary)] font-mono text-[11px] md:text-xs overflow-hidden text-ellipsis whitespace-nowrap shadow-inner">
                     {referralLink}
                   </div>
                   <button 
                     onClick={handleCopy}
-                    className={`flex items-center justify-center gap-2 px-3 md:px-4 py-2.5 md:py-3 rounded-[4px] border transition-all duration-300 cursor-pointer ${
+                    className={`flex items-center justify-center gap-2 px-3 md:px-4 py-2.5 md:py-3 rounded-[var(--radius-xs)] border transition-all duration-300 cursor-pointer ${
                       copied 
                         ? 'bg-[var(--control-active-bg)] border-[var(--border-default)] text-[var(--control-active-fg)] font-bold' 
                         : 'bg-[var(--surface-inset)] hover:bg-[var(--surface-subtle)] border-[var(--border-default)] text-[var(--text-primary)] font-extrabold'
                     }`}
                   >
-                    {copied ? <Check size={16} className="text-accent" /> : <Copy size={16} className="text-accent" />}
+                    {copied ? <Check size={16} className="text-[var(--fg-accent)]" /> : <Copy size={16} className="text-[var(--fg-accent)]" />}
                     <span className="hidden sm:inline text-xs md:text-sm font-bold">{copied ? t('copied') : t('copy')}</span>
                   </button>
                 </div>
@@ -1350,7 +1353,7 @@ export const RewardsPage: React.FC = () => {
               <div className="pt-6 border-t border-[var(--border-default)] space-y-4">
                 <div className="space-y-1.5" style={{ textAlign: dir === 'rtl' ? 'right' : 'left' }}>
                   <label className={`text-xs md:text-sm text-[var(--text-secondary)] font-bold uppercase tracking-widest flex items-center gap-2 ${dir === 'rtl' ? 'flex-row-reverse' : ''}`}>
-                    <Mail size={14} className="text-accent" />
+                    <Mail size={14} className="text-[var(--fg-accent)]" />
                     <span>{dir === 'rtl' ? 'دعوة صديق عبر البريد الإلكتروني' : 'Invite Friend via Email'}</span>
                   </label>
                   <p className="text-[10px] md:text-[11px] text-[var(--text-muted)] leading-relaxed">
@@ -1367,20 +1370,20 @@ export const RewardsPage: React.FC = () => {
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                     placeholder={dir === 'rtl' ? 'البريد الإلكتروني للزميل (مثال: peer@example.com)' : 'Peer email address (e.g., peer@example.com)'}
-                    className="flex-1 px-3 md:px-4 py-2 bg-[var(--surface-page)] border border-[var(--border-default)] rounded-[4px] text-xs md:text-sm focus:outline-none focus:border-accent font-sans text-[var(--text-primary)] transition-all duration-300"
+                    className="flex-1 px-3 md:px-4 py-2 bg-[var(--surface-page)] border border-[var(--border-default)] rounded-[var(--radius-xs)] text-xs md:text-sm focus:outline-none focus:border-[var(--border-accent)] font-sans text-[var(--text-primary)] transition-all duration-300"
                     disabled={isInviting}
                   />
                   <button
                     type="submit"
                     disabled={isInviting}
-                    className={`flex items-center justify-center gap-2 px-4 md:px-5 py-2 rounded-[4px] bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-bold text-xs md:text-sm shadow-md transition-all duration-300 cursor-pointer ${
+                    className={`flex items-center justify-center gap-2 px-4 md:px-5 py-2 rounded-[var(--radius-xs)] bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-bold text-xs md:text-sm shadow-md transition-all duration-300 cursor-pointer ${
                       isInviting ? 'opacity-60 cursor-not-allowed' : ''
                     }`}
                   >
                     {isInviting ? (
-                      <RefreshCw size={14} className="animate-spin text-accent" />
+                      <RefreshCw size={14} className="animate-spin text-[var(--fg-accent)]" />
                     ) : (
-                      <Send size={14} className="text-accent" />
+                      <Send size={14} className="text-[var(--fg-accent)]" />
                     )}
                     <span>{isInviting ? (dir === 'rtl' ? 'جاري الإرسال...' : 'Sending...') : (dir === 'rtl' ? 'إرسال الدعوة' : 'Send Invite')}</span>
                   </button>
@@ -1392,7 +1395,7 @@ export const RewardsPage: React.FC = () => {
                     <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] block" style={{ textAlign: dir === 'rtl' ? 'right' : 'left' }}>
                       {dir === 'rtl' ? 'سجل الدعوات المرسلة' : 'Sent Invitations Ledger'}
                     </span>
-                    <div className="max-h-32 overflow-y-auto space-y-1.5 scrollbar-thin border border-[var(--border-default)] rounded-[4px] bg-[var(--surface-page)]/40 p-2 md:p-3">
+                    <div className="max-h-32 overflow-y-auto space-y-1.5 scrollbar-thin border border-[var(--border-default)] rounded-[var(--radius-xs)] bg-[var(--surface-page)]/40 p-2 md:p-3">
                       {sentInvitations.map((inv: any, invIdx: number) => (
                         <div key={`reward-inv-${inv.id || invIdx}-${invIdx}`} className="flex items-center justify-between text-[11px] py-1 border-b border-[var(--border-default)]/40 last:border-0" style={{ direction: dir === 'rtl' ? 'rtl' : 'ltr' }}>
                           <span className="font-mono text-[var(--text-secondary)] font-bold">{inv.email}</span>
@@ -1404,19 +1407,19 @@ export const RewardsPage: React.FC = () => {
                                 year: 'numeric'
                               })}
                             </span>
-                            <span className="px-1.5 py-0.5 rounded-sm text-[9px] font-black uppercase bg-[var(--surface-inset)] text-[var(--text-secondary)] border border-[var(--border-default)]">
+                            <span className="px-1.5 py-0.5 rounded-[var(--radius-xs)] text-[9px] font-black uppercase bg-[var(--surface-inset)] text-[var(--text-secondary)] border border-[var(--border-default)]">
                               {inv.status === 'reminded' ? (dir === 'rtl' ? 'تم التذكير' : 'Reminded') : (dir === 'rtl' ? 'تم الإرسال' : 'Sent')}
                             </span>
                             <button
                               type="button"
                               onClick={() => handleRemindInvitation(inv.email)}
                               disabled={remindingEmails[inv.email]}
-                              className="px-2 py-1 bg-[var(--surface-inset)] hover:bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] text-[10px] font-bold rounded-[4px] transition-all duration-300 cursor-pointer flex items-center gap-1"
+                              className="px-2 py-1 bg-[var(--surface-inset)] hover:bg-[var(--surface-subtle)] border border-[var(--border-default)] text-[var(--text-primary)] text-[10px] font-bold rounded-[var(--radius-xs)] transition-all duration-300 cursor-pointer flex items-center gap-1"
                             >
                               {remindingEmails[inv.email] ? (
-                                <RefreshCw size={10} className="animate-spin text-accent" />
+                                <RefreshCw size={10} className="animate-spin text-[var(--fg-accent)]" />
                               ) : (
-                                <Zap size={10} className="text-accent" />
+                                <Zap size={10} className="text-[var(--fg-accent)]" />
                               )}
                               <span>{dir === 'rtl' ? 'تذكير' : 'Remind'}</span>
                             </button>
@@ -1429,10 +1432,10 @@ export const RewardsPage: React.FC = () => {
               </div>
             )}
 
-            <div className="group flex items-center justify-between p-4 md:p-6 rounded-[var(--radius)] border bg-[var(--surface-page)] border-[var(--border-default)] hover:border-[var(--border-accent)] transition-all duration-300 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
+            <div className="group flex items-center justify-between p-4 md:p-6 rounded-[var(--radius-md)] border bg-[var(--surface-page)] border-[var(--border-default)] hover:border-[var(--border-accent)] transition-all duration-300 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
               <div className="flex items-center gap-3 md:gap-4">
-                <div className="w-10 h-10 md:w-12 md:h-12 rounded-[4px] bg-[var(--surface-inset)] border border-[var(--border-default)] flex items-center justify-center text-[var(--text-primary)] transition-all duration-300">
-                  <Gift size={20} className="md:w-6 md:h-6 group-hover:scale-110 transition-transform duration-300 text-accent" />
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-[var(--radius-xs)] bg-[var(--surface-inset)] border border-[var(--border-default)] flex items-center justify-center text-[var(--text-primary)] transition-all duration-300">
+                  <Gift size={20} className="md:w-6 md:h-6 group-hover:scale-110 transition-transform duration-300 text-[var(--fg-accent)]" />
                 </div>
                 <span className="font-black text-xs md:text-base text-[var(--text-primary)] uppercase tracking-tight">
                   {t('totalSuccessfulReferralsUser')}
@@ -1448,11 +1451,11 @@ export const RewardsPage: React.FC = () => {
       </div>
 
       {/* Referred Friends & Deposit Verification History List */}
-      <div className="rounded-[var(--radius)] p-5 md:p-8 border bg-[var(--surface-subtle)] border-[var(--border-default)] flex flex-col transition-theme hover:border-[var(--border-accent)]">
+      <div className="rounded-[var(--radius-md)] p-5 md:p-8 border bg-[var(--surface-subtle)] border-[var(--border-default)] flex flex-col transition-theme hover:border-[var(--border-accent)]">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 border-b border-[var(--border-default)] pb-6">
           <div>
             <h3 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <Users size={20} className="text-accent" />
+              <Users size={20} className="text-[var(--fg-accent)]" />
               <span>{dir === 'rtl' ? 'سجل الأصدقاء والعمولات' : 'Invited Friends & Verification Status'}</span>
             </h3>
             <p className="text-xs text-[var(--text-secondary)] mt-1 font-medium select-none">
@@ -1465,7 +1468,7 @@ export const RewardsPage: React.FC = () => {
           {/* Filters & Sorting */}
           <div className="flex flex-wrap items-center gap-3 self-start sm:self-center">
             {/* Filters */}
-            <div className="flex flex-wrap gap-1 bg-[var(--surface-page)] p-1 rounded-[4px] border border-[var(--border-default)]">
+            <div className="flex flex-wrap gap-1 bg-[var(--surface-page)] p-1 rounded-[var(--radius-xs)] border border-[var(--border-default)]">
               {(['all', 'verified', 'pending', 'nodeposityet'] as const).map((filterOpt) => {
                 const label = {
                   all: dir === 'rtl' ? 'الكل' : 'All',
@@ -1479,7 +1482,7 @@ export const RewardsPage: React.FC = () => {
                     key={`reward-filter-${filterOpt}`}
                     type="button"
                     onClick={() => setFriendsFilter(filterOpt)}
-                    className={`px-3 py-1.5 rounded-[4px] text-[10px] font-black uppercase text-center transition-all duration-300 cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-[var(--radius-xs)] text-[10px] font-black uppercase text-center transition-all duration-300 cursor-pointer ${
                       friendsFilter === filterOpt
                         ? 'bg-[var(--surface-inset)] text-[var(--text-primary)] border border-[var(--border-default)] font-extrabold'
                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
@@ -1492,22 +1495,17 @@ export const RewardsPage: React.FC = () => {
             </div>
 
             {/* Sorting Dropdown */}
-            <div className="flex items-center gap-1.5 bg-[var(--surface-page)] px-2 py-1.5 rounded-sm border border-[var(--border-default)] text-xs font-bold text-[var(--text-secondary)]">
-              <span className="text-[10px] uppercase font-black tracking-wider select-none">
-                {dir === 'rtl' ? 'ترتيب:' : 'Sort:'}
-              </span>
-              <select
+            <div className="w-36">
+              <SelectDropdown
+                size="sm"
                 value={friendsSort}
-                onChange={(e) => setFriendsSort(e.target.value as 'joined_at' | 'deposit_amount')}
-                className="bg-transparent border-none outline-none text-[var(--text-primary)] font-black text-[10px] uppercase cursor-pointer py-0.5"
-              >
-                <option value="joined_at" className="bg-[var(--surface-subtle)] text-[var(--text-primary)] font-bold">
-                  {dir === 'rtl' ? 'التاريخ' : 'Date'}
-                </option>
-                <option value="deposit_amount" className="bg-[var(--surface-subtle)] text-[var(--text-primary)] font-bold">
-                  {dir === 'rtl' ? 'مبلغ الإيداع' : 'Deposit Amount'}
-                </option>
-              </select>
+                onChange={(val) => setFriendsSort(val as 'joined_at' | 'deposit_amount')}
+                dir={dir === 'rtl' ? 'rtl' : 'ltr'}
+                options={[
+                  { value: 'joined_at', label: dir === 'rtl' ? 'التاريخ' : 'Date' },
+                  { value: 'deposit_amount', label: dir === 'rtl' ? 'مبلغ الإيداع' : 'Deposit Amount' }
+                ]}
+              />
             </div>
           </div>
         </div>
@@ -1515,7 +1513,7 @@ export const RewardsPage: React.FC = () => {
         {/* Loading Spinner */}
         {isLoadingReferredFriends ? (
           <div className="py-12 flex flex-col items-center justify-center gap-3 text-[var(--text-secondary)]">
-            <RefreshCw className="animate-spin text-accent" size={24} />
+            <RefreshCw className="animate-spin text-[var(--fg-accent)]" size={24} />
             <span className="text-xs font-bold uppercase tracking-wider">
               {dir === 'rtl' ? 'جاري تحميل سجل الأرباح...' : 'Loading referral ledger...'}
             </span>
@@ -1531,7 +1529,7 @@ export const RewardsPage: React.FC = () => {
 
           if (filtered.length === 0) {
             return (
-              <div className="py-12 text-center rounded-[var(--radius)] border border-dashed border-[var(--border-default)] bg-[var(--surface-page)]/40">
+              <div className="py-12 text-center rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)] bg-[var(--surface-page)]/40">
                 <Users className="mx-auto text-[var(--text-muted)] opacity-30 mb-3" size={32} />
                 <h4 className="text-sm font-bold text-[var(--text-primary)]">
                   {dir === 'rtl' ? 'لا توجد نتائج مطابقة لتصفيتك' : 'No Friends Fit This Filter'}
@@ -1622,7 +1620,7 @@ export const RewardsPage: React.FC = () => {
                       <tr key={`friend-row-${friend.referral_id || friend.id || fIdx}-${fIdx}`} className="hover:bg-[var(--surface-page)]/40 transition-theme">
                         <td className="py-4 pr-3">
                           <div className={`flex items-center gap-3 ${dir === 'rtl' ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}>
-                            <div className="w-8 h-8 rounded-[4px] bg-[var(--surface-inset)] text-[var(--text-primary)] flex items-center justify-center font-bold text-xs uppercase border border-[var(--border-default)] select-none">
+                            <div className="w-8 h-8 rounded-[var(--radius-xs)] bg-[var(--surface-inset)] text-[var(--text-primary)] flex items-center justify-center font-bold text-xs uppercase border border-[var(--border-default)] select-none">
                               {friend.name ? friend.name.charAt(0) : 'U'}
                             </div>
                             <div>
@@ -1648,7 +1646,7 @@ export const RewardsPage: React.FC = () => {
                         </td>
                         <td className={`py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                           <div className="inline-flex flex-col">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-[3px] text-[9px] font-black border uppercase tracking-wider ${depBadgeProps.bg}`}>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-[var(--radius-xs)] text-[9px] font-black border uppercase tracking-wider ${depBadgeProps.bg}`}>
                               {depBadgeProps.label}
                             </span>
                             {friend.deposit_rejection_reason && friend.deposit_status === 'rejected' && (
@@ -1676,16 +1674,16 @@ export const RewardsPage: React.FC = () => {
                                   className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[9px] font-black uppercase bg-[var(--surface-inset)] text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] border border-[var(--border-default)] transition-theme cursor-pointer"
                                 >
                                   {remindingEmails[friend.email] ? (
-                                    <RefreshCw size={10} className="animate-spin text-accent" />
+                                    <RefreshCw size={10} className="animate-spin text-[var(--fg-accent)]" />
                                   ) : (
-                                    <Zap size={10} className="text-accent" />
+                                    <Zap size={10} className="text-[var(--fg-accent)]" />
                                   )}
                                   <span>{dir === 'rtl' ? 'تذكير' : 'Remind'}</span>
                                 </button>
                               )}
                             </div>
                             {friend.referral_status === 'active' && (
-                              <span className="block text-[10px] text-accent font-extrabold tracking-tight">
+                              <span className="block text-[10px] text-[var(--fg-accent)] font-extrabold tracking-tight">
                                 +{Number(friend.bonus_points || 0).toLocaleString()} PTS
                               </span>
                             )}
@@ -1703,7 +1701,7 @@ export const RewardsPage: React.FC = () => {
 
       {/* KYC Verification Card */}
       {contextUser?.kyc_required && contextUser?.kyc_status !== 'verified' && (
-        <div className={`rounded-[var(--radius)] p-5 md:p-8 border transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] col-span-1 md:col-span-2 shadow-sm ${
+        <div className={`rounded-[var(--radius-md)] p-5 md:p-8 border transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] col-span-1 md:col-span-2 shadow-sm ${
           contextUser?.kyc_status === 'pending' ? 'bg-[var(--surface-inset)] border-[var(--border-default)]' : 
           contextUser?.kyc_status === 'rejected' ? 'bg-red-500/5 border-red-500/20 shadow-red-500/5' : ''
         }`}>
@@ -1711,10 +1709,10 @@ export const RewardsPage: React.FC = () => {
           {contextUser?.kyc_status === 'pending' ? (
             <div className="flex flex-col items-center text-center py-6 md:py-10 space-y-4 md:space-y-6">
               <div className="relative">
-                <div className="w-20 h-20 md:w-24 md:h-24 rounded-[var(--radius)] bg-[var(--surface-inset)] flex items-center justify-center border border-[var(--border-default)]">
-                  <ShieldCheck size={40} className="md:w-[48px] md:h-[48px] text-accent" />
+                <div className="w-20 h-20 md:w-24 md:h-24 rounded-[var(--radius-md)] bg-[var(--surface-inset)] flex items-center justify-center border border-[var(--border-default)]">
+                  <ShieldCheck size={40} className="md:w-[48px] md:h-[48px] text-[var(--fg-accent)]" />
                 </div>
-                <div className="absolute -bottom-1.5 -right-1.5 w-8 h-8 md:w-10 md:h-10 rounded-[var(--radius)] bg-[var(--surface-card)] border-[3px] md:border-4 border-[var(--surface-page)] flex items-center justify-center">
+                <div className="absolute -bottom-1.5 -right-1.5 w-8 h-8 md:w-10 md:h-10 rounded-[var(--radius-md)] bg-[var(--surface-card)] border-[3px] md:border-4 border-[var(--surface-page)] flex items-center justify-center">
                   <Clock size={16} className="text-amber-500" />
                 </div>
               </div>
@@ -1730,8 +1728,8 @@ export const RewardsPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className={`mt-4 md:mt-8 p-4 md:p-6 rounded-[var(--radius)] border flex flex-col md:flex-row items-center gap-4 md:gap-6 max-w-3xl bg-[var(--surface-page)]/50 border-[var(--border-default)]`}>
-                <div className="flex-shrink-0 p-3 md:p-4 rounded-[var(--radius)] bg-[var(--surface-inset)] text-[var(--text-primary)]">
+              <div className={`mt-4 md:mt-8 p-4 md:p-6 rounded-[var(--radius-md)] border flex flex-col md:flex-row items-center gap-4 md:gap-6 max-w-3xl bg-[var(--surface-page)]/50 border-[var(--border-default)]`}>
+                <div className="flex-shrink-0 p-3 md:p-4 rounded-[var(--radius-md)] bg-[var(--surface-inset)] text-[var(--text-primary)]">
                   <Lock size={20} className="md:w-6 md:h-6" />
                 </div>
                 <div className={`text-[10px] md:text-sm leading-relaxed ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
@@ -1749,7 +1747,7 @@ export const RewardsPage: React.FC = () => {
           ) : contextUser?.kyc_status === 'rejected' ? (
             <div className="flex flex-col items-center text-center py-6 md:py-10 space-y-4 md:space-y-6">
               <div className="relative">
-                <div className="w-20 h-20 md:w-24 md:h-24 rounded-[var(--radius)] bg-red-500/10 flex items-center justify-center">
+                <div className="w-20 h-20 md:w-24 md:h-24 rounded-[var(--radius-md)] bg-red-500/10 flex items-center justify-center">
                   <XCircle size={40} className="md:w-[48px] md:h-[48px] text-red-500" />
                 </div>
               </div>
@@ -1759,7 +1757,7 @@ export const RewardsPage: React.FC = () => {
                   {dir === 'rtl' ? 'تم رفض طلب التحقق' : 'Verification Request Rejected'}
                 </h3>
                 {contextUser?.kyc_rejection_reason && (
-                  <div className={`p-4 rounded-[var(--radius)] border bg-red-500/5 border-red-500/20 text-red-500 text-sm md:text-base font-medium`}>
+                  <div className={`p-4 rounded-[var(--radius-md)] border bg-red-500/5 border-red-500/20 text-red-500 text-sm md:text-base font-medium`}>
                     <p className="text-[10px] uppercase tracking-widest text-red-400 mb-1 font-black">
                       {t('kycRejectionReason')}
                     </p>
@@ -1778,9 +1776,9 @@ export const RewardsPage: React.FC = () => {
                     setSelfieData(null);
                     setKycFullName('');
                   }}
-                  className="mt-4 px-8 py-3 rounded-[var(--radius)] bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-bold text-sm md:text-base transition-all duration-300 shadow-md flex items-center gap-2 mx-auto cursor-pointer"
+                  className="mt-4 px-8 py-3 rounded-[var(--radius-md)] bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-bold text-sm md:text-base transition-all duration-300 shadow-md flex items-center gap-2 mx-auto cursor-pointer"
                 >
-                  <RefreshCw size={18} className="text-accent" />
+                  <RefreshCw size={18} className="text-[var(--fg-accent)]" />
                   {dir === 'rtl' ? 'إعادة المحاولة' : 'Try Again'}
                 </button>
               </div>
@@ -1790,15 +1788,15 @@ export const RewardsPage: React.FC = () => {
               {/* Left Side: Info */}
               <div className="flex-1 space-y-4 md:space-y-6">
                 <div className="flex items-center gap-3 md:gap-4">
-                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-[var(--radius)] bg-[var(--surface-inset)] flex items-center justify-center text-[var(--text-primary)] border border-[var(--border-default)] flex-shrink-0">
-                    <ShieldCheck size={20} className="md:w-6 md:h-6 text-accent" />
+                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-[var(--radius-md)] bg-[var(--surface-inset)] flex items-center justify-center text-[var(--text-primary)] border border-[var(--border-default)] flex-shrink-0">
+                    <ShieldCheck size={20} className="md:w-6 md:h-6 text-[var(--fg-accent)]" />
                   </div>
                   <div>
                     <div className="flex flex-wrap items-center gap-2 md:gap-3">
                       <h3 className="text-lg md:text-xl font-bold text-[var(--text-primary)]">
                         {t('kycVerification')}
                       </h3>
-                      <span className={`px-2 py-0.5 rounded-[calc(var(--radius)/2)] text-[9px] md:text-xs font-bold border bg-[var(--surface-page)]/50 border-[var(--border-default)] text-[var(--text-secondary)]`}>
+                      <span className={`px-2 py-0.5 rounded-[var(--radius-xs)] text-[9px] md:text-xs font-bold border bg-[var(--surface-page)]/50 border-[var(--border-default)] text-[var(--text-secondary)]`}>
                         {t('kycThresholdNote')}
                       </span>
                     </div>
@@ -1809,7 +1807,7 @@ export const RewardsPage: React.FC = () => {
                   {t('kycDescription')}
                 </p>
 
-                <div className="p-4 rounded-[var(--radius)] border flex items-start gap-3 bg-[var(--surface-page)] border-[var(--border-default)]">
+                <div className="p-4 rounded-[var(--radius-md)] border flex items-start gap-3 bg-[var(--surface-page)] border-[var(--border-default)]">
                   <Lock className="text-[var(--text-muted)] mt-0.5 flex-shrink-0" size={16} />
                   <p className="text-[10px] md:text-sm text-[var(--text-secondary)] leading-relaxed font-medium">
                     {t('selfieSecurityNote')}
@@ -1824,7 +1822,7 @@ export const RewardsPage: React.FC = () => {
                   <label className="block text-xs md:text-sm font-medium text-[var(--text-secondary)]">
                     {t('fullNameAsPerIdUser')}
                   </label>
-                  <div className={`relative flex items-center rounded-[var(--radius)] border transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] focus-within:border-accent`}>
+                  <div className={`relative flex items-center rounded-[var(--radius-md)] border transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] focus-within:border-[var(--border-accent)]`}>
                     <input 
                       type="text"
                       value={kycFullName || ''}
@@ -1839,10 +1837,10 @@ export const RewardsPage: React.FC = () => {
                 <div className="space-y-2">
                   {isCapturing && !selfieCaptured ? (
                     <div className="space-y-2">
-                      <video ref={videoRef} className="w-full rounded-[var(--radius)] bg-[var(--surface-inset)]" autoPlay playsInline />
+                      <video ref={videoRef} className="w-full rounded-[var(--radius-md)] bg-[var(--surface-inset)]" autoPlay playsInline />
                       <button 
                         onClick={captureImage}
-                        className="w-full py-2.5 md:py-3 rounded-[var(--radius)] bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-bold text-xs md:text-base cursor-pointer transition-all duration-300"
+                        className="w-full py-2.5 md:py-3 rounded-[var(--radius-md)] bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] font-bold text-xs md:text-base cursor-pointer transition-all duration-300"
                       >
                         {t('capture')}
                       </button>
@@ -1851,15 +1849,15 @@ export const RewardsPage: React.FC = () => {
                     <button 
                       onClick={startCamera}
                       disabled={selfieCaptured}
-                      className={`w-full flex items-center justify-center gap-2 md:gap-3 py-3 md:py-4 rounded-[var(--radius)] border-2 border-dashed transition-theme ${
+                      className={`w-full flex items-center justify-center gap-2 md:gap-3 py-3 md:py-4 rounded-[var(--radius-md)] border-2 border-dashed transition-theme ${
                         selfieCaptured 
                           ? 'border-[var(--border-default)] bg-[var(--surface-inset)] text-[var(--text-primary)] cursor-default shadow-sm'
-                          : `border-[var(--border-default)] hover:border-accent text-[var(--text-secondary)] hover:text-[var(--text-primary)]`
+                          : `border-[var(--border-default)] hover:border-[var(--border-accent)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]`
                       }`}
                     >
                       {selfieCaptured ? (
                         <>
-                          <CheckCircle2 size={16} className="md:w-5 md:h-5 text-accent" />
+                          <CheckCircle2 size={16} className="md:w-5 md:h-5 text-[var(--fg-accent)]" />
                           <span className="font-bold text-xs md:text-base">{t('selfieCaptured')}</span>
                         </>
                       ) : (
@@ -1877,16 +1875,16 @@ export const RewardsPage: React.FC = () => {
                 <button 
                   onClick={handleSubmitKYC}
                   disabled={!kycFullName.trim() || !selfieCaptured || isSubmitting}
-                  className={`w-full flex items-center justify-center gap-2 py-3 md:py-4 rounded-[4px] font-bold text-xs md:text-base transition-all duration-300 cursor-pointer ${
+                  className={`w-full flex items-center justify-center gap-2 py-3 md:py-4 rounded-[var(--radius-xs)] font-bold text-xs md:text-base transition-all duration-300 cursor-pointer ${
                     !kycFullName.trim() || !selfieCaptured || isSubmitting
                       ? 'opacity-50 cursor-not-allowed bg-[var(--surface-inset)] text-[var(--text-muted)]'
                       : 'bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] shadow-md'
                   }`}
                 >
                   {isSubmitting ? (
-                    <RefreshCw className="animate-spin text-accent" size={16} />
+                    <RefreshCw className="animate-spin text-[var(--fg-accent)]" size={16} />
                   ) : (
-                    <ShieldCheck size={16} className="text-accent" />
+                    <ShieldCheck size={16} className="text-[var(--fg-accent)]" />
                   )}
                   <span>
                     {isSubmitting 
@@ -1907,14 +1905,14 @@ export const RewardsPage: React.FC = () => {
         <div className="md:col-span-2">
           <div className="flex items-center justify-between mb-4 md:mb-6">
             <div className="flex items-center gap-2">
-              <History className="text-accent md:w-5 md:h-5" size={18} />
+              <History className="text-[var(--fg-accent)] md:w-5 md:h-5" size={18} />
               <h3 className="text-base md:text-lg font-bold text-[var(--text-primary)]">{t('transactionHistory')}</h3>
             </div>
             {transactions.length > 0 && (
               <button
                 onClick={handleClearHistory}
                 disabled={isSubmitting}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-red-500 text-xs font-bold transition-theme disabled:opacity-50 cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-xs)] border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-red-500 text-xs font-bold transition-theme disabled:opacity-50 cursor-pointer"
               >
                 <RefreshCw size={12} className={isSubmitting ? "animate-spin" : ""} />
                 {dir === 'rtl' ? 'مسح السجل' : 'Clear History'}
@@ -1922,7 +1920,7 @@ export const RewardsPage: React.FC = () => {
             )}
           </div>
           
-          <div className={`overflow-hidden rounded-[var(--radius)] border border-[var(--border-default)] bg-[var(--surface-subtle)]`}>
+          <div className={`overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-subtle)]`}>
             <div className="overflow-x-auto no-scrollbar">
               <table className="w-full text-[10px] md:text-sm text-left rtl:text-right">
                 <thead className={`text-[9px] md:text-xs uppercase bg-[var(--surface-page)]/40 text-[var(--text-muted)]`}>
@@ -1954,7 +1952,7 @@ export const RewardsPage: React.FC = () => {
                         return (
                           <tr key={`rewards-tx-${tx.id || txIdx}-${txIdx}`} className="border-b border-[var(--border-default)] hover:bg-[var(--surface-page)]/20 transition-colors">
                             <td className="px-6 py-4 font-medium text-[var(--text-primary)] whitespace-nowrap">
-                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius)] text-xs font-semibold ${badgeClass}`}>
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-md)] text-xs font-semibold ${badgeClass}`}>
                                 {label}
                               </span>
                             </td>
@@ -1998,7 +1996,7 @@ export const RewardsPage: React.FC = () => {
                               onClick={() => setTxOffset(prev => prev + TX_LIMIT)}
                               className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-bold flex items-center gap-2 mx-auto transition-theme cursor-pointer"
                             >
-                              <RefreshCw size={14} className={`text-accent ${isSubmitting ? "animate-spin" : ""}`} />
+                              <RefreshCw size={14} className={`text-[var(--fg-accent)] ${isSubmitting ? "animate-spin" : ""}`} />
                               {t('loadMore')}
                             </button>
                           </td>
@@ -2028,12 +2026,12 @@ export const RewardsPage: React.FC = () => {
               onTouchStart={swipeHandlers.onTouchStart}
               onTouchMove={swipeHandlers.onTouchMove}
               onTouchEnd={swipeHandlers.onTouchEnd}
-              className={`relative w-full max-w-md rounded-[var(--radius)] p-6 md:p-8 shadow-2xl bg-[var(--surface-card)] border border-[var(--border-default)] z-10`}
+              className={`relative w-full max-w-md rounded-[var(--radius-md)] p-6 md:p-8 shadow-2xl bg-[var(--surface-card)] border border-[var(--border-default)] z-10`}
             >
               
               {/* Header */}
               <div className="flex items-center justify-center gap-2 md:gap-3 mb-6 md:mb-8">
-                <Zap className="text-accent md:w-7 md:h-7" size={24} />
+                <Zap className="text-[var(--fg-accent)] md:w-7 md:h-7" size={24} />
                 <h2 className="text-xl md:text-2xl font-bold text-[var(--text-primary)]">
                   {t('convertPoints')}
                 </h2>
@@ -2044,7 +2042,7 @@ export const RewardsPage: React.FC = () => {
                 <label className="block text-xs md:text-sm font-medium text-[var(--text-secondary)]">
                   {t('numberOfPoints')}
                 </label>
-                <div className={`relative flex items-center rounded-[4px] border transition-all duration-300 bg-[var(--surface-subtle)] border-[var(--border-default)] focus-within:border-accent`}>
+                <div className={`relative flex items-center rounded-[var(--radius-xs)] border transition-all duration-300 bg-[var(--surface-subtle)] border-[var(--border-default)] focus-within:border-[var(--border-accent)]`}>
                   <input 
                     type="text"
                     value={convertAmount || ''}
@@ -2062,16 +2060,16 @@ export const RewardsPage: React.FC = () => {
               <div className="flex items-center gap-3 md:gap-4 mt-6 md:mt-8">
                 <button 
                   onClick={() => setIsConvertModalOpen(false)}
-                  className="flex-1 py-3 md:py-4 rounded-[4px] font-bold text-sm md:text-base transition-all duration-300 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-inset)] cursor-pointer"
+                  className="flex-1 py-3 md:py-4 rounded-[var(--radius-xs)] font-bold text-sm md:text-base transition-all duration-300 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-inset)] cursor-pointer"
                 >
                   {t('cancel')}
                 </button>
                 <button 
                   onClick={handleConvertPoints}
                   disabled={isSubmitting}
-                  className="flex-[2] py-3 md:py-4 rounded-[4px] font-bold text-sm md:text-base transition-all duration-300 bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] cursor-pointer disabled:opacity-50 shadow-md"
+                  className="flex-[2] py-3 md:py-4 rounded-[var(--radius-xs)] font-bold text-sm md:text-base transition-all duration-300 bg-[var(--control-active-bg)] hover:opacity-90 text-[var(--control-active-fg)] cursor-pointer disabled:opacity-50 shadow-md"
                 >
-                  {isSubmitting ? <RefreshCw className="animate-spin text-accent" size={16} /> : t('confirmConversion')}
+                  {isSubmitting ? <RefreshCw className="animate-spin text-[var(--fg-accent)]" size={16} /> : t('confirmConversion')}
                 </button>
               </div>
 

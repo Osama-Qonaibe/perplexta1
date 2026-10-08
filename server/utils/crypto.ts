@@ -1,10 +1,10 @@
+import '../bootstrapEnv.js';
 import crypto from 'crypto';
 
-const rawKey = process.env.ENCRYPTION_KEY || 'perplexta_secure_key_32_chars_!!';
-// Safety check: If the key looks like a DB URL or is too long/short, use fallback
-const ENCRYPTION_KEY = (rawKey.startsWith('postgres') || rawKey.startsWith('http') || rawKey.length > 200) 
-  ? 'perplexta_secure_key_32_chars_!!' 
-  : rawKey;
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY as string;
+if (!ENCRYPTION_KEY) {
+  throw new Error('ENCRYPTION_KEY environment variable is required and missing');
+}
 
 const IV_LENGTH = 16;
 
@@ -37,12 +37,12 @@ export function decrypt(text: string): string {
     const ivHex = textParts.shift();
     const encryptedHex = textParts.join(':');
     
-    if (!ivHex || !encryptedHex) return text;
+    if (!ivHex || !encryptedHex) return '';
 
     const iv = Buffer.from(ivHex, 'hex');
     const encryptedText = Buffer.from(encryptedHex, 'hex');
     
-    if (iv.length !== IV_LENGTH || encryptedText.length === 0) return text;
+    if (iv.length !== IV_LENGTH || encryptedText.length === 0) return '';
 
     const decipher = crypto.createDecipheriv(
       'aes-256-cbc', 
@@ -53,6 +53,6 @@ export function decrypt(text: string): string {
     decrypted = Buffer.concat([decrypted, decipher.final()]);
     return decrypted.toString();
   } catch (err) {
-    return text;
+    return '';
   }
 }

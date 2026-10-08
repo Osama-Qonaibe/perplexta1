@@ -5,6 +5,14 @@
 # php -- END cPanel-generated handler, do not edit
 
 Options -Indexes
+
+# Prevent direct access to sensitive configuration, backup, and environment files
+<FilesMatch "^\.env|^\.git|package\.json|tsconfig\.json|vite\.config\.ts|server\.ts">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+LimitRequestBody 104857600
 # Markdown for Agents - serve auth.md directly
 RewriteCond %{HTTP:Accept} text/markdown
 RewriteRule ^$ /auth.md [L]

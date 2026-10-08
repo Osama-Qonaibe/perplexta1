@@ -1,6 +1,7 @@
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import { logSecurityAlert } from '../services/notifications.js';
+import { getToolFriendlyName } from '../services/quota.js';
 
 const limitMultiplier = 500;
 
@@ -163,14 +164,15 @@ export const verifyConsumptionLimits = async (req: any, res: any, next: any) => 
 
       if (!affordability.allowed) {
         const uRes = await pool.query('SELECT language FROM users WHERE id = $1', [userId]);
-        const userLang = uRes.rows[0]?.language || 'en';
+        const userLang = uRes.rows[0]?.language || 'ar';
 
-        const periodStrEn = quotaCheck.period === 'daily' ? 'Daily' : 'Monthly';
-        const periodStrAr = quotaCheck.period === 'daily' ? 'يومي' : 'شهري';
-        const cost = affordability.requiredPoints;
+        const periodStrEn = quotaCheck.period === 'monthly' ? 'monthly' : 'daily';
+        const periodStrAr = quotaCheck.period === 'monthly' ? 'الشهري' : 'اليومي';
+        const toolNameAr = getToolFriendlyName(toolId, 'ar');
+        const toolNameEn = getToolFriendlyName(toolId, 'en');
 
-        const msgEn = `Premium Membership Required: You have reached your ${periodStrEn} capacity for this tool. Please upgrade your plan or recharge your digital wallet (Pay-per-Request: ${cost} Points) to execute excess actions.`;
-        const msgAr = `تتطلب هذه العملية رصيداً أو عضوية ممتازة: لقد تجاوزت الحد ال${periodStrAr} المسموح به لأداة مخصصة. يرجى شحن محفظتك الرقمية أو ترقية باقتك للاستمرار بالاستفادة بالدفع لكل معاملة (${cost} نقاط).`;
+        const msgEn = `You have reached the ${periodStrEn} limit for "${toolNameEn}"`;
+        const msgAr = `لقد استنفدت الحد ${periodStrAr} المتاح لأداة "${toolNameAr}"`;
 
         return res.status(429).json({
           error: userLang === 'ar' ? msgAr : msgEn,
@@ -179,6 +181,8 @@ export const verifyConsumptionLimits = async (req: any, res: any, next: any) => 
           limit: quotaCheck.limit,
           current: quotaCheck.currentUsage,
           period: quotaCheck.period,
+          tool: toolId,
+          toolName: userLang === 'ar' ? toolNameAr : toolNameEn,
           cta: {
             upgrade: true,
             referral: true
@@ -189,7 +193,7 @@ export const verifyConsumptionLimits = async (req: any, res: any, next: any) => 
 
     return next();
   } catch (error) {
-    console.error('[Consumption Limiter Middleware] Quota enforcement failure:', error);
+    console.info('[Consumption Limiter Middleware] Quota check notice:', (error as any)?.message || error);
     return next(); // Safe degraded bypass
   }
 };

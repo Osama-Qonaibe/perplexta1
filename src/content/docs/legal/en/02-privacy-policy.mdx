@@ -1,0 +1,58 @@
+# Enterprise Privacy Policy & Data Protection Charter
+
+Effective Date: September 21, 2026  
+Data Controller: **ViralLinkUp Limited** (Incorporated in England and Wales under Company No. **16804604**).  
+
+---
+
+## 1. Corporate Privacy Commitment
+
+**ViralLinkUp Limited** ("Perplexta", "We", "Us") operates under the foundational principle that enterprise privacy is enforced through architectural guarantees rather than mere contractual promises. The platform architecture strictly embeds Privacy by Design and by Default pursuant to Article 25 of the UK General Data Protection Regulation (UK GDPR) and the Data Protection Act 2018.
+
+### 1.1 Strict Zero-Training Commitment
+- **Absolute Guarantee:** Customer prompts, source code files, input documents, and generative outputs are never utilized to train, retrain, fine-tune, or validate foundational or public artificial intelligence models operated by Google DeepMind, local compute nodes, or third parties.
+- Customer inputs exist strictly within an ephemeral context window and are flushed from inference memory immediately upon completion of token stream delivery.
+
+---
+
+## 2. Categories of Data Collected & Lawful Basis
+
+| Data Category | Processing Scope | Lawful Basis (UK GDPR Art. 6) |
+| :--- | :--- | :--- |
+| **Identity & Authentication Data** | Full name, corporate email address, username, profile photo, and phone number for verified advertisers. | Performance of Contract (Art. 6(1)(b)) |
+| **Transaction & Ledger Data** | Wallet top-up transactions, token consumption records, and payment gateway tokens. (Full card details are never stored on platform servers). | Legal & Contractual Obligations (Art. 6(1)(b) & (c)) |
+| **Technical & Telemetry Data** | Salted and hashed IP addresses, browser agent signatures, and cryptographically signed audit logs. | Legitimate Interests & System Defense (Art. 6(1)(f)) |
+| **Workload & Media Content** | Input prompts, uploaded documents (PDF, DOCX), and user-authored posts across ViralBook. | Performance of Contract & User Consent (Art. 6(1)(a) & (b)) |
+
+---
+
+## 3. Strict Database Segregation Architecture
+
+Perplexta enforces absolute physical and logical database segregation to eliminate cross-tenant leakage:
+1. **Core Database (Operational):** Stores user account metadata, team configurations, ViralBook commercial posts, and chat workspace index records.
+2. **Ledger Database (The Financial Vault):** An isolated, append-only database recording balance adjustments, debit debriefs, and transaction histories. It cannot be queried directly from client browsers.
+3. **Security Database (Audit & Defense):** Maintains immutable telemetry, intrusion attempts, rate-limit thresholds, and perimeter firewall event streams.
+
+---
+
+## 4. IP Sanitization & Perimeter Defense
+
+- All incoming traffic is filtered through perimeter Web Application Firewalls (Cloudflare) to deliver distributed denial-of-service mitigation.
+- Client IP addresses are stored within internal security buffers solely utilizing one-way cryptographic hashing algorithms with revolving salt values. Raw IP records are accessible only upon receipt of a valid, enforceable court order issued by the competent courts of England and Wales.
+
+---
+
+## 5. Data Subject Rights (UK & EU GDPR)
+
+Pursuant to Articles 15 to 22 of the UK and EU GDPR, users possess the following enforceable rights, exercisable without fee via account settings or authorized platform support channels:
+1. **Right of Access (DSAR):** Request a complete, structured export of all personal data held under your identifier.
+2. **Right to Rectification:** Update or rectify inaccurate personal attributes through the profile management interface.
+3. **Right to Erasure (Right to be Forgotten):** Request irrevocable deletion of your account and operational telemetry, subject to statutory retention obligations under UK tax law (HMRC) and Money Laundering Regulations 2017 mandating a seven (7) year retention of financial ledger entries.
+4. **Right to Restriction:** Temporarily restrict data processing pending dispute adjudication.
+5. **Right to Data Portability:** Obtain your structured data in standard machine-readable format (JSON / CSV).
+
+---
+
+## 6. International Data Transfers
+
+Workloads deployed across global edge networks comply strictly with the UK International Data Transfer Addendum (IDTA) and European Commission Standard Contractual Clauses (SCCs), ensuring equivalent protection across all authorized cloud sub-processors.

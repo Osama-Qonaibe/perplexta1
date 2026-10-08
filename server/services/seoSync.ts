@@ -147,7 +147,7 @@ ${itemData.features ? `Features: ${itemData.features}` : ''}
 
 Generate JSON with:
 1. meta_title_en: Punchy English SEO title max 60 chars ending with "| Viralbook"
-2. meta_title_ar: Punchy Arabic SEO title max 60 chars ending with "| فايرال بوك"
+2. meta_title_ar: Punchy Arabic SEO title max 60 chars ending with "| فيرال بوك"
 3. meta_description_en: Concise English meta description (130-155 characters)
 4. meta_description_ar: Concise Arabic meta description (130-155 characters)
 5. keywords_en: 8-10 high-performing comma-separated keywords in English optimized with content similarity and trending search data
@@ -283,7 +283,7 @@ export async function syncBulletinAdsMetadata() {
     }
 
     if (!meta_title_ar || !meta_title_ar.trim()) {
-      meta_title_ar = aiData?.meta_title_ar || `${(title || 'منشور فايرال بوك').trim()} | فايرال بوك`.slice(0, 255);
+      meta_title_ar = aiData?.meta_title_ar || `${(title || 'منشور فيرال بوك').trim()} | فيرال بوك`.slice(0, 255);
       needsUpdate = true;
     }
 
@@ -496,7 +496,7 @@ export async function syncSingleContentSeoItem(type: 'bulletin', id: number) {
 
   const slug = `viralbook-${row.id}-${slugify(title || 'post')}`;
   const meta_title_en = aiData?.meta_title_en || `${(title || 'Viralbook Post').trim()} | Viralbook`.slice(0, 255);
-  const meta_title_ar = aiData?.meta_title_ar || `${(title || 'منشور فايرال بوك').trim()} | فايرال بوك`.slice(0, 255);
+  const meta_title_ar = aiData?.meta_title_ar || `${(title || 'منشور فيرال بوك').trim()} | فيرال بوك`.slice(0, 255);
   const meta_description_en = aiData?.meta_description_en || extractDescription(description || title || '');
   const meta_description_ar = aiData?.meta_description_ar || extractDescription(description || title || '');
   const keywords_en = aiData?.keywords_en || extractKeywords(title || '', category || '', description || '', 'en');
@@ -562,14 +562,14 @@ export async function getSmartSeoSuggestion(type: 'bulletin', id: number) {
   const aiData = await generateSeoWithAi('bulletin', itemData);
 
   const rawTitle = row.title || 'Viralbook Item';
-  const rawTitleAr = row.title || 'منشور فايرال بوك';
+  const rawTitleAr = row.title || 'منشور فيرال بوك';
   const rawDesc = row.description || row.title || '';
   const rawDescAr = row.description || row.title || '';
   const rawCat = row.category || '';
   const rawCatAr = row.category || '';
 
   const suggestedTitleEn = aiData?.meta_title_en || `${rawTitle.trim()} | Viralbook`.slice(0, 255);
-  const suggestedTitleAr = aiData?.meta_title_ar || `${rawTitleAr.trim()} | فايرال بوك`.slice(0, 255);
+  const suggestedTitleAr = aiData?.meta_title_ar || `${rawTitleAr.trim()} | فيرال بوك`.slice(0, 255);
   const suggestedDescEn = aiData?.meta_description_en || extractDescription(rawDesc);
   const suggestedDescAr = aiData?.meta_description_ar || extractDescription(rawDescAr);
   const suggestedKeywordsEn = aiData?.keywords_en || extractKeywords(rawTitle, rawCat, rawDesc, 'en');
@@ -638,7 +638,7 @@ export async function applySmartSeoSuggestion(
   const itemCat = existing.category || '';
 
   const meta_title_en = (metadata.meta_title_en !== undefined ? metadata.meta_title_en : existing.meta_title_en) || `${itemTitle} | Viralbook`;
-  const meta_title_ar = (metadata.meta_title_ar !== undefined ? metadata.meta_title_ar : existing.meta_title_ar) || `${itemTitle} | فايرال بوك`;
+  const meta_title_ar = (metadata.meta_title_ar !== undefined ? metadata.meta_title_ar : existing.meta_title_ar) || `${itemTitle} | فيرال بوك`;
   const meta_description_en = (metadata.meta_description_en !== undefined ? metadata.meta_description_en : existing.meta_description_en) || extractDescription(itemDesc);
   const meta_description_ar = (metadata.meta_description_ar !== undefined ? metadata.meta_description_ar : existing.meta_description_ar) || extractDescription(itemDesc);
   const keywords_en = (metadata.keywords_en !== undefined ? metadata.keywords_en : existing.keywords_en) || extractKeywords(itemTitle, itemCat, '', 'en');
@@ -716,12 +716,12 @@ export async function syncDynamicRoutesToSeoMetadata(): Promise<{ syncedRoutes: 
         entity_type: 'viralbook',
         entity_id: String(row.id),
         title_en: row.meta_title_en || (row.title ? `${row.title} | Viralbook` : 'Viralbook Post | Perplexta'),
-        title_ar: row.meta_title_ar || (row.title ? `${row.title} | فايرال بوك` : 'منشور فايرال بوك | بيربليكستا'),
+        title_ar: row.meta_title_ar || (row.title ? `${row.title} | فيرال بوك` : 'منشور فيرال بوك | بيربليكستا'),
         description_en: row.meta_description_en || (row.description ? extractDescription(row.description) : ''),
         description_ar: row.meta_description_ar || (row.description ? extractDescription(row.description) : ''),
         og_image_url: row.og_image_url || row.image_url || '',
         keywords_en: row.keywords_en || 'viralbook, perplexta, viral, post, announcement',
-        keywords_ar: row.keywords_ar || 'فايرال بوك, إعلانات, بيربليكستا, خدمات, منشورات',
+        keywords_ar: row.keywords_ar || 'فيرال بوك, إعلانات, بيربليكستا, خدمات, منشورات',
         is_active: true
       });
       await upsertSeoMetadata({

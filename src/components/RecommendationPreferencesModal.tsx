@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sliders, X, Check, Save, Tag, DollarSign, RefreshCw } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -26,6 +27,7 @@ export const RecommendationPreferencesModal: React.FC<RecommendationPreferencesM
   onSaved
 }) => {
   const { language, token } = useAppContext();
+  const isRtl = language === 'ar';
 
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [maxPrice, setMaxPrice] = useState<number>(5000);
@@ -38,6 +40,20 @@ export const RecommendationPreferencesModal: React.FC<RecommendationPreferencesM
       fetchPreferences();
     }
   }, [isOpen, token]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen, onClose]);
 
   const fetchPreferences = async () => {
     setIsLoading(true);
@@ -83,12 +99,12 @@ export const RecommendationPreferencesModal: React.FC<RecommendationPreferencesM
 
       const data = await res.json();
       if (data.success) {
-        setSuccessMsg(language === 'ar' ? 'تم حفظ تفضيلات التوصيات بنجاح' : 'Preferences saved successfully');
+        setSuccessMsg(isRtl ? 'تم حفظ تفضيلات التوصيات بنجاح' : 'Preferences saved successfully');
         if (onSaved) onSaved();
         setTimeout(() => {
           setSuccessMsg(null);
           onClose();
-        }, 1000);
+        }, 800);
       }
     } catch (err) {
       console.error('[RecommendationPreferencesModal] Save error:', err);
@@ -97,55 +113,66 @@ export const RecommendationPreferencesModal: React.FC<RecommendationPreferencesM
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-[var(--surface-overlay)] backdrop-blur-md">
+      <div 
+        className="fixed inset-0 z-[1000] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md overflow-y-auto overscroll-contain"
+        dir={isRtl ? 'rtl' : 'ltr'}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            onClose();
+          }
+        }}
+      >
         <motion.div
-          initial={{ opacity: 0, scale: 0.96, y: 8 }}
+          initial={{ opacity: 0, scale: 0.95, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 8 }}
+          exit={{ opacity: 0, scale: 0.95, y: 12 }}
           transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full max-w-lg rounded-[var(--pub-radius-container)] border border-[var(--pub-border-default)] bg-[var(--pub-surface-container)] p-5 sm:p-6 shadow-2xl relative overflow-hidden text-[var(--pub-text-primary)]"
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-lg rounded-2xl border border-[var(--border-default)] bg-[var(--surface-card)] p-5 sm:p-6 shadow-2xl relative overflow-hidden text-[var(--text-primary)] my-auto transform-gpu"
         >
           {/* Top Bar */}
-          <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-[var(--pub-border-default)]">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-[var(--pub-radius-control)] bg-[var(--pub-accent-muted)] border border-[var(--pub-accent-primary)]/30 flex items-center justify-center text-[var(--pub-accent-primary)]">
-                <Sliders size={16} />
+          <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-[var(--border-default)]">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-shape-md bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0">
+                <Sliders size={18} />
               </div>
               <div>
-                <h3 className="text-sm sm:text-base font-extrabold text-[var(--pub-text-primary)]">
-                  {language === 'ar' ? 'تخصيص تفضيلات التوصيات' : 'Customize Discovery Vector'}
+                <h3 className="text-sm sm:text-base font-extrabold text-[var(--text-primary)]">
+                  {isRtl ? 'تخصيص تفضيلات التوصيات' : 'Customize Recommendations'}
                 </h3>
-                <p className="text-[11px] text-[var(--pub-text-muted)]">
-                  {language === 'ar' ? 'حدّد المجالات والنطاق السعري لضبط المقترحات بدقة' : 'Select categories & budget limits to tune your recommendations'}
+                <p className="text-[11px] text-[var(--text-muted)] font-medium">
+                  {isRtl ? 'حدّد المجالات والنطاق السعري لضبط المقترحات بدقة' : 'Select categories & budget limits to tune your recommendations'}
                 </p>
               </div>
             </div>
 
             <button
               onClick={onClose}
-              className="ide-header-button w-8 h-8 p-0 flex items-center justify-center"
+              className="w-8 h-8 rounded-shape-sm border border-[var(--border-default)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] active:scale-95 transition-theme cursor-pointer"
+              title={isRtl ? 'إغلاق' : 'Close'}
             >
               <X size={15} />
             </button>
           </div>
 
           {isLoading ? (
-            <div className="py-12 flex items-center justify-center text-[var(--pub-accent-primary)]">
-              <RefreshCw size={22} className="animate-spin" />
+            <div className="py-12 flex flex-col items-center justify-center gap-2 text-accent">
+              <RefreshCw size={24} className="animate-spin" />
+              <span className="text-xs text-[var(--text-muted)] font-bold">{isRtl ? 'جاري تحميل التفضيلات...' : 'Loading preferences...'}</span>
             </div>
           ) : (
             <div className="space-y-4">
               {/* Category Selector */}
               <div>
-                <label className="text-xs font-bold text-[var(--pub-text-primary)] flex items-center gap-1 mb-2">
-                  <Tag size={13} className="text-[var(--pub-accent-primary)]" />
-                  <span>{language === 'ar' ? 'مجالات الاهتمام المفضلّة' : 'Preferred Categories'}</span>
+                <label className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5 mb-2">
+                  <Tag size={14} className="text-accent" />
+                  <span>{isRtl ? 'مجالات الاهتمام المفضّلة' : 'Preferred Categories'}</span>
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-52 overflow-y-auto custom-scrollbar p-0.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-52 overflow-y-auto custom-scrollbar p-0.5">
                   {CATEGORY_OPTIONS.map(cat => {
                     const isSelected = selectedCategories.includes(cat.id);
                     return (
@@ -153,14 +180,14 @@ export const RecommendationPreferencesModal: React.FC<RecommendationPreferencesM
                         key={cat.id}
                         type="button"
                         onClick={() => handleToggleCategory(cat.id)}
-                        className={`flex items-center justify-between p-2 rounded-[var(--pub-radius-control)] border text-xs font-bold transition-colors text-start cursor-pointer ${
+                        className={`flex items-center justify-between p-2.5 rounded-shape-sm border text-xs font-bold transition-all text-start cursor-pointer active:scale-98 ${
                           isSelected
-                            ? 'bg-[var(--pub-accent-muted)] text-[var(--pub-accent-primary)] border-[var(--pub-accent-primary)]/40 shadow-2xs'
-                            : 'bg-[var(--pub-surface-subtle)] text-[var(--pub-text-muted)] border-[var(--pub-border-default)] hover:text-[var(--pub-text-primary)] hover:border-[var(--pub-border-strong)]'
+                            ? 'bg-accent/10 text-accent border-accent/40 shadow-xs'
+                            : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)] border-[var(--border-default)] hover:text-[var(--text-primary)] hover:border-accent/20'
                         }`}
                       >
-                        <span className="truncate">{language === 'ar' ? cat.name_ar : cat.name_en}</span>
-                        {isSelected && <Check size={13} className="shrink-0 text-[var(--pub-accent-primary)]" />}
+                        <span className="truncate">{isRtl ? cat.name_ar : cat.name_en}</span>
+                        {isSelected && <Check size={14} className="shrink-0 text-accent" />}
                       </button>
                     );
                   })}
@@ -168,13 +195,13 @@ export const RecommendationPreferencesModal: React.FC<RecommendationPreferencesM
               </div>
 
               {/* Price Range */}
-              <div>
+              <div className="pt-2 border-t border-[var(--border-default)]">
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-[var(--pub-text-primary)] flex items-center gap-1">
-                    <DollarSign size={13} className="text-[var(--pub-accent-primary)]" />
-                    <span>{language === 'ar' ? 'الحد الأقصى للميزانية' : 'Maximum Budget Limit'}</span>
+                  <label className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                    <DollarSign size={14} className="text-accent" />
+                    <span>{isRtl ? 'الحد الأقصى للميزانية' : 'Maximum Budget Limit'}</span>
                   </label>
-                  <span className="ide-badge-info">
+                  <span className="px-2 py-0.5 rounded-shape-xs bg-accent/10 border border-accent/20 text-accent font-black text-xs">
                     ${maxPrice} USD
                   </span>
                 </div>
@@ -185,9 +212,9 @@ export const RecommendationPreferencesModal: React.FC<RecommendationPreferencesM
                   step="50"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(Number(e.target.value))}
-                  className="w-full accent-[var(--pub-accent-primary)] cursor-pointer"
+                  className="w-full accent-[var(--accent)] cursor-pointer"
                 />
-                <div className="flex justify-between text-[10px] text-[var(--pub-text-muted)] font-semibold mt-0.5">
+                <div className="flex justify-between text-[10px] text-[var(--text-muted)] font-semibold mt-0.5">
                   <span>$50 USD</span>
                   <span>$10,000+ USD</span>
                 </div>
@@ -195,39 +222,40 @@ export const RecommendationPreferencesModal: React.FC<RecommendationPreferencesM
 
               {/* Success Alert */}
               {successMsg && (
-                <div className="p-2.5 rounded-[var(--pub-radius-control)] bg-[var(--pub-accent-muted)] border border-[var(--pub-accent-primary)]/30 text-xs font-bold text-[var(--pub-accent-primary)] flex items-center gap-2">
+                <div className="p-2.5 rounded-shape-sm bg-[var(--fg-success)]/10 border border-[var(--fg-success)]/30 text-xs font-bold text-[var(--fg-success)] flex items-center gap-2">
                   <Check size={14} />
                   <span>{successMsg}</span>
                 </div>
               )}
 
               {/* Modal Footer */}
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--pub-border-default)]">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border-default)]">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="ide-header-button text-xs"
+                  className="px-4 py-2 min-h-[38px] rounded-shape-sm border border-[var(--border-default)] hover:bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] font-bold text-xs transition-theme cursor-pointer"
                 >
-                  {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                  {isRtl ? 'إلغاء' : 'Cancel'}
                 </button>
                 <button
                   type="button"
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="ide-send-button text-xs"
+                  className="px-4 py-2 min-h-[38px] rounded-shape-sm bg-accent text-white hover:opacity-90 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                 >
                   {isSaving ? (
                     <RefreshCw size={13} className="animate-spin" />
                   ) : (
                     <Save size={13} />
                   )}
-                  <span>{language === 'ar' ? 'حفظ التفضيلات' : 'Save Preferences'}</span>
+                  <span>{isRtl ? 'حفظ التفضيلات' : 'Save Preferences'}</span>
                 </button>
               </div>
             </div>
           )}
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };

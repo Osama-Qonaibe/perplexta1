@@ -52,6 +52,7 @@ export const DatabaseOrchestrationView = ({
   language: string;
 }) => {
   const { token, socket } = useAppContext();
+  const [activeDbTab, setActiveDbTab] = useState<'all' | 'connections' | 'migrations' | 'backups'>('all');
   const [databases, setDatabases] = useState<any[]>([]);
   const [isMigrating, setIsMigrating] = useState<{
     id: string;
@@ -583,7 +584,61 @@ export const DatabaseOrchestrationView = ({
   };
 
   return (
-    <div className="space-y-4 max-w-6xl mx-auto relative transition-theme">
+    <div className="space-y-6 max-w-6xl mx-auto relative transition-theme">
+      {/* Sub-Tabs Navigation Bar */}
+      <div className="w-full flex items-center justify-between border-b border-[var(--border-default)] pb-3">
+        <div className="flex items-center gap-1.5 p-1 rounded-[var(--radius-md)] bg-[var(--surface-subtle)] border border-[var(--border-default)] overflow-x-auto max-w-full custom-scrollbar">
+          <button
+            type="button"
+            onClick={() => setActiveDbTab('all')}
+            className={`flex items-center gap-2 px-3.5 py-2 min-h-[38px] rounded-[var(--radius-sm)] text-xs font-bold transition-all whitespace-nowrap cursor-pointer touch-target-44 ${
+              activeDbTab === 'all'
+                ? "bg-[var(--surface-card)] text-[var(--fg-accent)] shadow-xs border border-[var(--border-accent)]/30 font-black"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)]/50 border border-transparent"
+            }`}
+          >
+            <Database size={16} />
+            <span>{dir === 'rtl' ? 'عرض شامل لكل العمليات' : 'Full Suite'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveDbTab('connections')}
+            className={`flex items-center gap-2 px-3.5 py-2 min-h-[38px] rounded-[var(--radius-sm)] text-xs font-bold transition-all whitespace-nowrap cursor-pointer touch-target-44 ${
+              activeDbTab === 'connections'
+                ? "bg-[var(--surface-card)] text-[var(--fg-accent)] shadow-xs border border-[var(--border-accent)]/30 font-black"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)]/50 border border-transparent"
+            }`}
+          >
+            <Server size={16} />
+            <span>{dir === 'rtl' ? 'عقد الاتصال وحالة الخوادم' : 'Connections & Nodes'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveDbTab('migrations')}
+            className={`flex items-center gap-2 px-3.5 py-2 min-h-[38px] rounded-[var(--radius-sm)] text-xs font-bold transition-all whitespace-nowrap cursor-pointer touch-target-44 ${
+              activeDbTab === 'migrations'
+                ? "bg-[var(--surface-card)] text-[var(--fg-accent)] shadow-xs border border-[var(--border-accent)]/30 font-black"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)]/50 border border-transparent"
+            }`}
+          >
+            <RefreshCw size={16} />
+            <span>{dir === 'rtl' ? 'مُنشئ المخططات والترحيل (1-Click)' : 'Migrations & Schema Builder'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveDbTab('backups')}
+            className={`flex items-center gap-2 px-3.5 py-2 min-h-[38px] rounded-[var(--radius-sm)] text-xs font-bold transition-all whitespace-nowrap cursor-pointer touch-target-44 ${
+              activeDbTab === 'backups'
+                ? "bg-[var(--surface-card)] text-[var(--fg-accent)] shadow-xs border border-[var(--border-accent)]/30 font-black"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)]/50 border border-transparent"
+            }`}
+          >
+            <HistoryIcon size={16} />
+            <span>{dir === 'rtl' ? 'النسخ الاحتياطي والإنعاش' : 'Disaster Recovery & Backups'}</span>
+          </button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {databases.map((db, dIdx) => {
           const Icon = db.icon;
@@ -591,12 +646,12 @@ export const DatabaseOrchestrationView = ({
           return (
             <div
               key={`db-card-${db.id || dIdx}-${dIdx}`}
-              className={`p-5 rounded-lg border flex flex-col gap-4 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] hover:border-accent/20 shadow-sm`}
+              className={`p-5 rounded-shape-md border flex flex-col gap-4 transition-theme bg-[var(--surface-subtle)] border-[var(--border-default)] hover:border-accent/20 shadow-sm`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div
-                    className="p-2.5 rounded-md border border-[var(--border-accent)] bg-[var(--surface-card)] text-[var(--fg-accent)] transition-theme"
+                    className="p-2.5 rounded-shape-sm border border-[var(--border-accent)] bg-[var(--surface-card)] text-[var(--fg-accent)] transition-theme"
                   >
                     <Icon size={20} />
                   </div>
@@ -639,11 +694,11 @@ export const DatabaseOrchestrationView = ({
                 </div>
               </div>
 
-              <div className="flex p-1.5 bg-[var(--surface-page)] border border-[var(--border-default)] rounded-md mb-6 shadow-inner overflow-hidden relative">
+              <div className="flex p-1.5 bg-[var(--surface-page)] border border-[var(--border-default)] rounded-shape-sm mb-6 shadow-inner overflow-hidden relative">
                 <div className="absolute inset-0 bg-[var(--fg-accent)]/5 pointer-events-none" />
                 <button
                   onClick={() => handleChange(db.id, "type", "cloud")}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-[11px] font-black uppercase tracking-[0.2em] rounded-sm transition-theme ease-out relative z-10 ${db.type === "cloud" ? "bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] shadow-xs" : "text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]/50"}`}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-[11px] font-black uppercase tracking-[0.2em] rounded-shape-xs transition-theme ease-out relative z-10 ${db.type === "cloud" ? "bg-[var(--bg-accent-emphasis)] text-[var(--fg-on-emphasis)] shadow-xs" : "text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]/50"}`}
                 >
                   <Cloud
                     size={14}
@@ -653,7 +708,7 @@ export const DatabaseOrchestrationView = ({
                 </button>
                 <button
                   onClick={() => handleChange(db.id, "type", "local")}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-[11px] font-black uppercase tracking-[0.2em] rounded-sm transition-theme ease-out relative z-10 ${db.type === "local" ? "bg-[var(--surface-card)] text-[var(--text-primary)] border border-[var(--border-default)] shadow-xs" : "text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]/50"}`}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-[11px] font-black uppercase tracking-[0.2em] rounded-shape-xs transition-theme ease-out relative z-10 ${db.type === "local" ? "bg-[var(--surface-card)] text-[var(--text-primary)] border border-[var(--border-default)] shadow-xs" : "text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]/50"}`}
                 >
                   <Database size={14} /> {t("local")}
                 </button>
@@ -666,7 +721,7 @@ export const DatabaseOrchestrationView = ({
                     initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 1.02 }}
-                    className="space-y-4 p-5 rounded-md bg-accent/[0.02] border border-accent/10 shadow-inner relative overflow-hidden"
+                    className="space-y-4 p-5 rounded-shape-sm bg-accent/[0.02] border border-accent/10 shadow-inner relative overflow-hidden"
                   >
                     {db.isTesting && (
                       <div className="absolute inset-0 bg-[var(--surface-subtle)]/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center space-y-3 animate-in fade-in">
@@ -711,7 +766,7 @@ export const DatabaseOrchestrationView = ({
                     <textarea
                       rows={3}
                       placeholder="postgresql://user:pass@host:port/db"
-                      className={`w-full p-4 rounded-sm border bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-primary)] text-xs font-mono resize-none focus:ring-1 focus:ring-accent-500/30 outline-none transition-theme shadow-sm leading-relaxed ${db.showConnectionString ? "" : "blur-[3px] select-none"}`}
+                      className={`w-full p-4 rounded-shape-xs border bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-primary)] text-xs font-mono resize-none focus:ring-1 focus:ring-accent-500/30 outline-none transition-theme shadow-sm leading-relaxed ${db.showConnectionString ? "" : "blur-[3px] select-none"}`}
                       value={db.connection_string || ""}
                       onChange={(e) =>
                         handleChange(db.id, "connection_string", e.target.value)
@@ -730,19 +785,19 @@ export const DatabaseOrchestrationView = ({
                     initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 1.02 }}
-                    className="space-y-4 p-5 rounded-md bg-blue-500/[0.02] border border-blue-500/10 shadow-inner relative overflow-hidden"
+                    className="space-y-4 p-5 rounded-shape-sm bg-[var(--fg-accent)]/[0.02] border border-[var(--border-accent)]/10 shadow-inner relative overflow-hidden"
                   >
                     <div className="absolute top-0 right-0 p-2 opacity-10 pointer-events-none">
-                      <Terminal size={40} className="text-blue-500" />
+                      <Terminal size={40} className="text-[var(--fg-accent)]" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1 text-right">
-                        <label className="text-[9px] uppercase text-blue-500/60 font-black tracking-widest px-1">
+                        <label className="text-[9px] uppercase text-[var(--fg-accent)]/60 font-black tracking-widest px-1">
                           {t("dbHost")}
                         </label>
                         <input
                           placeholder="localhost"
-                          className="w-full h-9 px-3 rounded-sm border bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-primary)] text-xs font-mono focus:border-blue-500/50 outline-none transition-theme shadow-sm"
+                          className="w-full h-9 px-3 rounded-shape-xs border bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-primary)] text-xs font-mono focus:border-[var(--border-accent)]/50 outline-none transition-theme shadow-sm"
                           value={db.host || ""}
                           onChange={(e) =>
                             handleChange(db.id, "host", e.target.value)
@@ -750,12 +805,12 @@ export const DatabaseOrchestrationView = ({
                         />
                       </div>
                       <div className="space-y-1 text-right">
-                        <label className="text-[9px] uppercase text-blue-500/60 font-black tracking-widest px-1">
+                        <label className="text-[9px] uppercase text-[var(--fg-accent)]/60 font-black tracking-widest px-1">
                           {t("dbPort")}
                         </label>
                         <input
                           placeholder="5432"
-                          className="w-full h-9 px-3 rounded-sm border bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-primary)] text-xs font-mono focus:border-blue-500/50 outline-none transition-theme shadow-sm"
+                          className="w-full h-9 px-3 rounded-shape-xs border bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-primary)] text-xs font-mono focus:border-[var(--border-accent)]/50 outline-none transition-theme shadow-sm"
                           value={db.port || ""}
                           onChange={(e) =>
                             handleChange(db.id, "port", e.target.value)
@@ -763,12 +818,12 @@ export const DatabaseOrchestrationView = ({
                         />
                       </div>
                       <div className="space-y-1 text-right">
-                        <label className="text-[9px] uppercase text-blue-500/60 font-black tracking-widest px-1">
+                        <label className="text-[9px] uppercase text-[var(--fg-accent)]/60 font-black tracking-widest px-1">
                           {t("dbUsername")}
                         </label>
                         <input
                           placeholder="postgres"
-                          className="w-full h-9 px-3 rounded-sm border bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-primary)] text-xs font-mono focus:border-blue-500/50 outline-none transition-theme shadow-sm"
+                          className="w-full h-9 px-3 rounded-shape-xs border bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-primary)] text-xs font-mono focus:border-[var(--border-accent)]/50 outline-none transition-theme shadow-sm"
                           value={db.username || ""}
                           onChange={(e) =>
                             handleChange(db.id, "username", e.target.value)
@@ -776,12 +831,12 @@ export const DatabaseOrchestrationView = ({
                         />
                       </div>
                       <div className="space-y-1 text-right">
-                        <label className="text-[9px] uppercase text-blue-500/60 font-black tracking-widest px-1">
+                        <label className="text-[9px] uppercase text-[var(--fg-accent)]/60 font-black tracking-widest px-1">
                           {t("dbName")}
                         </label>
                         <input
                           placeholder="platform_core"
-                          className="w-full h-9 px-3 rounded-sm border bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-primary)] text-xs font-mono focus:border-blue-500/50 outline-none transition-theme shadow-sm"
+                          className="w-full h-9 px-3 rounded-shape-xs border bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-primary)] text-xs font-mono focus:border-[var(--border-accent)]/50 outline-none transition-theme shadow-sm"
                           value={db.db_name || ""}
                           onChange={(e) =>
                             handleChange(db.id, "db_name", e.target.value)
@@ -798,7 +853,7 @@ export const DatabaseOrchestrationView = ({
                                 !db.showPassword,
                               )
                             }
-                            className="text-blue-500/60 hover:text-blue-500 transition-theme p-1"
+                            className="text-[var(--fg-accent)]/60 hover:text-[var(--fg-accent)] transition-theme p-1"
                           >
                             {db.showPassword ? (
                               <EyeOff size={14} />
@@ -806,14 +861,14 @@ export const DatabaseOrchestrationView = ({
                               <Eye size={14} />
                             )}
                           </button>
-                          <label className="text-[9px] uppercase text-blue-500/60 font-black tracking-widest">
+                          <label className="text-[9px] uppercase text-[var(--fg-accent)]/60 font-black tracking-widest">
                             {t("dbPassword")}
                           </label>
                         </div>
                         <input
                           type={db.showPassword ? "text" : "password"}
                           placeholder="••••••••"
-                          className="w-full h-9 px-3 rounded-sm border bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-primary)] text-xs font-mono focus:border-blue-500/50 outline-none transition-theme shadow-sm"
+                          className="w-full h-9 px-3 rounded-shape-xs border bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-primary)] text-xs font-mono focus:border-[var(--border-accent)]/50 outline-none transition-theme shadow-sm"
                           value={db.password || ""}
                           onChange={(e) =>
                             handleChange(db.id, "password", e.target.value)
@@ -825,7 +880,7 @@ export const DatabaseOrchestrationView = ({
                 )}
               </AnimatePresence>
 
-              <div className="col-span-3 h-[52px] flex items-center justify-center border border-dashed border-[var(--border-default)] rounded-sm bg-accent/5">
+              <div className="col-span-3 h-[52px] flex items-center justify-center border border-dashed border-[var(--border-default)] rounded-shape-xs bg-accent/5">
                 <span className="text-[10px] text-[var(--text-secondary)] font-mono">
                   {t("cloudAutoScalingEnabled")}
                 </span>
@@ -835,7 +890,7 @@ export const DatabaseOrchestrationView = ({
                   <button
                     onClick={() => handleTestConnection(db.id)}
                     disabled={db.isTesting}
-                    className={`flex items-center justify-center gap-2 py-2.5 rounded-sm border transition-theme font-bold text-xs bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-secondary)] hover:text-accent hover:border-accent/30 group`}
+                    className={`flex items-center justify-center gap-2 py-2.5 rounded-shape-xs border transition-theme font-bold text-xs bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-secondary)] hover:text-accent hover:border-accent/30 group`}
                   >
                     {db.isTesting ? (
                       <>
@@ -854,7 +909,7 @@ export const DatabaseOrchestrationView = ({
                   </button>
                   <button
                     onClick={() => handleSaveConfig(db.id)}
-                    className="flex items-center justify-center gap-2 py-2.5 rounded-sm border transition-theme font-bold text-xs bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]"
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-shape-xs border transition-theme font-bold text-xs bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)]"
                   >
                     <Save size={14} className="text-[var(--text-muted)]" />{" "}
                     {t("saveDbConfig")}
@@ -866,7 +921,7 @@ export const DatabaseOrchestrationView = ({
                     onClick={() => handleRunMigrations(db.id, "scratch")}
                     disabled={isMigrating !== null}
                     title={t("migrateScratchDesc")}
-                    className={`flex flex-col items-center justify-center gap-1 py-4 rounded-[var(--radius-sm)] border transition-theme font-bold text-[10px] uppercase tracking-wider relative overflow-hidden group border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 shadow-xs cursor-pointer ${
+                    className={`flex flex-col items-center justify-center gap-1 py-4 rounded-[var(--radius-sm)] border transition-theme font-bold text-[10px] uppercase tracking-wider relative overflow-hidden group border-[var(--fg-danger)]/30 bg-[var(--status-danger-subtle)] hover:bg-[var(--fg-danger)]/20 text-[var(--fg-danger)] shadow-xs cursor-pointer ${
                       isMigrating?.id === db.id && isMigrating?.type === "scratch" ? "opacity-70 grayscale" : ""
                     }`}
                   >
@@ -874,7 +929,7 @@ export const DatabaseOrchestrationView = ({
                     isMigrating?.type === "scratch" ? (
                       <RefreshCw
                         size={16}
-                        className="animate-spin text-red-500"
+                        className="animate-spin text-[var(--fg-danger)]"
                       />
                     ) : (
                       <Trash2
@@ -918,7 +973,7 @@ export const DatabaseOrchestrationView = ({
                         onClick={() => {
                           setOpenBackupMenuId((prev) => (prev === db.id ? null : db.id));
                         }}
-                        className={`w-full h-full flex flex-col items-center justify-center gap-1 py-4 rounded-sm border transition-theme font-bold text-[10px] uppercase tracking-wider bg-[var(--surface-page)] border-[var(--border-default)] text-blue-500 hover:border-blue-500/50 hover:bg-blue-500/5`}
+                        className={`w-full h-full flex flex-col items-center justify-center gap-1 py-4 rounded-shape-xs border transition-theme font-bold text-[10px] uppercase tracking-wider bg-[var(--surface-page)] border-[var(--border-default)] text-[var(--fg-accent)] hover:border-[var(--border-accent)]/50 hover:bg-[var(--fg-accent)]/5`}
                       >
                         <HistoryIcon
                           size={16}
@@ -932,7 +987,7 @@ export const DatabaseOrchestrationView = ({
                       <div
                         className={`${
                           openBackupMenuId === db.id ? "block" : "hidden"
-                        } absolute bottom-[110%] left-0 right-0 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-md shadow-2xl z-50 p-2 animate-in fade-in slide-in-from-bottom-2 transition-theme`}
+                        } absolute bottom-[110%] left-0 right-0 bg-[var(--surface-subtle)] border border-[var(--border-default)] rounded-shape-sm shadow-2xl z-50 p-2 animate-in fade-in slide-in-from-bottom-2 transition-theme`}
                       >
                         {(() => {
                           const currentDbTargetType = db.id === "ledger" ? "ledger" : (db.id === "external" ? "external" : (db.id === "security" ? "security" : (db.id === "media" ? "media" : "core")));
@@ -944,7 +999,7 @@ export const DatabaseOrchestrationView = ({
                                   handleExportBackup(db.id);
                                   setOpenBackupMenuId(null);
                                 }}
-                                className="w-full flex items-center gap-3 p-3 rounded-md hover:bg-blue-500/10 text-blue-500 transition-theme text-xs font-bold"
+                                className="w-full flex items-center gap-3 p-3 rounded-shape-sm hover:bg-[var(--bg-accent-subtle)] text-[var(--fg-accent)] transition-theme text-xs font-bold"
                               >
                                 <Download size={16} />{" "}
                                 {dir === "rtl"
@@ -952,7 +1007,7 @@ export const DatabaseOrchestrationView = ({
                                   : `Export Backup (${currentDbName})`}
                               </button>
                               <div className="h-px bg-[var(--border-default)] my-1" />
-                              <label className="w-full flex items-center gap-3 p-3 rounded-md hover:bg-accent/10 text-accent transition-theme text-xs font-bold cursor-pointer">
+                              <label className="w-full flex items-center gap-3 p-3 rounded-shape-sm hover:bg-accent/10 text-accent transition-theme text-xs font-bold cursor-pointer">
                                 <Upload size={16} />
                                 {dir === "rtl"
                                   ? `استيراد نسخة إلى (${currentDbName})`
@@ -976,7 +1031,7 @@ export const DatabaseOrchestrationView = ({
 
                 <button
                   onClick={() => handleActivateDatabase(db.id, db.is_active)}
-                  className={`w-full py-4 rounded-lg border transition-theme font-bold text-xs flex items-center justify-center gap-3 relative overflow-hidden group ${
+                  className={`w-full py-4 rounded-shape-md border transition-theme font-bold text-xs flex items-center justify-center gap-3 relative overflow-hidden group ${
                     db.is_active
                       ? "bg-[var(--surface-subtle)] border-[var(--fg-danger)]/40 text-[var(--fg-danger)] hover:bg-[var(--surface-card)]"
                       : "bg-[var(--bg-accent-emphasis)] border-[var(--border-accent)] text-[var(--fg-on-emphasis)] hover:opacity-90 shadow-xs"

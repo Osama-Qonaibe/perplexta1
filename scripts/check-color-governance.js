@@ -14,11 +14,14 @@ const HARDCODED_EMERALD_BRAND_REGEX = /text-emerald-\d+|bg-emerald-\d+|border-em
 let violationsCount = 0;
 
 function scanDirectory(dir) {
-  if (!fs.existsSync(dir)) return;
-  const files = fs.readdirSync(dir);
+  const resolvedDir = path.resolve(dir);
+  if (!fs.existsSync(resolvedDir)) return;
+  const files = fs.readdirSync(resolvedDir);
 
   for (const file of files) {
-    const fullPath = path.join(dir, file);
+    if (file.includes('..') || file.includes('/') || file.includes('\\') || file.includes('\0')) continue;
+    const fullPath = path.resolve(resolvedDir, file);
+    if (!fullPath.startsWith(resolvedDir + path.sep)) continue;
     const stat = fs.statSync(fullPath);
 
     if (stat.isDirectory()) {

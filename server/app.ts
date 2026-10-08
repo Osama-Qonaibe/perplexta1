@@ -6,16 +6,51 @@ import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
 import { Readable, Transform } from 'stream';
-import { globalLimiter, adminLimiter } from './middleware/rateLimit.js';
+
+/**
+ * ============================================================================
+ * SERVER-SIDE CRON & BACKGROUND MAINTENANCE AUDIT DIRECTIVE
+ * ============================================================================
+ * 
+ * OUTBOUND API & GPU NEUTRALIZATION STATUS:
+ * [✓] All background intervals hitting external GPU providers (RunPod, ComfyUI, etc.) are NEUTRALIZED.
+ * [✓] Automated background periodic pings in `gpuDiscoveryService` are DISABLED.
+ * [✓] Outbound search engine sitemap pings in `sitemapPinger` are DISABLED.
+ * [✓] All remaining scheduled background jobs run 100% internally on local PostgreSQL & local disk.
+ * 
+ * INTERNAL MAINTENANCE TASKS SCHEDULED (server/jobs/cron.ts):
+ * 1. Daily Maintenance (`0 3 * * *`):
+ *    - Resets `used_today` in local DB (`api_keys_vault`, `gpu_providers`).
+ *    - Purges temporary media files older than 48 hours from local disk.
+ *    - Purges expired 24h stories and trashed bulletin posts from local DB.
+ *    - Cleans up orphaned physical upload files on local disk.
+ * 2. 48-Hour Media Storage Purge (`Every 6 Hours`):
+ *    - 6-hour interval check to remove temporary generated images/videos > 48h from local disk.
+ * 3. Database Heartbeat (`Every 5 Minutes`):
+ *    - Monitors local PostgreSQL connection pool status and saturation metrics.
+ * 4. Subscription Renewal Audit (`5 3 * * *`):
+ *    - Scans local DB subscriptions expiring in 3 days and inserts internal notifications into local DB.
+ * 5. Daily SEO Metadata Sync (`0 2 * * *`):
+ *    - Scans local DB bulletin ads and pages to generate missing SEO meta tags in local DB.
+ * 6. Monthly Memory Compaction (`30 4 1 * *`):
+ *    - Performs deterministic heuristic text compaction on chat memory summaries in local DB (Zero AI API calls).
+ * 7. Monthly Financial Ledger Audit (`0 5 1 * *`):
+ *    - Reconciles local wallet ledger balances and logs discrepancy reports in local DB.
+ * 8. Weekly Wallet Reconciliation (`0 4 * * 0`):
+ *    - Weekly audit of local wallet balances against append-only ledger transaction history in local DB.
+ * ============================================================================
+ */
+import { globalLimiter, authLimiter, adminLimiter } from './middleware/rateLimit.js';
 import { csrfProtection } from './middleware/csrf.js';
 import { uploadValidator } from './middleware/uploadValidator.js';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { generateMarkdownForPage, estimateMarkdownTokens } from './utils/markdown-for-agents.js';
 import { getBaseUrl, getPreferredLanguage } from './utils/request.js';
 import { generateAuthMd } from './utils/auth-md.js';
 import { paymentMiddlewareFromConfig } from '@x402/express';
 import wellKnownRouter from './routes/well-known.js';
 
-import { pool, ledgerPool, externalPool, securityPool, getDatabasePool, getExternalPool, getPoolMetrics, cleanupAbandonedConnections } from './db/index.js';
+import { pool, ledgerPool, externalPool, securityPool, mediaPool, getDatabasePool, getExternalPool, getMediaPool, getPoolMetrics, executeWithExternalBackpressure, cleanupAbandonedConnections, isDatabaseConnected } from './db/index.js';
 import QueryStream from 'pg-query-stream';
 import { UserFile, DepositRequest, ToolOrchestrator } from './db/types.js';
 import { getCachedRouteSeo, getCachedAllActiveRouteSeo, getCachedRouteSeoMetadata, getCachedSeoMetadata, upsertSeoMetadata, getAllSeoMetadata, getCachedOgPreview } from './db/queries.js';
@@ -55,6 +90,7 @@ const activePoolsList = [
   { name: 'ledger', poolInstance: ledgerPool },
   { name: 'external', poolInstance: externalPool },
   { name: 'security', poolInstance: securityPool },
+  { name: 'media', poolInstance: mediaPool },
 ];
 activePoolsList.forEach(({ poolInstance }) => ensureSaturationListener(poolInstance));
 
@@ -84,6 +120,8 @@ export async function ensureApiPerfLogsTable() {
       CREATE INDEX IF NOT EXISTS idx_api_performance_logs_created_at ON api_performance_logs (created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_api_performance_logs_duration ON api_performance_logs (duration_ms);
       CREATE INDEX IF NOT EXISTS idx_api_performance_logs_endpoint ON api_performance_logs (endpoint);
+      CREATE INDEX IF NOT EXISTS idx_api_performance_logs_user_id ON api_performance_logs (user_id);
+      CREATE INDEX IF NOT EXISTS idx_api_performance_logs_is_slow ON api_performance_logs (is_slow) WHERE is_slow = true;
     `);
     isApiPerfTableEnsured = true;
   } catch (err: any) {
@@ -137,6 +175,10 @@ async function recordSlowApiRequest(data: {
  * 3. Detects and asynchronously records slow API requests exceeding 500ms into the dedicated api_performance_logs database table.
  */
 app.use((req, res, next) => {
+  // WebContainer & SharedArrayBuffer Cross-Origin Isolation Headers
+  res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+
   // Gracefully handle network stream errors like EPIPE and ECONNRESET to prevent uncaughtExceptions
   res.on('error', (err: any) => {
     if (err.code === 'EPIPE' || err.code === 'ECONNRESET') {
@@ -186,7 +228,38 @@ app.use((req, res, next) => {
       const totalDurationMs = Math.round((Number(elapsedHr) / 1_000_000) * 100) / 100;
       const roundedMs = totalDurationMs.toFixed(2);
 
-      if (totalDurationMs >= 500) {
+      const aiInferenceEndpoints = [
+        '/api/chats/sync-message',
+        '/api/chats/stream-message',
+        '/api/v1/chat/completions',
+        '/api/admin/gpu-providers/inference/dispatch',
+        '/api/bulletin/ai/generate',
+        '/api/media/generate'
+      ];
+
+      const isAiInferenceRoute = aiInferenceEndpoints.some(ep => req.originalUrl.startsWith(ep));
+
+      if (isAiInferenceRoute) {
+        console.log(`[AI Inference Workload] 🧠 ${req.method} ${req.originalUrl} - Status: ${res.statusCode} - ${(totalDurationMs / 1000).toFixed(2)}s`);
+        
+        setImmediate(() => {
+          const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || req.socket?.remoteAddress || null;
+          const userId = (req as any).user?.id || (req as any).userId || null;
+          const rawEndpoint = req.baseUrl ? `${req.baseUrl}${req.path}` : (req.path || req.originalUrl?.split('?')[0] || '/');
+
+          recordSlowApiRequest({
+            endpoint: rawEndpoint,
+            method: req.method,
+            statusCode: res.statusCode,
+            durationMs: totalDurationMs,
+            clientIp,
+            userAgent: req.headers['user-agent'] || null,
+            userId,
+            queryParams: req.query || {},
+            headersSnapshot: {}
+          }).catch(() => {});
+        });
+      } else if (totalDurationMs >= 500) {
         console.warn(`[SLOW API] ⚠️ ${req.method} ${req.originalUrl} - Status: ${res.statusCode} - ${roundedMs}ms (>500ms threshold)`);
 
         setImmediate(() => {
@@ -223,43 +296,84 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(compression({
+const normalCompression = compression({
   level: 6,
   threshold: 1024,
   filter: (req: any, res: any) => {
     if (req.headers['x-no-compression']) {
       return false;
     }
-    // Disable compression for range requests to prevent breaking video streaming
     if (req.headers.range) {
       return false;
     }
-    // Disable compression for uploads and media files
     const isMedia = req.path && (
       req.path.startsWith('/uploads/') ||
-      /\.(mp4|webm|mov|ogg|mp3|wav|m4a|aac|flac|png|jpg|jpeg|gif|webp)$/i.test(req.path)
+      /\.(mp4|webm|mov|ogg|mp3|wav|m4a|aac|flac|png|jpg|jpeg|gif|webp|pdf|zip|gz|br)$/i.test(req.path)
     );
     if (isMedia) {
       return false;
     }
     return compression.filter(req, res);
   }
-}) as any);
+}) as any;
+
+const aggressiveCompression = compression({
+  level: 9, // Maximum zlib/gzip compression level for slow/metered connections
+  threshold: 128, // Lower threshold to compress smaller JSON/API payloads
+  memLevel: 9, // Maximum memory allocation window for compression
+  filter: (req: any, res: any) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    if (req.headers.range) {
+      return false;
+    }
+    const isMedia = req.path && (
+      req.path.startsWith('/uploads/') ||
+      /\.(mp4|webm|mov|ogg|mp3|wav|m4a|aac|flac|png|jpg|jpeg|gif|webp|pdf|zip|gz|br)$/i.test(req.path)
+    );
+    if (isMedia) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}) as any;
+
+app.use((req: any, res: any, next: any) => {
+  const isSaveDataHeader = req.headers['save-data'] === 'on';
+  const isCustomHeader = req.headers['x-data-saver'] === 'true' || req.headers['x-aggressive-compression'] === 'true';
+  const isCookie = req.cookies?.data_saver === 'true' || req.cookies?.data_saver === '1' || (req.headers.cookie && /data_saver=(true|1)/i.test(req.headers.cookie));
+  const isUserDataSaver = req.user?.data_saver === true;
+
+  if (isSaveDataHeader || isCustomHeader || isCookie || isUserDataSaver) {
+    req.isAggressiveCompression = true;
+    res.setHeader('X-Content-Compression-Mode', 'Aggressive-Level-9');
+    res.setHeader('Vary', 'Accept-Encoding, Save-Data, X-Data-Saver');
+    return aggressiveCompression(req, res, next);
+  }
+
+  return normalCompression(req, res, next);
+});
 
 app.use((req, res, next) => {
   if (!req.path.startsWith('/api/')) {
     return next();
   }
 
-  // Pre-flight check: If core pool is null, the system is in Degraded Mode or still initializing.
-  if (pool === null) {
+  // Health and diagnostic probes must always succeed to inform load balancers and dev supervisor of real-time state
+  if (req.path === '/api/health' || req.path === '/api/diagnostics/db' || req.path === '/api/health/db' || req.path === '/api/db-health') {
+    return next();
+  }
+
+  // Pre-flight check: If core pool is not active, the system is in Degraded Mode or still initializing.
+  if (!isDatabaseConnected()) {
     // Allow public read endpoints that have memory-cached fallbacks to serve content smoothly
     const isPublicDegradedAllowed = /^\/api\/(settings|plans|ads|seo|routes-seo|og-preview|health|system|categories)/.test(req.path);
     if (isPublicDegradedAllowed) {
       return next();
     }
 
-    if (req.path === '/api/auth/me') {
+    if (req.path === '/api/auth/me' || req.path === '/api/auth/user') {
       return res.json({ user: null, degraded: true });
     }
 
@@ -271,19 +385,59 @@ app.use((req, res, next) => {
     });
   }
 
-  const isBackpressureSaturated = (p: any) => {
-    if (!p) return false;
-    const maxPool = p.options?.max || 20;
-    const totalCount = p.totalCount || 0;
-    const waitingCount = p.waitingCount || 0;
-    return totalCount >= maxPool && waitingCount > 15;
-  };
+  // Evaluate saturation & backpressure across all database pools
+  const poolList: Array<{ name: string; poolInstance: any }> = [
+    { name: 'core', poolInstance: pool },
+    { name: 'ledger', poolInstance: ledgerPool },
+    { name: 'external', poolInstance: externalPool },
+    { name: 'security', poolInstance: securityPool },
+    { name: 'media', poolInstance: mediaPool },
+  ];
 
-  if (isBackpressureSaturated(pool) || isBackpressureSaturated(ledgerPool) || isBackpressureSaturated(externalPool) || isBackpressureSaturated(securityPool)) {
+  const poolStatusMap = poolList.reduce((acc, { name, poolInstance }) => {
+    acc[name] = getPoolMetrics(poolInstance, name);
+    return acc;
+  }, {} as Record<string, ReturnType<typeof getPoolMetrics>>);
+
+  // Dedicated backpressure check for external database pool routes
+  const isExternalRoute = req.path.startsWith('/api/external') || req.path.startsWith('/api/integrations') || req.path.startsWith('/api/well-known') || req.path.startsWith('/api/agent');
+  const externalMetrics = poolStatusMap.external;
+
+  if (isExternalRoute && (externalMetrics?.saturated || externalMetrics?.backpressure_level === 'critical')) {
+    res.setHeader('Retry-After', '2');
+    return res.status(503).json({
+      error: 'External Database Backpressure',
+      message: 'The external database connection pool is currently under heavy load backpressure. Please retry shortly.',
+      code: 'EXTERNAL_POOL_SATURATED',
+      pool: 'external',
+      metrics: {
+        waiting: externalMetrics.waiting,
+        active: externalMetrics.active,
+        max: externalMetrics.max,
+        utilizationPercent: externalMetrics.utilization_percent,
+        backpressureLevel: externalMetrics.backpressure_level
+      }
+    });
+  }
+
+  // Global pool backpressure check for all API routes
+  const saturatedPoolEntry = Object.entries(poolStatusMap).find(([_, m]) => m.saturated || (m.backpressure_level === 'critical' && m.waiting > 3));
+
+  if (saturatedPoolEntry) {
+    const [satPoolName, satMetrics] = saturatedPoolEntry;
     res.setHeader('Retry-After', '2');
     return res.status(503).json({
       error: 'Service Overloaded',
-      message: 'The database connection pool is currently saturated. Please retry shortly.'
+      message: `The '${satPoolName}' database connection pool is currently saturated (${satMetrics.waiting} queued requests, ${satMetrics.utilization_percent}% utilization). Please retry shortly.`,
+      code: 'DATABASE_POOL_SATURATED',
+      saturatedPool: satPoolName,
+      metrics: {
+        waiting: satMetrics.waiting,
+        active: satMetrics.active,
+        max: satMetrics.max,
+        utilizationPercent: satMetrics.utilization_percent,
+        backpressureLevel: satMetrics.backpressure_level
+      }
     });
   }
   next();
@@ -316,11 +470,20 @@ const x402Middleware = paymentMiddlewareFromConfig(
   false // syncFacilitatorOnStart = false to avoid startup crashes
 );
 
-const trustProxyVal = process.env.TRUST_PROXIES || '1';
-if (trustProxyVal === 'true' || trustProxyVal === '1') {
+const rawTrustProxy = process.env.TRUST_PROXIES?.trim() || '1';
+try {
+  if (rawTrustProxy.toLowerCase() === 'true') {
+    app.set('trust proxy', true);
+  } else if (rawTrustProxy === '1') {
+    app.set('trust proxy', 1);
+  } else if (!isNaN(Number(rawTrustProxy))) {
+    app.set('trust proxy', Number(rawTrustProxy));
+  } else {
+    app.set('trust proxy', rawTrustProxy.split(',').map(s => s.trim()));
+  }
+} catch (err) {
+  console.warn('[Proxy] Invalid TRUST_PROXIES config, falling back to 1:', rawTrustProxy);
   app.set('trust proxy', 1);
-} else {
-  app.set('trust proxy', isNaN(Number(trustProxyVal)) ? trustProxyVal.split(',').map(s => s.trim()) : Number(trustProxyVal));
 }
 
 app.use((req, res, next) => {
@@ -334,6 +497,7 @@ app.use((req, res, next) => {
   
   if (!isApiOrUploads && !hasStaticExtension) {
     res.setHeader('Link', '</.well-known/api-catalog>; rel="api-catalog", </.well-known/mcp/server-card.json>; rel="service-desc", </.well-known/acp.json>; rel="acp", </.well-known/oauth-authorization-server>; rel="oauth-authorization-server", </.well-known/oauth-protected-resource>; rel="oauth-protected-resource", </auth.md>; rel="service-doc"');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
   }
   next();
 });
@@ -353,159 +517,99 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use((req: any, res: any, next: any) => {
-  const isDev = process.env.NODE_ENV !== 'production';
-  const nonce = res.locals.nonce || '';
-  
-  // 1. Explicitly separate GTM (Google Tag Manager) script directives
-  const gtmScriptSources = [
-    "https://www.googletagmanager.com",
-    "https://*.googletagmanager.com"
-  ];
-
-  // 2. Explicitly separate GA (Google Analytics) script directives
-  const gaScriptSources = [
-    "https://*.google-analytics.com",
-    "https://analytics.google.com",
-    "https://*.analytics.google.com"
-  ];
-
-  // 3. Define other trusted script sources
-  const otherScriptSources = [
-    "https://apis.google.com",
-    "https://*.google.com",
-    "https://*.gstatic.com",
-    "https://*.googleapis.com",
-    "https://*.stripe.com",
-    "https://*.firebaseapp.com",
-    "https://*.doubleclick.net",
-    "https://*.googleadservices.com",
-    "https://www.youtube.com",
-    "https://s.ytimg.com"
-  ];
-
-  // 4. Construct CSP script-src directives using modern 'strict-dynamic' for secure nested loads,
-  // while keeping 'unsafe-inline' and host sources as solid fallbacks for backward compatibility.
-  const scriptSrcDirectives = [
-    "'self'",
-    "'unsafe-inline'",
-    "'unsafe-eval'",
-    ...(!isDev && nonce ? [`'nonce-${nonce}'`, "'strict-dynamic'"] : []),
-    ...gtmScriptSources,
-    ...gaScriptSources,
-    ...otherScriptSources
-  ];
-
-  const scriptSrcElemDirectives = [
-    "'self'",
-    "'unsafe-inline'",
-    ...(!isDev && nonce ? [`'nonce-${nonce}'`, "'strict-dynamic'"] : []),
-    ...gtmScriptSources,
-    ...gaScriptSources,
-    ...otherScriptSources
-  ];
-
-  const cspDirectives: any = {
-    defaultSrc: ["'self'"],
-    scriptSrc: scriptSrcDirectives,
-    scriptSrcElem: scriptSrcElemDirectives,
-    scriptSrcAttr: ["'self'", "'unsafe-inline'"],
-    styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://*.googleapis.com", "https://accounts.google.com"],
-    styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://*.googleapis.com", "https://accounts.google.com"],
-    styleSrcAttr: ["'self'", "'unsafe-inline'"],
-    imgSrc: ["'self'", "data:", "blob:", "https:", "*"],
-    connectSrc: [
-      "'self'", 
-      "wss:", 
-      "ws:", 
-      "https://*.googleapis.com", 
-      "https://*.firebaseapp.com", 
-      "https://api.stripe.com", 
-      "https://checkout.stripe.com", 
-      "https://maps.googleapis.com", 
-      "https://*.google-analytics.com", 
-      "https://analytics.google.com", 
-      "https://*.analytics.google.com", 
-      "https://www.google.com", 
-      "https://*.google.com", 
-      "https://apis.google.com", 
-      "https://*.googletagmanager.com", 
-      "https://*.doubleclick.net", 
-      "https://*.googleadservices.com", 
-      "https://stats.g.doubleclick.net", 
-      "https://*.g.doubleclick.net", 
-      "https://*.run.app", 
-      "https://*.aistudio.google"
-    ],
-    fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
-    frameAncestors: ["'self'", "https://*.google.com", "https://ai.studio", "https://*.run.app", "https://*.aistudio.google"],
-    frameSrc: [
-      "'self'", 
-      "https://*.stripe.com", 
-      "https://*.google.com", 
-      "https://apis.google.com", 
-      "https://accounts.google.com", 
-      "https://www.youtube.com", 
-      "https://www.youtube-nocookie.com", 
-      "https://*.youtube.com", 
-      "https://*.doubleclick.net"
-    ],
-    workerSrc: ["'self'", "blob:"],
-    childSrc: ["'self'", "blob:"],
-    manifestSrc: ["'self'"]
-  };
-
-  if (!isDev) {
-    cspDirectives.upgradeInsecureRequests = [];
+// Block malicious automated vulnerability scanners attempting to probe sensitive dotfiles (e.g. /.git/config, /.env, /.aws)
+app.use((req, res, next) => {
+  const lowercasePath = req.path.toLowerCase();
+  if (
+    lowercasePath.startsWith('/.git') ||
+    lowercasePath.startsWith('/.env') ||
+    lowercasePath.startsWith('/.aws') ||
+    lowercasePath.startsWith('/.ssh') ||
+    lowercasePath.startsWith('/.htaccess')
+  ) {
+    return res.status(404).send('Not Found');
   }
-
-  helmet({
-    contentSecurityPolicy: {
-      directives: cspDirectives
-    },
-    crossOriginEmbedderPolicy: false,
-    crossOriginOpenerPolicy: false
-  })(req, res, next);
+  next();
 });
 
-const envOrigins = process.env.CORS_ALLOWED_ORIGINS ? process.env.CORS_ALLOWED_ORIGINS.split(',').map(o => o.trim()) : [];
+app.use(helmet({
+  frameguard: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://*.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net", "data:"],
+      imgSrc: ["'self'", "data:", "https:", "blob:", "*"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://*.googleapis.com", "https://*.googletagmanager.com"],
+      connectSrc: ["'self'", "https://api.perplexta.com", "wss:", "ws:", "https:", "*"],
+      frameAncestors: ["'self'", "https://*.google.com", "https://ai.studio", "https://*.run.app", "https://*.aistudio.google", "https://aistudio.google.com"],
+      frameSrc: ["'self'", "https:", "*"],
+      objectSrc: ["'none'"]
+    }
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }
+}));
+
+// ===== PERFORMANCE: Compression (Integrated with dynamic data-saver logic above) =====
+// Note: Global compression is already handled by the normalCompression/aggressiveCompression middleware stack.
+// ====================================
+
 const allowedOrigins = [
-  process.env.APP_URL,
-  ...envOrigins
-].filter(Boolean) as string[];
+  ...(process.env.CORS_ALLOWED_ORIGINS ? process.env.CORS_ALLOWED_ORIGINS.split(',').map(o => o.trim()) : []),
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()) : []),
+  ...(process.env.APP_URL ? [process.env.APP_URL.trim()] : []),
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'https://perplexta.com',
+  'https://www.perplexta.com'
+].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) return callback(null, '*');
-    if (process.env.NODE_ENV !== 'production' || allowedOrigins.includes(origin)) {
-      return callback(null, origin);
-    }
-    if (origin.endsWith('.run.app') || origin.endsWith('.aistudio.google')) {
-      return callback(null, origin);
-    }
-    callback(new Error('CORS Policy: Origin not permitted. Configure CORS_ALLOWED_ORIGINS in .env if needed.'));
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+
+    // AI Studio official development/preview domains
+    if (origin.endsWith('.aistudio.google')) return callback(null, true);
+
+    // Specific Google Cloud Run deployment for this application only (blocks arbitrary 3rd party .run.app origins)
+    const isAuthorizedCloudRun = origin.endsWith('.run.app') && (
+      origin.includes('guaw7b2cx6awvqizmf77ap') ||
+      origin.includes('315908805121') ||
+      origin.includes('ais-dev-') ||
+      origin.includes('ais-pre-')
+    );
+    if (isAuthorizedCloudRun) return callback(null, true);
+
+    if (process.env.NODE_ENV !== 'production') return callback(null, true);
+
+    console.warn(`[CORS] Blocked unauthorized origin: ${origin}`);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['X-CSRF-Token', 'X-Request-Id'],
+  maxAge: 86400
 }));
 
 app.use(express.json({ 
-  limit: '100mb',
+  limit: '10mb',
   verify: (req: any, res, buf) => {
     if (req.originalUrl && (req.originalUrl.startsWith('/api/payments/webhook') || req.originalUrl.includes('webhook'))) {
       req.rawBody = buf;
     }
   }
 }));
-app.use(express.urlencoded({ limit: '100mb', extended: true }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (err && (err.type === 'entity.too.large' || err.status === 413 || err.statusCode === 413 || err.name === 'PayloadTooLargeError')) {
     console.warn(`[Payload Too Large] Request size limit exceeded for ${req.method} ${req.path}`);
     return res.status(413).json({
-      error: 'حجم الطلب كبير جداً. الحد الأقصى المسموح به هو 100 ميجابايت.',
-      error_en: 'Payload too large. Maximum allowed request size is 100MB.',
+      error: 'حجم الطلب كبير جداً. الحد الأقصى المسموح به لطلبات JSON هو 10 ميجابايت. للوسائط الكبيرة، يرجى استخدام مسارات رفع الملفات المخصصة.',
+      error_en: 'Payload too large. Maximum allowed JSON request size is 10MB. For larger media, use dedicated multipart upload routes.',
       type: 'PAYLOAD_TOO_LARGE'
     });
   }
@@ -521,15 +625,30 @@ app.use((req, res, next) => {
 
 app.use(uploadValidator);
 
-const publicPath = path.join(process.cwd(), 'public');
-const uploadsPath = path.join(process.cwd(), 'uploads');
-const distPath = path.join(process.cwd(), 'dist');
+const publicPath = path.resolve(process.cwd(), 'public');
+const uploadsPath = path.resolve(process.cwd(), 'uploads');
+// Robust distPath resolution supporting both local development and bundled production execution
+const distPath = fs.existsSync(path.resolve(process.cwd(), 'dist'))
+  ? path.resolve(process.cwd(), 'dist')
+  : (typeof __dirname !== 'undefined' ? path.resolve(__dirname) : path.resolve(process.cwd()));
+
+const isProduction = process.env.NODE_ENV === 'production';
+const indexPath = path.resolve(distPath, 'index.html');
+const fallbackPath = path.resolve(process.cwd(), 'index.html');
 
 const serveStaticResource = (fileName: string, fallbackFileName?: string) => {
   return (req: express.Request, res: express.Response) => {
-    // Determine the actual file to serve
-    const distFile = path.join(distPath, fileName);
-    const publicFile = path.join(publicPath, fileName);
+    // Validate fileName to prevent path traversal
+    if (!fileName || fileName.includes('..') || fileName.includes('/') || fileName.includes('\\') || fileName.includes('\0')) {
+      return res.status(400).type('text/plain').send('Invalid file name');
+    }
+    const safeName = path.basename(fileName);
+    const distFile = path.resolve(distPath, safeName);
+    const publicFile = path.resolve(publicPath, safeName);
+
+    if (!distFile.startsWith(distPath + path.sep) || !publicFile.startsWith(publicPath + path.sep)) {
+      return res.status(400).type('text/plain').send('Invalid file path');
+    }
     
     let fileToServe: string | null = null;
     if (fs.existsSync(distFile)) {
@@ -537,10 +656,14 @@ const serveStaticResource = (fileName: string, fallbackFileName?: string) => {
     } else if (fs.existsSync(publicFile)) {
       fileToServe = publicFile;
     } else if (fallbackFileName) {
-      const distFallback = path.join(distPath, fallbackFileName);
-      const publicFallback = path.join(publicPath, fallbackFileName);
-      if (fs.existsSync(distFallback)) fileToServe = distFallback;
-      else if (fs.existsSync(publicFallback)) fileToServe = publicFallback;
+      if (fallbackFileName.includes('..') || fallbackFileName.includes('/') || fallbackFileName.includes('\\') || fallbackFileName.includes('\0')) {
+        return res.status(400).type('text/plain').send('Invalid fallback file name');
+      }
+      const safeFallback = path.basename(fallbackFileName);
+      const distFallback = path.resolve(distPath, safeFallback);
+      const publicFallback = path.resolve(publicPath, safeFallback);
+      if (distFallback.startsWith(distPath + path.sep) && fs.existsSync(distFallback)) fileToServe = distFallback;
+      else if (publicFallback.startsWith(publicPath + path.sep) && fs.existsSync(publicFallback)) fileToServe = publicFallback;
     }
 
     if (!fileToServe) {
@@ -576,9 +699,13 @@ app.get(['/manifest.webmanifest', '/manifest.json'], async (req, res) => {
     const activeNameAr = settings?.site_name_ar || 'بيربليكستا';
     const description = settings?.site_description_en || 'Professional Elite AI Analytics & Strategic Intelligence Platform';
 
+    // Localize the manifest name and short_name based on language request headers or query params
+    const isArabic = !!(req.headers['accept-language']?.toLowerCase().includes('ar') || req.query.lang === 'ar');
+    const localizedName = isArabic ? activeNameAr : activeNameEn;
+
     const manifestObj = {
-      name: `${activeNameAr} - ${activeNameEn}`,
-      short_name: activeNameEn,
+      name: localizedName,
+      short_name: localizedName,
       description,
       id: '/',
       start_url: '/',
@@ -690,7 +817,13 @@ app.get([
   return res.status(404).end();
 });
 
-app.get('/sw.js', serveStaticResource('sw.js'));
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Content-Type', 'application/javascript');
+  res.sendFile(path.join(process.cwd(), 'public', 'sw.js'));
+});
 app.get('/version.json', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -704,16 +837,19 @@ app.get('/version.json', (req, res) => {
 
 app.use(wellKnownRouter);
 
-app.use(express.static(publicPath, {
+// ===== PERFORMANCE: Static caching =====
+app.use(express.static('public', {
   etag: true,
   lastModified: true,
-  maxAge: '1d'
+  maxAge: '7d', // browser cache for 7 days
+  immutable: false
 }));
+// =======================================
 
 import jwt from 'jsonwebtoken';
-import { getSystemSettings } from './services/system.js';
-import { filePermissionCache, fileVersionCache, FILE_CACHE_TTL_MS, invalidateFilePermissionCache, invalidateFileVersionCache } from './services/filePermissionCache.js';
-export { filePermissionCache, fileVersionCache, invalidateFilePermissionCache, invalidateFileVersionCache };
+import { getSystemSettings, resolvePersistentSystemAssetUrl } from './services/system.js';
+import { filePermissionCache, fileVersionCache, missingFileCache, FILE_CACHE_TTL_MS, MISSING_FILE_TTL_MS, invalidateFilePermissionCache, invalidateFileVersionCache } from './services/filePermissionCache.js';
+export { filePermissionCache, fileVersionCache, missingFileCache, invalidateFilePermissionCache, invalidateFileVersionCache };
 
 if (!fs.existsSync(uploadsPath)) {
   try {
@@ -762,6 +898,10 @@ const mediaMimeTypes: Record<string, string> = {
   '.ogv': 'video/ogg',
   '.flv': 'video/x-flv',
   '.wmv': 'video/x-ms-wmv',
+  '.ts': 'video/mp2t',
+  '.mts': 'video/mp2t',
+  '.m2ts': 'video/mp2t',
+  '.vob': 'video/dvd',
   '.ogg': 'audio/ogg',
   '.mp3': 'audio/mpeg',
   '.wav': 'audio/wav',
@@ -773,25 +913,42 @@ const mediaMimeTypes: Record<string, string> = {
 };
 
 async function checkIsPublicFile(filename: string): Promise<boolean> {
-  const cleanName = path.basename(filename.split('?')[0].replace(/^(\/)?(uploads\/)+/i, ''));
-  const cacheKey = `public_ref:${cleanName}`;
-  const now = Date.now();
+  if (!filename || filename.includes('..') || filename.includes('\0')) return false;
   
-  const ext = path.extname(cleanName).toLowerCase();
-  const isMediaExt = Boolean(mediaMimeTypes[ext]);
-  const diskPath = path.join(uploadsPath, cleanName);
-  const fileExistsOnDisk = fs.existsSync(diskPath);
+  const cleanPath = filename.split('?')[0].replace(/^(\/)?(uploads\/)+/i, '').replace(/^\/+/, '');
+  const cleanName = path.basename(cleanPath);
+  if (!cleanName || cleanName.includes('..') || cleanName.includes('/') || cleanName.includes('\\')) return false;
 
-  // If file physically exists on disk or is a media extension, it is always public/accessible
-  if (fileExistsOnDisk || isMediaExt) {
-    filePermissionCache.set(cacheKey, { authorized: true, expiresAt: now + FILE_CACHE_TTL_MS });
+  // System brand assets, default images, and standard public upload media are always public
+  const ext = path.extname(cleanName).toLowerCase();
+  const isRecognizedMedia = Object.keys(mediaMimeTypes).includes(ext) ||
+    cleanName.startsWith('pvid_') ||
+    cleanName.startsWith('vid_') ||
+    cleanName.startsWith('reel_') ||
+    cleanName.startsWith('story_') ||
+    cleanName.startsWith('thumb_') ||
+    cleanName.startsWith('ad_') ||
+    cleanName.includes('_thumb') ||
+    cleanName.includes('_processed') ||
+    cleanName.includes('_opt');
+
+  if (
+    cleanPath.startsWith('brand/') || 
+    cleanPath.startsWith('brand\\') || 
+    cleanPath === 'brand' || 
+    cleanPath === 'default_video_poster.jpg' ||
+    isRecognizedMedia
+  ) {
     return true;
   }
 
+  const cacheKey = `public_ref:${cleanName}`;
+  const now = Date.now();
+
   if (filePermissionCache.has(cacheKey)) {
     const cached = filePermissionCache.get(cacheKey)!;
-    if (now < cached.expiresAt && cached.authorized) {
-      return true;
+    if (now < cached.expiresAt) {
+      return cached.authorized;
     }
     filePermissionCache.delete(cacheKey);
   }
@@ -808,8 +965,8 @@ async function checkIsPublicFile(filename: string): Promise<boolean> {
       if (
         meta.is_public === true ||
         meta.isPublic === true ||
-        ['image', 'video', 'audio'].includes(row.file_type) ||
-        (row.mime_type && (row.mime_type.startsWith('image/') || row.mime_type.startsWith('video/') || row.mime_type.startsWith('audio/')))
+        meta.generated === true ||
+        Boolean(meta.origin && meta.origin.startsWith('AI_Orchestrator'))
       ) {
         isPublic = true;
       }
@@ -817,47 +974,65 @@ async function checkIsPublicFile(filename: string): Promise<boolean> {
 
     if (!isPublic) {
       const pattern = `%${cleanName}%`;
-      const combinedCheck = await pool.query(`
-        SELECT (
-          EXISTS(SELECT 1 FROM bulletin_ads WHERE image_url LIKE $1 OR video_url LIKE $1 OR author_avatar LIKE $1) OR
-          EXISTS(SELECT 1 FROM advertisements WHERE image_url LIKE $1) OR
-          EXISTS(SELECT 1 FROM users WHERE avatar LIKE $1) OR
-          EXISTS(SELECT 1 FROM bulletin_pages WHERE avatar_url LIKE $1 OR cover_url LIKE $1) OR
-          EXISTS(SELECT 1 FROM system_settings WHERE logo_url LIKE $1 OR logo_light_url LIKE $1 OR seo_image_url LIKE $1 OR favicon_url LIKE $1)
-        ) AS is_public
-      `, [pattern]);
+      try {
+        const combinedCheck = await pool.query(`
+          SELECT (
+            EXISTS(SELECT 1 FROM messages WHERE content LIKE $1) OR
+            EXISTS(SELECT 1 FROM bulletin_ads WHERE image_url LIKE $1 OR video_url LIKE $1 OR author_avatar LIKE $1) OR
+            EXISTS(SELECT 1 FROM advertisements WHERE image_url LIKE $1) OR
+            EXISTS(SELECT 1 FROM users WHERE avatar LIKE $1) OR
+            EXISTS(SELECT 1 FROM bulletin_pages WHERE avatar_url LIKE $1 OR cover_url LIKE $1) OR
+            EXISTS(SELECT 1 FROM system_settings WHERE logo_url LIKE $1 OR logo_light_url LIKE $1 OR seo_image_url LIKE $1 OR favicon_url LIKE $1)
+          ) AS is_public
+        `, [pattern]);
 
-      if (combinedCheck.rows[0]?.is_public) {
-        isPublic = true;
-      } else {
+        if (combinedCheck.rows[0]?.is_public) {
+          isPublic = true;
+        }
+      } catch (checkErr: any) {
+        console.warn('[Upload Secure Handler] Public reference query warning:', checkErr.message);
       }
     }
 
-    if (isPublic) {
-      filePermissionCache.set(cacheKey, { authorized: true, expiresAt: now + FILE_CACHE_TTL_MS });
-      return true;
+    if (!isPublic) {
+      const targetMediaPool = mediaPool || pool;
+      if (targetMediaPool) {
+        try {
+          const mediaCheck = await targetMediaPool.query(`
+            SELECT EXISTS(
+              SELECT 1 FROM media_assets 
+              WHERE stored_path LIKE $1 OR original_filename = $2 OR (metadata->>'generated')::boolean = true OR (metadata->>'is_public')::boolean = true
+            ) AS is_public
+          `, [`%${cleanName}%`, cleanName]);
+          if (mediaCheck.rows[0]?.is_public) {
+            isPublic = true;
+          }
+        } catch (_) {
+          // Table media_assets might not exist or be on separate pool, ignore gracefully
+        }
+      }
     }
 
-    return false;
+    filePermissionCache.set(cacheKey, { authorized: isPublic, expiresAt: now + FILE_CACHE_TTL_MS });
+    return isPublic;
   } catch (dbErr) {
     console.error('[Upload Secure Handler] checkIsPublicFile error:', dbErr);
-    return isMediaExt || fileExistsOnDisk;
+    filePermissionCache.set(cacheKey, { authorized: false, expiresAt: now + FILE_CACHE_TTL_MS });
+    return false;
   }
 }
 
-// Mount uploads as static first for fast direct hits
-app.use('/uploads', express.static(uploadsPath, {
-  maxAge: '30d',
-  etag: true,
-  fallthrough: true,
-  setHeaders: (res, path) => {
-    res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-  }
-}));
-
 // Safe universal middleware handler for /uploads (avoids any path-to-regexp regex parsing errors across Express 4/5)
 app.use('/uploads', async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // Enforce CORS headers for all uploads delivery
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
   // Only handle GET and HEAD requests for file delivery
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return next();
@@ -865,20 +1040,34 @@ app.use('/uploads', async (req: express.Request, res: express.Response, next: ex
 
   try {
     const rawFilename = (req.path || '').toString();
+    if (rawFilename.includes('..') || rawFilename.includes('\0')) {
+      return res.status(400).json({ error: 'Invalid file path' });
+    }
     const cleanRaw = rawFilename.replace(/^(\/)?(uploads\/)+/i, '').replace(/^\/+/, '');
     const cleanPathOnly = cleanRaw.split('?')[0];
+    if (cleanPathOnly.includes('..') || cleanPathOnly.includes('\0')) {
+      return res.status(400).json({ error: 'Invalid file path' });
+    }
     const filename = path.basename(cleanPathOnly);
 
-    if (!filename) {
+    if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       return next();
     }
     
-    // Check primary uploads directory, then nested, then public/uploads
-    let candidatePaths = [
-      path.join(uploadsPath, cleanPathOnly),
-      path.join(uploadsPath, filename),
-      path.join(process.cwd(), 'public', 'uploads', filename),
-      path.join(process.cwd(), 'public', filename),
+    // Check primary uploads directory, then nested brand, then public/uploads
+    const resolvedUploads = path.resolve(uploadsPath);
+    const resolvedBrand = path.resolve(uploadsPath, 'brand');
+    const resolvedPublic = path.resolve(process.cwd(), 'public');
+    const resolvedPublicUploads = path.resolve(resolvedPublic, 'uploads');
+
+    const candidatePaths = [
+      path.resolve(resolvedUploads, cleanPathOnly),
+      path.resolve(resolvedUploads, filename),
+      path.resolve(resolvedBrand, filename),
+      path.resolve(resolvedPublicUploads, cleanPathOnly),
+      path.resolve(resolvedPublicUploads, filename),
+      path.resolve(resolvedPublic, cleanPathOnly),
+      path.resolve(resolvedPublic, filename),
     ];
 
     let resolvedPath = candidatePaths[0];
@@ -886,7 +1075,11 @@ app.use('/uploads', async (req: express.Request, res: express.Response, next: ex
 
     for (const cp of candidatePaths) {
       const resolved = path.resolve(cp);
-      if (fs.existsSync(resolved)) {
+      if (
+        (resolved.startsWith(resolvedUploads + path.sep) ||
+         resolved.startsWith(resolvedPublic + path.sep)) &&
+        fs.existsSync(resolved)
+      ) {
         resolvedPath = resolved;
         foundFile = true;
         break;
@@ -899,19 +1092,23 @@ app.use('/uploads', async (req: express.Request, res: express.Response, next: ex
       const cleanBaseName = nameWithoutExt.replace(/(_opt|_optimized)+$/i, '');
 
       const candidates = Array.from(new Set([
-        path.join(uploadsPath, `${cleanBaseName}_opt.webp`),
-        path.join(uploadsPath, `${cleanBaseName}.webp`),
-        path.join(uploadsPath, `${cleanBaseName}.png`),
-        path.join(uploadsPath, `${cleanBaseName}.jpg`),
-        path.join(uploadsPath, `${cleanBaseName}.jpeg`),
-        path.join(uploadsPath, `${cleanBaseName}.gif`),
-        path.join(uploadsPath, `${cleanBaseName}.svg`),
-        path.join(uploadsPath, `${nameWithoutExt}.png`),
-        path.join(uploadsPath, `${nameWithoutExt}.jpg`)
+        path.resolve(resolvedUploads, `${cleanBaseName}_opt.webp`),
+        path.resolve(resolvedUploads, `${cleanBaseName}.webp`),
+        path.resolve(resolvedUploads, `${cleanBaseName}.png`),
+        path.resolve(resolvedUploads, `${cleanBaseName}.jpg`),
+        path.resolve(resolvedUploads, `${cleanBaseName}.jpeg`),
+        path.resolve(resolvedUploads, `${cleanBaseName}.gif`),
+        path.resolve(resolvedUploads, `${cleanBaseName}.svg`),
+        path.resolve(resolvedUploads, `${nameWithoutExt}.png`),
+        path.resolve(resolvedUploads, `${nameWithoutExt}.jpg`),
+        path.resolve(resolvedBrand, `${cleanBaseName}.webp`),
+        path.resolve(resolvedBrand, `${cleanBaseName}.png`),
+        path.resolve(resolvedBrand, `${nameWithoutExt}.webp`),
+        path.resolve(resolvedBrand, `${nameWithoutExt}.png`)
       ]));
 
       for (const cand of candidates) {
-        if (fs.existsSync(cand)) {
+        if (cand.startsWith(resolvedUploads + path.sep) && fs.existsSync(cand)) {
           resolvedPath = cand;
           foundFile = true;
           break;
@@ -919,43 +1116,93 @@ app.use('/uploads', async (req: express.Request, res: express.Response, next: ex
       }
 
       if (!foundFile) {
+        if (filename === 'default_video_poster.jpg') {
+          res.setHeader('Content-Type', 'image/svg+xml');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          return res.send(`<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" style="background:#111827;"><rect width="100%" height="100%" fill="#111827"/><circle cx="640" cy="360" r="60" fill="#3B82F6" opacity="0.15"/><polygon points="620,330 620,390 675,360" fill="#3B82F6"/></svg>`);
+        }
+
+        const nowMs = Date.now();
+        if (missingFileCache.has(filename)) {
+          const exp = missingFileCache.get(filename)!;
+          if (nowMs < exp) {
+            res.setHeader('Cache-Control', 'public, max-age=60');
+            return res.status(404).json({ error: 'File not found' });
+          }
+          missingFileCache.delete(filename);
+        }
+
         try {
           if (pool) {
-            let dbRes = await pool.query(
+            const dbRes = await pool.query(
               'SELECT file_data FROM user_files WHERE (file_url LIKE $1 OR file_name = $2) AND file_data IS NOT NULL LIMIT 1',
               [`%${filename}%`, filename]
             );
-            if (dbRes.rows.length === 0) {
-              dbRes = await pool.query(
+            if (dbRes.rows.length > 0 && dbRes.rows[0].file_data) {
+              const fileData = dbRes.rows[0].file_data;
+              try {
+                fs.writeFileSync(resolvedPath, fileData);
+                foundFile = true;
+              } catch (writeErr) {
+                console.error('[Uploads] Error writing user_files fallback to disk:', writeErr);
+                const fallbackExt = path.extname(filename).toLowerCase();
+                const mimeType = mediaMimeTypes[fallbackExt] || 'application/octet-stream';
+                res.setHeader('Content-Type', mimeType);
+                res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+                return res.send(fileData);
+              }
+            }
+          }
+
+          if (!foundFile) {
+            const targetMediaPool = mediaPool || pool;
+            if (targetMediaPool) {
+              const mediaRes = await targetMediaPool.query(
                 'SELECT file_data FROM media_assets WHERE (stored_path LIKE $1 OR original_filename = $2) AND file_data IS NOT NULL LIMIT 1',
                 [`%${filename}%`, filename]
               );
-            }
-            if (dbRes.rows.length > 0 && dbRes.rows[0].file_data) {
-              const fileData = dbRes.rows[0].file_data;
-              const fallbackExt = path.extname(filename).toLowerCase();
-              const mimeType = mediaMimeTypes[fallbackExt] || 'application/octet-stream';
-              res.setHeader('Content-Type', mimeType);
-              res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-              return res.send(fileData);
+              if (mediaRes.rows.length > 0 && mediaRes.rows[0].file_data) {
+                const fileData = mediaRes.rows[0].file_data;
+                try {
+                  fs.writeFileSync(resolvedPath, fileData);
+                  foundFile = true;
+                } catch (writeErr) {
+                  console.error('[Uploads] Error writing media_assets fallback to disk:', writeErr);
+                  const fallbackExt = path.extname(filename).toLowerCase();
+                  const mimeType = mediaMimeTypes[fallbackExt] || 'application/octet-stream';
+                  res.setHeader('Content-Type', mimeType);
+                  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+                  return res.send(fileData);
+                }
+              }
             }
           }
         } catch (dbErr) {
           console.error('[Uploads] DB Fallback error:', dbErr);
         }
         
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        return res.status(404).json({ error: 'File not found' });
+        if (!foundFile) {
+          missingFileCache.set(filename, nowMs + MISSING_FILE_TTL_MS);
+          res.setHeader('Cache-Control', 'public, max-age=60');
+          return res.status(404).json({ error: 'File not found' });
+        }
       }
     }
 
     const actualExt = path.extname(resolvedPath).toLowerCase();
     const mimeType = mediaMimeTypes[actualExt] || 'application/octet-stream';
-    const isVideoOrAudio = ['.mp4', '.webm', '.mp3', '.wav', '.mov', '.ogg'].includes(actualExt);
-    const isMedia = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.mp4', '.webm', '.mp3', '.wav', '.mov', '.ogg'].includes(actualExt);
+    const isVideoOrAudio = mimeType.startsWith('video/') || mimeType.startsWith('audio/') || ['.mp4', '.webm', '.mp3', '.wav', '.mov', '.ogg', '.mkv', '.avi', '.m4v', '.3gp', '.3g2', '.ogv', '.flv', '.wmv', '.ts', '.mts', '.m2ts', '.vob', '.m4a', '.aac', '.flac', '.opus'].includes(actualExt);
+    const isMedia = isVideoOrAudio || mimeType.startsWith('image/') || Object.keys(mediaMimeTypes).includes(actualExt);
 
     const serveFile = async (pathToSend: string) => {
-      const stat = fs.statSync(pathToSend);
+      const resolvedToSend = path.resolve(pathToSend);
+      if (
+        !resolvedToSend.startsWith(resolvedUploads + path.sep) &&
+        !resolvedToSend.startsWith(resolvedPublic + path.sep)
+      ) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const stat = fs.statSync(resolvedToSend);
       const mtime = stat.mtime.toUTCString();
       const fileSize = stat.size;
 
@@ -989,9 +1236,14 @@ app.use('/uploads', async (req: express.Request, res: express.Response, next: ex
       res.setHeader('Last-Modified', mtime);
       res.setHeader('ETag', etag);
       res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('X-Accel-Buffering', 'no');
 
       if (isMedia) {
-        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        if (isVideoOrAudio) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, no-transform, immutable');
+        } else {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
       } else {
         res.setHeader('Cache-Control', 'private, no-cache, must-revalidate');
       }
@@ -1065,7 +1317,10 @@ app.use('/uploads', async (req: express.Request, res: express.Response, next: ex
         if (parts[1] && parts[1].trim() !== '') {
           end = parseInt(parts[1], 10);
         } else {
-          end = fileSize - 1;
+          // Dynamic adaptive chunking for open-ended ranges (e.g. Range: bytes=0-)
+          // Delivers initial audio/video frames in milliseconds without waiting for the full file
+          const dynamicChunk = calculateDynamicChunkSize();
+          end = Math.min(start + dynamicChunk - 1, fileSize - 1);
         }
 
         if (end >= fileSize) {
@@ -1105,10 +1360,6 @@ app.use('/uploads', async (req: express.Request, res: express.Response, next: ex
       });
       return readStream.pipe(res);
     };
-
-    if (mediaMimeTypes[actualExt] || isMedia) {
-      return await serveFile(resolvedPath);
-    }
 
     const isPublic = await checkIsPublicFile(filename);
     if (isPublic) {
@@ -1299,7 +1550,8 @@ app.get('/api/health', (req, res) => res.json({
     core: getPoolMetrics(pool, 'core'),
     ledger: getPoolMetrics(ledgerPool, 'ledger'),
     external: getPoolMetrics(externalPool, 'external'),
-    security: getPoolMetrics(securityPool, 'security')
+    security: getPoolMetrics(securityPool, 'security'),
+    media: getPoolMetrics(mediaPool, 'media')
   }
 }));
 
@@ -1308,7 +1560,8 @@ app.get(['/api/diagnostics/db', '/api/health/db', '/api/db-health'], (req, res) 
     core: getPoolMetrics(pool, 'core'),
     ledger: getPoolMetrics(ledgerPool, 'ledger'),
     external: getPoolMetrics(externalPool, 'external'),
-    security: getPoolMetrics(securityPool, 'security')
+    security: getPoolMetrics(securityPool, 'security'),
+    media: getPoolMetrics(mediaPool, 'media')
   };
   const isSaturated = Object.values(pools).some(p => p.saturated);
 
@@ -1365,6 +1618,7 @@ app.get('/api/docs/openapi.json', (req, res) => {
   });
 });
 
+import { checkSubscriptionLimits } from './middleware/subscriptionLimits.js';
 import mcpRoutes from './routes/mcp.js';
 import authRoutes from './routes/auth.js';
 import chatRoutes from './routes/chat.js';
@@ -1397,13 +1651,17 @@ import gpuProvidersRoutes from './routes/gpuProviders.js';
 import ownershipRoutes from './routes/ownership.js';
 import sceneArchitectRoutes from './routes/sceneArchitect.js';
 import studioRoutes from './routes/studio.js';
+import audioRoutes from './routes/audio.js';
+import adminAudioRoutes from './routes/adminAudio.js';
 
 app.use('/api/mcp', mcpRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/chats', chatRoutes);
-app.use('/api/messages', messageRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/chats', checkSubscriptionLimits, chatRoutes);
+app.use('/api/messages', checkSubscriptionLimits, messageRoutes);
 app.use('/api/admin', adminLimiter, adminRoutes);
 app.use('/api/admin/gpu-providers', adminLimiter, gpuProvidersRoutes);
+app.use('/api/admin/audio', adminLimiter, adminAudioRoutes);
+app.use('/api/audio', audioRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/user', userRoutes);
@@ -1431,7 +1689,7 @@ app.post('/api/activity/log', async (req, res) => {
     const userAgent = req.headers['user-agent'] || null;
 
     let validUserId: number | null = null;
-    if (userId) {
+    if (userId !== undefined && userId !== null) {
       const parsedId = typeof userId === 'number' ? userId : parseInt(String(userId), 10);
       if (!isNaN(parsedId) && parsedId > 0) {
         try {
@@ -1475,7 +1733,30 @@ app.post('/api/activity/log', async (req, res) => {
   }
 });
 
+app.get('/api/theme-customizations', async (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+  try {
+    const targetPool = pool || getDatabasePool('core');
+    if (!targetPool) return res.json({ success: true, customizations: { light: {}, dark: {} }, updated_at: null });
+    const result = await targetPool.query('SELECT theme_mode, tokens, updated_at FROM admin_theme_customizations');
+    const customizations: Record<string, any> = { light: {}, dark: {} };
+    let latestUpdate: string | null = null;
+    for (const row of result.rows) {
+      customizations[row.theme_mode] = row.tokens || {};
+      if (row.updated_at) {
+        if (!latestUpdate || new Date(row.updated_at) > new Date(latestUpdate)) {
+          latestUpdate = new Date(row.updated_at).toISOString();
+        }
+      }
+    }
+    res.json({ success: true, customizations, updated_at: latestUpdate });
+  } catch (err: any) {
+    res.json({ success: true, customizations: { light: {}, dark: {} }, updated_at: null });
+  }
+});
+
 app.get('/api/seo-routes', async (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
   try {
     if (!pool) return res.json([]);
     const rows = await getCachedAllActiveRouteSeo();
@@ -1486,6 +1767,7 @@ app.get('/api/seo-routes', async (req, res) => {
 });
 
 app.get('/api/seo-metadata', async (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
   try {
     const route = req.query.route ? String(req.query.route) : null;
     if (route) {
@@ -1521,6 +1803,17 @@ Sitemap: ${baseUrl}/sitemap.xml
 app.get('/sitemap.xml', async (req, res) => {
   res.setHeader('Content-Type', 'application/xml; charset=utf-8');
   
+  const combineUrl = (base: string, relativePath: string): string => {
+    if (!relativePath) return base;
+    if (relativePath.startsWith('http://') || relativePath.startsWith('https://') || relativePath.startsWith('data:')) {
+      return relativePath;
+    }
+    const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
+    const cleanPath = relativePath.startsWith('/') ? relativePath : '/' + relativePath;
+    const combined = `${cleanBase}${cleanPath}`;
+    return combined.replace(/([^:]\/)\/+/g, '$1');
+  };
+
   try {
     const baseUrl = getBaseUrl(req);
     const staticRoutes = [
@@ -1537,15 +1830,49 @@ app.get('/sitemap.xml', async (req, res) => {
     res.write(`<?xml version="1.0" encoding="UTF-8"?>\n`);
     res.write(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n`);
 
+    const processedRoutes = new Set<string>();
+
     for (const item of staticRoutes) {
+      processedRoutes.add(item.url);
       res.write(`  <url>\n`);
-      res.write(`    <loc>${baseUrl}${item.url}</loc>\n`);
+      res.write(`    <loc>${combineUrl(baseUrl, item.url)}</loc>\n`);
       res.write(`    <changefreq>${item.changefreq || 'weekly'}</changefreq>\n`);
       res.write(`    <priority>${item.priority || '0.5'}</priority>\n`);
       res.write(`  </url>\n`);
     }
 
     if (pool) {
+      try {
+        const activeRouteSeos = await getCachedAllActiveRouteSeo();
+        if (activeRouteSeos && activeRouteSeos.length > 0) {
+          for (const item of activeRouteSeos) {
+            const routePath = item.route;
+            if (!routePath) continue;
+
+            const normalizedRoute = routePath === '/' ? '/' : routePath.replace(/\/$/, '');
+            const isSensitive = 
+              normalizedRoute.startsWith('/chat') ||
+              normalizedRoute.includes('/chat/') ||
+              normalizedRoute.startsWith('/admin') ||
+              normalizedRoute.startsWith('/settings') ||
+              normalizedRoute.startsWith('/wallet') ||
+              normalizedRoute.startsWith('/reset-password');
+
+            if (isSensitive) continue;
+            if (processedRoutes.has(normalizedRoute)) continue;
+            processedRoutes.add(normalizedRoute);
+
+            res.write(`  <url>\n`);
+            res.write(`    <loc>${combineUrl(baseUrl, normalizedRoute)}</loc>\n`);
+            res.write(`    <changefreq>daily</changefreq>\n`);
+            res.write(`    <priority>0.7</priority>\n`);
+            res.write(`  </url>\n`);
+          }
+        }
+      } catch (routeErr) {
+        console.error('[Sitemap] Active routes fetch error (non-blocking):', routeErr);
+      }
+
       const streamToResponse = async (clientPool: any, queryText: string, queryParams: any[], formatRow: (row: any) => string) => {
         let client;
         try {
@@ -1578,7 +1905,7 @@ app.get('/sitemap.xml', async (req, res) => {
       try {
         const formatImageNode = (img: string | null | undefined, baseUrl: string) => {
           if (!img) return '';
-          const url = img.startsWith('http') ? img : `${baseUrl}${img.startsWith('/') ? '' : '/'}${img}`;
+          const url = combineUrl(baseUrl, img);
           return `    <image:image>\n      <image:loc>${url}</image:loc>\n    </image:image>\n`;
         };
 
@@ -1595,11 +1922,12 @@ app.get('/sitemap.xml', async (req, res) => {
 
         await streamToResponse(
           pool,
-          'SELECT id, updated_at, image_url FROM bulletin_ads WHERE status = $1 ORDER BY id DESC',
+          "SELECT id, updated_at, image_url, expires_at FROM bulletin_ads WHERE status = $1 AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) ORDER BY id DESC",
           ['active'],
           (row) => {
             const metrics = getSitemapMetrics(row.updated_at);
-            return `  <url>\n    <loc>${baseUrl}/viralbook/${row.id}</loc>\n    <lastmod>${row.updated_at ? new Date(row.updated_at).toISOString() : new Date().toISOString()}</lastmod>\n    <changefreq>${metrics.changefreq}</changefreq>\n    <priority>${metrics.priority}</priority>\n${formatImageNode(row.image_url, baseUrl)}  </url>\n`;
+            const detailUrl = `/viralbook/${row.id}`;
+            return `  <url>\n    <loc>${combineUrl(baseUrl, detailUrl)}</loc>\n    <lastmod>${row.updated_at ? new Date(row.updated_at).toISOString() : new Date().toISOString()}</lastmod>\n    <changefreq>${metrics.changefreq}</changefreq>\n    <priority>${metrics.priority}</priority>\n${formatImageNode(row.image_url, baseUrl)}  </url>\n`;
           }
         );
       } catch (dbErr) {
@@ -1643,25 +1971,6 @@ app.use("/api/push", pushRoutes);
 app.use('/api/v1/scene-architect', sceneArchitectRoutes);
 app.use('/api/scene-architect', sceneArchitectRoutes);
 
-app.get('/api/theme-customizations', async (req, res) => {
-  try {
-    const targetPool = pool || getDatabasePool('core');
-    if (!targetPool) return res.json({ success: true, customizations: {} });
-    const result = await targetPool.query('SELECT theme_mode, tokens, updated_at FROM admin_theme_customizations');
-    const customizations: Record<string, any> = {};
-    let latestUpdate: Date | null = null;
-    for (const row of result.rows) {
-      customizations[row.theme_mode] = row.tokens || {};
-      if (row.updated_at && (!latestUpdate || new Date(row.updated_at) > latestUpdate)) {
-        latestUpdate = new Date(row.updated_at);
-      }
-    }
-    res.json({ success: true, customizations, updated_at: latestUpdate ? latestUpdate.toISOString() : null });
-  } catch (err) {
-    res.json({ success: true, customizations: {} });
-  }
-});
-
 function escapeHtmlAttribute(str: string): string {
   if (!str) return '';
   return String(str)
@@ -1671,6 +1980,16 @@ function escapeHtmlAttribute(str: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#x27;')
     .replace(/\//g, '&#x2F;');
+}
+
+function escapeUrlAttribute(str: string): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
 }
 
 class HtmlSeoTransformStream extends Transform {
@@ -1772,32 +2091,65 @@ async function injectSEOTags(
   let currentKeywords = defaultKeywords;
   let currentSiteName = defaultSiteName;
   
-  const DEFAULT_OG_IMAGE = '';
-  let imageUrl = settings.seo_image_url || '';
+  const resolvedSeoImage = resolvePersistentSystemAssetUrl(settings.seo_image_url, 'seo_image');
 
-  /** Validates local image existence, handles external URLs */
+  const DEFAULT_OG_IMAGE = resolvedSeoImage || '/uploads/brand/test_og_image.webp';
+  let imageUrl = '';
+
+  /** Combines a base URL and relative path, strictly avoiding duplicate slash errors */
+  const combineUrl = (base: string, relativePath: string): string => {
+    if (!relativePath) return base;
+    if (relativePath.startsWith('http://') || relativePath.startsWith('https://')) {
+      return relativePath;
+    }
+    const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
+    const cleanPath = relativePath.startsWith('/') ? relativePath : '/' + relativePath;
+    const combined = `${cleanBase}${cleanPath}`;
+    return combined.replace(/([^:]\/)\/+/g, '$1');
+  };
+
+  /** Validates local image existence, handles external URLs and base64 data URIs */
   const validateImageUrl = (url: string): string => {
     if (!url) return '';
 
-    if (url.startsWith('/')) {
-      if (url.startsWith('/uploads/')) {
-        const localPath = path.join(process.cwd(), url);
-        if (!fs.existsSync(localPath)) return '';
-      } else if (url.startsWith('/images/')) {
-        const publicPath = path.join(process.cwd(), 'public', url);
-        if (!fs.existsSync(publicPath)) return '';
-      }
-      return url;
+    // If data URI base64 image, resolve it to a persistent public file in uploads/brand/
+    if (url.startsWith('data:')) {
+      return resolvePersistentSystemAssetUrl(url, 'generic');
+    }
+
+    if (url.includes('..') || url.includes('\0')) {
+      return '';
+    }
+
+    let cleanUrl = url;
+    if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+      try {
+        const parsed = new URL(cleanUrl);
+        if (parsed.pathname.includes('/uploads/')) {
+          cleanUrl = parsed.pathname + parsed.search;
+        }
+      } catch (e) {}
+    }
+
+    if (!cleanUrl.startsWith('/') && !cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+      cleanUrl = '/' + cleanUrl;
+    }
+
+    if (cleanUrl.startsWith('/')) {
+      const cleanPath = cleanUrl.split('?')[0];
+      const filename = path.basename(cleanPath);
+      if (!filename || filename.includes('..')) return '';
+      return cleanUrl;
     }
 
     try {
-      const parsed = new URL(url);
+      const parsed = new URL(cleanUrl);
       const invalidHostnames = ['localhost', '127.0.0.1', '0.0.0.0', '::1'];
-      if (invalidHostnames.includes(parsed.hostname)) return DEFAULT_OG_IMAGE;
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return DEFAULT_OG_IMAGE;
-      return url;
+      if (invalidHostnames.includes(parsed.hostname)) return '';
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+      return cleanUrl;
     } catch (e) {
-      return DEFAULT_OG_IMAGE;
+      return '';
     }
   };
 
@@ -1830,70 +2182,89 @@ async function injectSEOTags(
   const normalizedPath = req.path === '/' ? '/' : (req.path || '/').replace(/\/$/, '');
 
   let isRouteSeoActive = false;
+  let isRouteSeoForcedDisabled = false;
   let extraJsonLd: any = null;
+  let seoUpdatedAt: string | null = null;
+
+  let postAuthor = '';
+  let postPublishedDate = '';
 
   if (pool) {
     try {
-      // Check dedicated og_preview_cache for pre-generated static Open Graph social media previews
-      const cachedOg = await getCachedOgPreview(normalizedPath);
-      if (cachedOg) {
-        if (cachedOg.title) currentTitle = cachedOg.title;
-        if (cachedOg.description) currentDesc = cachedOg.description;
-        if (cachedOg.image_url) imageUrl = validateImageUrl(cachedOg.image_url);
-        if (cachedOg.meta_data && typeof cachedOg.meta_data === 'object' && Object.keys(cachedOg.meta_data).length > 0) {
-          extraJsonLd = cachedOg.meta_data;
-        }
-        isRouteSeoActive = true;
-      }
-
-      // 1. First priority: Check optimized dynamic route SEO metadata (from seo_metadata table)
-      const dynamicSeo = await getCachedSeoMetadata(normalizedPath);
-      if (dynamicSeo) {
-        isRouteSeoActive = true;
-        const dTitle = preferredLang === 'ar'
-          ? (dynamicSeo.title_ar || dynamicSeo.title_en)
-          : (dynamicSeo.title_en || dynamicSeo.title_ar);
-        const dDesc = preferredLang === 'ar'
-          ? (dynamicSeo.description_ar || dynamicSeo.description_en)
-          : (dynamicSeo.description_en || dynamicSeo.description_ar);
-        const dKw = preferredLang === 'ar'
-          ? (dynamicSeo.keywords_ar || dynamicSeo.keywords_en)
-          : (dynamicSeo.keywords_en || dynamicSeo.keywords_ar);
-
-        if (dTitle) currentTitle = dTitle;
-        if (dDesc) currentDesc = dDesc;
-        if (dKw) currentKeywords = dKw;
-        if (dynamicSeo.og_image_url) imageUrl = validateImageUrl(dynamicSeo.og_image_url);
-        if (dynamicSeo.structured_data && typeof dynamicSeo.structured_data === 'object' && Object.keys(dynamicSeo.structured_data).length > 0) {
-          extraJsonLd = dynamicSeo.structured_data;
-        }
-      }
-
-      const routeMetadata = await getCachedRouteSeoMetadata(normalizedPath);
-      if (routeMetadata) {
-        isRouteSeoActive = true;
-        if (preferredLang === 'ar' ? routeMetadata.title_ar : routeMetadata.title_en) currentTitle = (preferredLang === 'ar' ? routeMetadata.title_ar : routeMetadata.title_en);
-        if (preferredLang === 'ar' ? routeMetadata.description_ar : routeMetadata.description_en) currentDesc = (preferredLang === 'ar' ? routeMetadata.description_ar : routeMetadata.description_en);
-        if (routeMetadata.og_image_url) imageUrl = validateImageUrl(routeMetadata.og_image_url);
-      }
-
+      // 1. SUPREME MASTER PRIORITY: Check Admin-configured Dynamic Route SEO Settings (route_seo_settings table)
       const routeMeta = await getCachedRouteSeo(normalizedPath);
       if (routeMeta) {
-        isRouteSeoActive = true;
-        const routeTitle = preferredLang === 'ar' 
-          ? (routeMeta.title_ar || routeMeta.title_en) 
-          : (routeMeta.title_en || routeMeta.title_ar);
-        const routeDesc = preferredLang === 'ar' 
-          ? (routeMeta.description_ar || routeMeta.description_en) 
-          : (routeMeta.description_en || routeMeta.description_ar);
-        const routeKw = preferredLang === 'ar' 
-          ? (routeMeta.keywords_ar || routeMeta.keywords_en) 
-          : (routeMeta.keywords_en || routeMeta.keywords_ar);
+        if (routeMeta.is_active !== false) {
+          isRouteSeoActive = true;
+          if (routeMeta.updated_at) {
+            seoUpdatedAt = String(Date.parse(routeMeta.updated_at));
+          }
+          const routeTitle = preferredLang === 'ar' 
+            ? (routeMeta.title_ar || routeMeta.title_en) 
+            : (routeMeta.title_en || routeMeta.title_ar);
+          const routeDesc = preferredLang === 'ar' 
+            ? (routeMeta.description_ar || routeMeta.description_en) 
+            : (routeMeta.description_en || routeMeta.description_ar);
+          const routeKw = preferredLang === 'ar' 
+            ? (routeMeta.keywords_ar || routeMeta.keywords_en) 
+            : (routeMeta.keywords_en || routeMeta.keywords_ar);
 
-        if (routeTitle) currentTitle = routeTitle;
-        if (routeDesc) currentDesc = routeDesc;
-        if (routeKw) currentKeywords = routeKw;
-        if (routeMeta.og_image_url) imageUrl = validateImageUrl(routeMeta.og_image_url);
+          if (routeTitle) currentTitle = routeTitle;
+          if (routeDesc) currentDesc = routeDesc;
+          if (routeKw) currentKeywords = routeKw;
+          if (routeMeta.og_image_url) imageUrl = validateImageUrl(routeMeta.og_image_url);
+        } else {
+          isRouteSeoForcedDisabled = true;
+        }
+      }
+
+      // If no admin route metadata is active, fall back to secondary cache tables
+      if (!isRouteSeoActive) {
+        // Check dedicated og_preview_cache for pre-generated static Open Graph social media previews
+        const cachedOg = await getCachedOgPreview(normalizedPath);
+        if (cachedOg) {
+          if (cachedOg.title) currentTitle = cachedOg.title;
+          if (cachedOg.description) currentDesc = cachedOg.description;
+          if (cachedOg.image_url) imageUrl = validateImageUrl(cachedOg.image_url);
+          if (cachedOg.meta_data && typeof cachedOg.meta_data === 'object' && Object.keys(cachedOg.meta_data).length > 0) {
+            extraJsonLd = cachedOg.meta_data;
+          }
+          isRouteSeoActive = true;
+        }
+
+        // Check optimized dynamic route SEO metadata (from seo_metadata table)
+        const dynamicSeo = await getCachedSeoMetadata(normalizedPath);
+        if (dynamicSeo) {
+          isRouteSeoActive = true;
+          if (dynamicSeo.updated_at) {
+            seoUpdatedAt = String(Date.parse(dynamicSeo.updated_at));
+          }
+          const dTitle = preferredLang === 'ar'
+            ? (dynamicSeo.title_ar || dynamicSeo.title_en)
+            : (dynamicSeo.title_en || dynamicSeo.title_ar);
+          const dDesc = preferredLang === 'ar'
+            ? (dynamicSeo.description_ar || dynamicSeo.description_en)
+            : (dynamicSeo.description_en || dynamicSeo.description_ar);
+          const dKw = preferredLang === 'ar'
+            ? (dynamicSeo.keywords_ar || dynamicSeo.keywords_en)
+            : (dynamicSeo.keywords_en || dynamicSeo.keywords_ar);
+
+          if (dTitle) currentTitle = dTitle;
+          if (dDesc) currentDesc = dDesc;
+          if (dKw) currentKeywords = dKw;
+          if (dynamicSeo.og_image_url) imageUrl = validateImageUrl(dynamicSeo.og_image_url);
+          if (dynamicSeo.structured_data && typeof dynamicSeo.structured_data === 'object' && Object.keys(dynamicSeo.structured_data).length > 0) {
+            extraJsonLd = dynamicSeo.structured_data;
+          }
+        }
+
+        const routeMetadata = await getCachedRouteSeoMetadata(normalizedPath);
+        if (routeMetadata) {
+          isRouteSeoActive = true;
+          if (preferredLang === 'ar' ? routeMetadata.title_ar : routeMetadata.title_en) currentTitle = (preferredLang === 'ar' ? routeMetadata.title_ar : routeMetadata.title_en);
+          if (preferredLang === 'ar' ? routeMetadata.description_ar : routeMetadata.description_en) currentDesc = (preferredLang === 'ar' ? routeMetadata.description_ar : routeMetadata.description_en);
+          if (routeMetadata.og_image_url) imageUrl = validateImageUrl(routeMetadata.og_image_url);
+        }
       }
     } catch (routeErr) {
     }
@@ -1936,23 +2307,107 @@ async function injectSEOTags(
         console.error('[SEO] Failed to fetch shared snapshot details:', err);
       }
     }
-  } else if (normalizedPath.startsWith('/bulletin/') || normalizedPath.startsWith('/viralbook/') || normalizedPath.startsWith('/reels/')) {
-    const parts = normalizedPath.split('/');
-    const adId = parts[parts.length - 1];
-    if (adId) {
+  } else if (normalizedPath.startsWith('/bulletin/page/') || normalizedPath.startsWith('/viralbook/page/') || normalizedPath.startsWith('/viralbook/pages/')) {
+    const parts = normalizedPath.split('/').filter(Boolean);
+    const pageSlug = parts[parts.length - 1];
+    if (pageSlug) {
+      try {
+        const pageRes = await pool.query(
+          'SELECT name, description, cover_url, avatar_url, category, city FROM bulletin_pages WHERE slug = $1 OR id = $2',
+          [pageSlug, parseInt(pageSlug, 10) || -1]
+        );
+        if (pageRes.rows.length > 0) {
+          const pageObj = pageRes.rows[0];
+          currentTitle = `${pageObj.name} - ${pageObj.category || 'الصفحة التجارية الرسمية'}`;
+          let cleanContent = (pageObj.description || 'تفضل بزيارة صفحتنا الرسمية على منصة بيربليكستا').replace(/[#*`_\[\]()]/g, '');
+          currentDesc = cleanContent.slice(0, 160).trim();
+          const targetMedia = pageObj.cover_url || pageObj.avatar_url;
+          if (targetMedia) {
+            imageUrl = validateImageUrl(targetMedia);
+          }
+        }
+      } catch (err) {
+        console.error('[SEO] Failed to fetch page details:', err);
+      }
+    }
+  } else if (
+    normalizedPath.startsWith('/bulletin') ||
+    normalizedPath.startsWith('/viralbook') ||
+    normalizedPath.startsWith('/reels') ||
+    normalizedPath.startsWith('/p/') ||
+    normalizedPath.startsWith('/post/') ||
+    normalizedPath.startsWith('/share/') ||
+    req.query.ad ||
+    req.query.reel ||
+    req.query.post_code
+  ) {
+    const queryCandidate = (req.query.ad || req.query.reel || req.query.post || req.query.code || req.query.id || req.query.p || '').toString().trim();
+    const parts = normalizedPath.split('/').filter(Boolean);
+    let candidateCode = queryCandidate || parts.find(p => /^PX-[A-Za-z0-9_-]+/i.test(p));
+    if (!candidateCode) {
+      const filteredParts = parts.filter(p => !['viralbook', 'bulletin', 'p', 'post', 'reels', 'pages', 'page', 'share'].includes(p.toLowerCase()));
+      candidateCode = filteredParts.length > 0 ? filteredParts[filteredParts.length - 1] : parts[parts.length - 1];
+    }
+
+    if (candidateCode && candidateCode !== 'viralbook' && candidateCode !== 'bulletin' && candidateCode !== 'reels') {
       try {
         const adRes = await pool.query(
-          'SELECT title, description, image_url, video_url, author_name, created_at, updated_at FROM bulletin_ads WHERE id = $1',
-          [parseInt(adId, 10) || -1]
+          'SELECT title, description, image_url, video_url, metadata, author_name, author_username, post_code, created_at, updated_at, media_urls FROM bulletin_ads WHERE post_code = $1 OR id = $2 OR post_code = $3',
+          [candidateCode, parseInt(candidateCode, 10) || -1, candidateCode.toUpperCase()]
         );
         if (adRes.rows.length > 0) {
           const ad = adRes.rows[0];
-          currentTitle = ad.title || currentTitle;
-          let cleanContent = (ad.description || '').replace(/[#*`_\[\]()]/g, '');
-          currentDesc = cleanContent.slice(0, 160).trim();
-          if (cleanContent.length > 160) currentDesc += '...';
+          if (ad.updated_at) {
+            seoUpdatedAt = String(Date.parse(ad.updated_at));
+          }
+          const authorDisplay = ad.author_name || (ad.author_username ? `@${ad.author_username}` : 'مستخدم بيربليكستا');
+          postAuthor = authorDisplay;
+          postPublishedDate = ad.created_at ? new Date(ad.created_at).toISOString() : '';
+
+          const postTitle = ad.title ? ad.title.trim() : '';
+          const cleanContent = (ad.description || '').replace(/[#*`_\[\]()]/g, '').trim();
+
+          if (postTitle) {
+            currentTitle = `${postTitle} | ${authorDisplay}`;
+          } else if (cleanContent) {
+            const snippet = cleanContent.length > 70 ? cleanContent.slice(0, 70).trim() + '...' : cleanContent;
+            currentTitle = `${snippet} | ${authorDisplay}`;
+          } else {
+            currentTitle = `منشور بواسطة ${authorDisplay} على بيربليكستا`;
+          }
+
+          currentDesc = cleanContent.slice(0, 220).trim() || `شاهد المنشور والتفاصيل الكاملة بواسطة ${authorDisplay} على منصة ${defaultSiteName}.`;
           
-          const targetMedia = ad.image_url || ad.video_url;
+          let targetMedia = ad.image_url || '';
+
+          if (!targetMedia && ad.media_urls) {
+            try {
+              const parsedUrls = typeof ad.media_urls === 'string' ? JSON.parse(ad.media_urls) : ad.media_urls;
+              if (Array.isArray(parsedUrls) && parsedUrls.length > 0) {
+                const firstImg = parsedUrls.find((u: string) => typeof u === 'string' && !u.match(/\.(mp4|webm|mov|mkv)$/i));
+                targetMedia = firstImg || parsedUrls[0];
+              }
+            } catch (e) {}
+          }
+
+          if (!targetMedia && ad.metadata) {
+            try {
+              const metaObj = typeof ad.metadata === 'string' ? JSON.parse(ad.metadata) : ad.metadata;
+              if (metaObj) {
+                if (metaObj.poster_url) targetMedia = metaObj.poster_url;
+                else if (metaObj.thumbnail_url) targetMedia = metaObj.thumbnail_url;
+                else if (Array.isArray(metaObj.media_gallery) && metaObj.media_gallery.length > 0) targetMedia = metaObj.media_gallery[0];
+                else if (Array.isArray(metaObj.images) && metaObj.images.length > 0) targetMedia = metaObj.images[0];
+                else if (Array.isArray(metaObj.photos) && metaObj.photos.length > 0) targetMedia = metaObj.photos[0];
+                else if (metaObj.image_url) targetMedia = metaObj.image_url;
+              }
+            } catch (e) {}
+          }
+
+          if (!targetMedia && ad.video_url) {
+            targetMedia = ad.video_url;
+          }
+
           if (targetMedia) {
             imageUrl = validateImageUrl(targetMedia);
           }
@@ -1966,14 +2421,14 @@ async function injectSEOTags(
             "dateModified": ad.updated_at ? new Date(ad.updated_at).toISOString() : undefined,
             "author": {
               "@type": "Person",
-              "name": ad.author_name || currentSiteName
+              "name": authorDisplay
             }
           };
 
           upsertSeoMetadata({
             route_path: normalizedPath,
             entity_type: 'bulletin',
-            entity_id: adId,
+            entity_id: String(ad.post_code || candidateCode),
             title_en: ad.title || 'Bulletin Item',
             title_ar: ad.title || 'عنصر في النشرة',
             description_en: cleanContent.slice(0, 160),
@@ -1987,7 +2442,7 @@ async function injectSEOTags(
         console.error('[SEO] Failed to fetch bulletin/reel details:', err);
       }
     }
-  } else {
+  } else if (!isRouteSeoActive) {
     if (preferredLang === 'en') {
       currentTitle = seoNameEn || seoNameAr || defaultSiteName;
       currentDesc = descEn || descAr || defaultDesc;
@@ -2011,8 +2466,11 @@ async function injectSEOTags(
     imageUrl = DEFAULT_OG_IMAGE;
   }
 
-  if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
-    imageUrl = `${baseUrl}${imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`}`;
+  imageUrl = combineUrl(baseUrl, imageUrl);
+
+  if (seoUpdatedAt && !imageUrl.startsWith('data:')) {
+    const separator = imageUrl.includes('?') ? '&' : '?';
+    imageUrl = `${imageUrl}${separator}v=${seoUpdatedAt}`;
   }
 
   let imageType = 'image/png';
@@ -2027,31 +2485,60 @@ async function injectSEOTags(
   }
 
   let faviconUrl = settings?.favicon_url || settings?.logo_url || '/apple-touch-icon.png';
-  if (faviconUrl && !faviconUrl.startsWith('http') && !faviconUrl.startsWith('data:')) {
-    faviconUrl = `${baseUrl}${faviconUrl.startsWith('/') ? faviconUrl : `/${faviconUrl}`}`;
-  }
+  faviconUrl = combineUrl(baseUrl, faviconUrl);
 
-  const currentUrl = `${baseUrl}${req.originalUrl || req.path}`;
+  let requestPath = req.originalUrl || req.path;
+  if (requestPath.includes('http://') || requestPath.includes('https://')) {
+    try {
+      const urlObj = new URL(requestPath.startsWith('/') ? requestPath.substring(1) : requestPath);
+      requestPath = urlObj.pathname;
+    } catch (e) {
+      const match = requestPath.match(/https?:\/\/[^\/]+(\/.*)/i);
+      if (match) {
+        requestPath = match[1];
+      } else {
+        requestPath = req.path;
+      }
+    }
+  }
+  const currentUrl = combineUrl(baseUrl, requestPath);
   const canonicalPath = req.path === '/' ? '/' : req.path.replace(/\/$/, '');
-  const canonicalUrl = `${baseUrl}${canonicalPath}`;
+  const canonicalUrl = combineUrl(baseUrl, canonicalPath);
 
   const escTitle    = escapeHtmlAttribute(currentTitle);
   const escDesc     = escapeHtmlAttribute(currentDesc);
   const escKeywords = escapeHtmlAttribute(currentKeywords);
-  const escImage    = escapeHtmlAttribute(imageUrl);
-  const escUrl      = escapeHtmlAttribute(currentUrl);
-  const escCanonical = escapeHtmlAttribute(canonicalUrl);
-  const escFavicon  = escapeHtmlAttribute(faviconUrl);
+  const escImage    = escapeUrlAttribute(imageUrl);
+  const escUrl      = escapeUrlAttribute(currentUrl);
+  const escCanonical = escapeUrlAttribute(canonicalUrl);
+  const escFavicon  = escapeUrlAttribute(faviconUrl);
   const escSiteName = escapeHtmlAttribute(currentSiteName);
 
   const PUBLIC_WHITELIST = ['/', '/subscription', '/bulletin', '/viralbook', '/rewards', '/terms', '/privacy', '/about'];
+  const isSensitivePath = 
+    normalizedPath.startsWith('/chat') ||
+    normalizedPath.includes('/chat/') ||
+    normalizedPath.startsWith('/admin') ||
+    normalizedPath.startsWith('/settings') ||
+    normalizedPath.startsWith('/wallet') ||
+    normalizedPath.startsWith('/reset-password');
+
   const isPublicRoute = 
-    isRouteSeoActive ||
-    PUBLIC_WHITELIST.includes(normalizedPath) ||
-    normalizedPath.startsWith('/share/') ||
-    normalizedPath.startsWith('/bulletin') ||
-    normalizedPath.startsWith('/viralbook') ||
-    normalizedPath.startsWith('/rewards');
+    !isSensitivePath && 
+    !isRouteSeoForcedDisabled && (
+      isRouteSeoActive ||
+      PUBLIC_WHITELIST.includes(normalizedPath) ||
+      normalizedPath.startsWith('/share/') ||
+      normalizedPath.startsWith('/bulletin') ||
+      normalizedPath.startsWith('/viralbook') ||
+      normalizedPath.startsWith('/reels') ||
+      normalizedPath.startsWith('/p/') ||
+      normalizedPath.startsWith('/post/') ||
+      normalizedPath.startsWith('/rewards') ||
+      normalizedPath.startsWith('/auth') ||
+      normalizedPath.startsWith('/login') ||
+      normalizedPath.startsWith('/register')
+    );
 
   let metaBlock = '';
 
@@ -2064,6 +2551,10 @@ async function injectSEOTags(
       html = html.replace('</head>', `${finalTitleHtml}</head>`);
     }
 
+    const isPostRoute = normalizedPath.startsWith('/bulletin') || normalizedPath.startsWith('/viralbook') || normalizedPath.startsWith('/reels') || normalizedPath.startsWith('/p/') || normalizedPath.startsWith('/post/');
+    const escAuthor = escapeHtmlAttribute(postAuthor || currentSiteName);
+    const escPublished = escapeHtmlAttribute(postPublishedDate);
+
     metaBlock = `
     <meta name="description" content="${escDesc}" />
     <meta name="keywords" content="${escKeywords}" />
@@ -2075,8 +2566,10 @@ async function injectSEOTags(
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:url" content="${escUrl}" />
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content="${isPostRoute ? 'article' : 'website'}" />
     <meta property="og:site_name" content="${escSiteName}" />
+    ${postAuthor ? `<meta name="author" content="${escAuthor}" />\n    <meta property="article:author" content="${escAuthor}" />` : ''}
+    ${postPublishedDate ? `<meta property="article:published_time" content="${escPublished}" />` : ''}
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${escTitle}" />
     <meta name="twitter:description" content="${escDesc}" />
@@ -2093,7 +2586,7 @@ async function injectSEOTags(
     }
 
     const breadcrumbNames: Record<string, Record<string, string>> = {
-      ar: { '/': 'الرئيسية', '/viralbook': 'فايرال بوك', '/bulletin': 'فايرال بوك', '/subscription': 'الاشتراكات', '/terms': 'الشروط والأحكام', '/privacy': 'سياسة الخصوصية', '/about': 'عن المنصة' },
+      ar: { '/': 'الرئيسية', '/viralbook': 'فيرال بوك', '/bulletin': 'فيرال بوك', '/subscription': 'الاشتراكات', '/terms': 'الشروط والأحكام', '/privacy': 'سياسة الخصوصية', '/about': 'عن المنصة' },
       en: { '/': 'Home', '/viralbook': 'Viralbook', '/bulletin': 'Viralbook', '/subscription': 'Subscriptions', '/terms': 'Terms & Conditions', '/privacy': 'Privacy Policy', '/about': 'About Us' },
       fr: { '/': 'Accueil', '/viralbook': 'Viralbook', '/bulletin': 'Viralbook', '/subscription': 'Abonnements', '/terms': "Conditions d'utilisation", '/privacy': 'Politique de confidentialité', '/about': 'À propos' },
       es: { '/': 'Inicio', '/viralbook': 'Viralbook', '/bulletin': 'Viralbook', '/subscription': 'Suscripciones', '/terms': 'Términos y condiciones', '/privacy': 'Política de privacidad', '/about': 'Acerca de' },
@@ -2142,7 +2635,20 @@ async function injectSEOTags(
 
     metaBlock += `\n    <script type="application/ld+json">\n${JSON.stringify(structuredData, null, 2).replace(/<\/script/gi, '<\\/script')}\n    </script>`;
   } else {
-    metaBlock = `\n    <meta name="robots" content="noindex, nofollow" />\n    `;
+    const titleTagRegex = /<title>[\s\S]*?<\/title>/i;
+    const secureTitle = preferredLang === 'ar' ? 'بيربليكستا - مساحة عمل محصنة' : 'Perplexta - Secure Workspace';
+    const finalTitleHtml = `<title>${secureTitle}</title>`;
+    if (titleTagRegex.test(html)) {
+      html = html.replace(titleTagRegex, finalTitleHtml);
+    } else {
+      html = html.replace('</head>', `${finalTitleHtml}</head>`);
+    }
+
+    metaBlock = `
+    <meta name="description" content="${preferredLang === 'ar' ? 'صفحة آمنة ومحمية وفق بروتوكولات الأمان لمنصة بيربليكستا.' : 'Secure node with zero crawling, protected under enterprise encryption protocols.'}" />
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, max-image-preview:none" />
+    <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet" />
+    `;
   }
 
   return await streamTransformHtml(html, escTitle, escCanonical, escFavicon, metaBlock, settings);
@@ -2210,6 +2716,19 @@ app.use(async (req: express.Request, res: express.Response, next: express.NextFu
     return next();
   }
 
+  const normalizedPathForRobots = req.path === '/' ? '/' : req.path.replace(/\/$/, '');
+  const isSensitivePath = 
+    normalizedPathForRobots.startsWith('/chat') ||
+    normalizedPathForRobots.includes('/chat/') ||
+    normalizedPathForRobots.startsWith('/admin') ||
+    normalizedPathForRobots.startsWith('/settings') ||
+    normalizedPathForRobots.startsWith('/wallet') ||
+    normalizedPathForRobots.startsWith('/reset-password');
+
+  if (isSensitivePath) {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
+  }
+
   const baseUrl = getBaseUrl(req);
 
   const acceptHeader = req.headers['accept'] || '';
@@ -2226,17 +2745,23 @@ app.use(async (req: express.Request, res: express.Response, next: express.NextFu
     const isProduction = process.env.NODE_ENV === 'production';
 
     if (isProduction) {
-      baseHtml = cachedIndexHtml || fs.readFileSync(path.join(distPath, 'index.html'), 'utf8');
+      baseHtml = cachedIndexHtml || (fs.existsSync(indexPath) ? fs.readFileSync(indexPath, 'utf8') : '');
+      if (!baseHtml && fs.existsSync(fallbackPath)) {
+        baseHtml = fs.readFileSync(fallbackPath, 'utf8');
+      }
+      if (!baseHtml) {
+        throw new Error('Production index.html not found in dist or root');
+      }
     } else {
-      const indexPath = path.join(process.cwd(), 'index.html');
-      if (fs.existsSync(indexPath)) {
-        baseHtml = fs.readFileSync(indexPath, 'utf8');
+      const devIndexPath = fs.existsSync(fallbackPath) ? fallbackPath : path.join(process.cwd(), 'index.html');
+      if (fs.existsSync(devIndexPath)) {
+        baseHtml = fs.readFileSync(devIndexPath, 'utf8');
         const viteInstance = req.app.locals.vite;
         if (viteInstance) {
           baseHtml = await viteInstance.transformIndexHtml('/', baseHtml);
         }
       } else {
-        throw new Error('Root index.html not found');
+        throw new Error('Development index.html not found at ' + devIndexPath);
       }
     }
 
@@ -2250,34 +2775,61 @@ app.use(async (req: express.Request, res: express.Response, next: express.NextFu
 
     let finalHtml = processedHtml;
     try {
-      const settings = await getSystemSettings();
-      finalHtml = await injectSEOTags(processedHtml, settings, req, baseUrl);
+      const settingsPromise = getSystemSettings().catch(err => {
+        console.warn('[Server] System settings unavailable, using defaults for SEO:', err.message);
+        return {} as any;
+      });
+
+      // Wrap SEO injection in a race with a timeout to prevent hanging the request if DB is slow
+      const timeoutPromise = new Promise<string>((resolve) => 
+        setTimeout(() => resolve(processedHtml), 2500)
+      );
+
+      const seoPromise = (async () => {
+        const settings = await settingsPromise;
+        return await injectSEOTags(processedHtml, settings, req, baseUrl);
+      })();
+
+      finalHtml = await Promise.race([seoPromise, timeoutPromise]).catch(err => {
+        console.warn('[Server] SEO injection failed or timed out, serving base HTML:', err.message);
+        return processedHtml;
+      });
     } catch (settingsError) {
-      console.warn('[SEO] getSystemSettings failed, serving HTML without SEO tags:', settingsError);
+      console.warn('[SEO] Unexpected error in SEO pipeline:', settingsError);
     }
 
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     res.setHeader('Surrogate-Control', 'no-store');
-    res.type('html').send(finalHtml);
+    res.setHeader('Vary', 'Accept-Encoding, Accept-Language, Cookie');
+    return res.type('html').send(finalHtml);
   } catch (err) {
     console.error('[SEO] Wildcard serve error, falling back to basic noncing:', err);
     try {
       const isProduction = process.env.NODE_ENV === 'production';
-      const indexPath = isProduction ? path.join(distPath, 'index.html') : path.join(process.cwd(), 'index.html');
+      const rootPath = process.cwd();
+      const indexPath = isProduction ? path.join(distPath, 'index.html') : path.join(rootPath, 'index.html');
+      
+      if (!fs.existsSync(indexPath)) {
+        console.error('[SEO] Critical: index.html not found at', indexPath);
+        return res.status(503).send('<html><body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #faf9f5; color: #181715; text-align: center; padding: 20px;"><div><h1 style="font-size: 24px;">Perplexta — System Initializing</h1><p>The platform is synchronizing its secure workspace. This usually takes a few seconds.</p><button onclick="window.location.reload()" style="margin-top: 20px; padding: 10px 20px; background: #181715; color: white; border: none; border-radius: 4px; cursor: pointer;">Refresh Now</button></div></body></html>');
+      }
+
       const baseHtml = fs.readFileSync(indexPath, 'utf8');
       const nonce = res.locals.nonce || '';
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
-      res.setHeader('Surrogate-Control', 'no-store');
       res.type('html').send(baseHtml.replace(/<script\b/g, `<script nonce="${nonce}"`) );
     } catch (readErr) {
       console.error('[SEO] Critical: Could not read index.html fallback:', readErr);
-      res.status(500).send('Internal Server Error');
+      res.status(500).send('<html><body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #faf9f5; color: #181715;"><div><h1 style="font-size: 24px;">Perplexta — System Initialization</h1><p>The platform is currently preparing its secure workspace environment. Please refresh shortly.</p></div></body></html>');
     }
   }
 });
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 export default app;

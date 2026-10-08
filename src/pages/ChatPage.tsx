@@ -49,7 +49,8 @@ const ChatPage: React.FC = () => {
     t, 
     theme, 
     socket,
-    setIsAuthModalOpen
+    setIsAuthModalOpen,
+    isMobile
   } = useAppContext();
   const { chatContainerRef, contentPaddingClass, contentMaxWidthClass } = useCanvasLayout();
 
@@ -126,15 +127,21 @@ const ChatPage: React.FC = () => {
   const toolsMenuRef = useRef<HTMLDivElement>(null);
   const modelsMenuRef = useRef<HTMLDivElement>(null);
 
-  const advancedTools = [
-    { id: 'perplexta_analysis', label: dir === 'rtl' ? 'تحليل' : 'Analysis', icon: <Search size={14} />, isNew: true },
-    { id: 'sovereign_search', label: dir === 'rtl' ? 'البحوث والدراسات' : 'Research & Studies', icon: <BookOpen size={14} />, isNew: true },
-    { id: 'image', label: dir === 'rtl' ? 'صورة' : 'Image', icon: <ImageIcon size={14} />, isNew: true },
-    { id: 'video', label: dir === 'rtl' ? 'فيديو' : 'Video', icon: <Video size={14} />, isNew: true },
-    { id: 'code', label: dir === 'rtl' ? 'كود' : 'Code', icon: <Code size={14} />, isNew: true },
-    { id: 'ads_copilot', label: dir === 'rtl' ? 'مساعد الإعلانات' : 'Ads Copilot', icon: <Megaphone size={14} />, isNew: true },
-    { id: 'audio_studio', label: dir === 'rtl' ? 'استوديو الصوت' : 'Audio Studio', icon: <Music size={14} />, isRouter: true },
-  ];
+  const advancedTools = useMemo(() => {
+    const list = [
+      { id: 'perplexta_analysis', label: dir === 'rtl' ? 'تحليل' : 'Analysis', icon: <Search size={14} />, isNew: true },
+      { id: 'sovereign_search', label: dir === 'rtl' ? 'البحوث والدراسات' : 'Research & Studies', icon: <BookOpen size={14} />, isNew: true },
+      { id: 'image', label: dir === 'rtl' ? 'صورة' : 'Image', icon: <ImageIcon size={14} />, isNew: true },
+      { id: 'video', label: dir === 'rtl' ? 'فيديو' : 'Video', icon: <Video size={14} />, isNew: true },
+      { id: 'code', label: dir === 'rtl' ? 'استوديو الكود' : 'Code Studio', icon: <Code size={14} />, isNew: true, isRouter: true },
+      { id: 'ads_copilot', label: dir === 'rtl' ? 'مساعد الإعلانات' : 'Ads Copilot', icon: <Megaphone size={14} />, isNew: true },
+      { id: 'audio_studio', label: dir === 'rtl' ? 'استوديو الصوت' : 'Audio Studio', icon: <Music size={14} />, isRouter: true },
+    ];
+    if (isMobile) {
+      return list.filter(t => t.id !== 'code' && t.id !== 'audio_studio');
+    }
+    return list;
+  }, [dir, isMobile]);
 
   const models = [
     { id: 'fast', label: dir === 'rtl' ? 'سريع' : 'Fast', icon: <Zap size={14} />, color: 'text-[var(--fg-accent)]' },
@@ -412,20 +419,11 @@ const ChatPage: React.FC = () => {
     isUserScrolledUpRef.current = false;
     if (scrollViewportRef.current) {
       const container = scrollViewportRef.current;
-      const desiredScrollTop = container.scrollHeight - container.clientHeight;
-
-      let maxScrollLimit = desiredScrollTop;
-      if (activeTurnTopRef.current !== null && isGenerating) {
-        maxScrollLimit = activeTurnTopRef.current;
-      }
-
-      const finalScrollTop = Math.min(desiredScrollTop, maxScrollLimit);
-      if (finalScrollTop >= 0) {
-        container.scrollTo({
-          top: finalScrollTop,
-          behavior
-        });
-      }
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior
+      });
+      setShowScrollBottom(false);
     }
   };
 
@@ -548,21 +546,52 @@ const ChatPage: React.FC = () => {
     };
   }, [handleExport, handleDeleteChat]);
 
-  const handleScroll = () => {
-    if (scrollViewportRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = scrollViewportRef.current;
-      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-      const isFarFromBottom = distanceFromBottom > 160;
-      setShowScrollBottom(isFarFromBottom);
-      
-      // If user intentionally scrolled up (> 180px), pause auto-scroll. Otherwise resume near bottom (< 40px).
-      if (distanceFromBottom > 180) {
-        isUserScrolledUpRef.current = true;
-      } else if (distanceFromBottom < 40) {
-        isUserScrolledUpRef.current = false;
-      }
+  const checkScrollPosition = useCallback(() => {
+    const el = scrollViewportRef.current;
+    if (!el) {
+      setShowScrollBottom(false);
+      return;
     }
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    // Show button when user has scrolled up past 45px from bottom
+    const isScrolledUp = distanceFromBottom > 45;
+    setShowScrollBottom(isScrolledUp);
+
+    if (distanceFromBottom > 100) {
+      isUserScrolledUpRef.current = true;
+    } else if (distanceFromBottom < 25) {
+      isUserScrolledUpRef.current = false;
+    }
+  }, []);
+
+  const handleScroll = () => {
+    checkScrollPosition();
   };
+
+  useEffect(() => {
+    const el = scrollViewportRef.current;
+    if (!el) return;
+
+    checkScrollPosition();
+
+    const onScroll = () => {
+      checkScrollPosition();
+    };
+
+    el.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [checkScrollPosition, messages.length]);
+
+  useEffect(() => {
+    const timer = setTimeout(checkScrollPosition, 100);
+    return () => clearTimeout(timer);
+  }, [messages, checkScrollPosition]);
 
   // Click Outside Export Menu
   useEffect(() => {
@@ -575,26 +604,52 @@ const ChatPage: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Session protection protocol: draft query auto-save & recovery
-  useEffect(() => {
-    const savedDraft = sessionStorage.getItem('perplexta_chat_draft');
-    if (savedDraft && !query) {
-      setQuery(savedDraft);
-    }
-  }, []);
+  // Active draft storage key computed dynamically per chat ID or new session
+  const activeDraftKey = useMemo(() => {
+    return activeRouteChatId ? `perplexta_chat_draft_${activeRouteChatId}` : 'perplexta_chat_draft_new';
+  }, [activeRouteChatId]);
 
+  // Session & Local Storage protection protocol: draft query background auto-save & recovery
+  useEffect(() => {
+    try {
+      const savedLocal = localStorage.getItem(activeDraftKey);
+      const savedSession = sessionStorage.getItem(activeDraftKey) || sessionStorage.getItem('perplexta_chat_draft');
+      const draftToRestore = savedLocal || savedSession;
+      if (draftToRestore) {
+        setQuery(draftToRestore);
+      } else {
+        setQuery('');
+      }
+    } catch {
+      // Ignore quota or storage restriction errors
+    }
+  }, [activeRouteChatId, activeDraftKey]);
+
+  // Background Auto-Save on draft input change
   useEffect(() => {
     if (query && query.trim()) {
-      sessionStorage.setItem('perplexta_chat_draft', query);
+      try {
+        localStorage.setItem(activeDraftKey, query);
+        sessionStorage.setItem(activeDraftKey, query);
+        sessionStorage.setItem('perplexta_chat_draft', query);
+      } catch {
+        // Ignore storage errors
+      }
     } else {
-      sessionStorage.removeItem('perplexta_chat_draft');
+      try {
+        localStorage.removeItem(activeDraftKey);
+        sessionStorage.removeItem(activeDraftKey);
+        sessionStorage.removeItem('perplexta_chat_draft');
+      } catch {
+        // Ignore storage errors
+      }
     }
-  }, [query]);
+  }, [query, activeDraftKey]);
 
-  // Session protection protocol: prevent accidental exit / loss on refresh
+  // Session protection protocol: prevent accidental exit / loss during active generation
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isGenerating || (query && query.trim().length > 0)) {
+      if (isGenerating) {
         e.preventDefault();
         e.returnValue = '';
         return '';
@@ -602,13 +657,19 @@ const ChatPage: React.FC = () => {
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [isGenerating, query]);
+  }, [isGenerating]);
 
   // Listen to clear-chat event to reset state and clear thread
   useEffect(() => {
     const handleClearChat = () => {
-      sessionStorage.removeItem('perplexta_active_chat_id');
-      sessionStorage.removeItem('perplexta_chat_draft');
+      try {
+        localStorage.removeItem(activeDraftKey);
+        localStorage.removeItem('perplexta_chat_draft_new');
+        sessionStorage.removeItem('perplexta_active_chat_id');
+        sessionStorage.removeItem('perplexta_chat_draft');
+      } catch {
+        // Ignore storage errors
+      }
       setMessages([]);
       setQuery('');
       setSelectedFile(null);
@@ -621,7 +682,7 @@ const ChatPage: React.FC = () => {
     };
     window.addEventListener('clear-chat', handleClearChat);
     return () => window.removeEventListener('clear-chat', handleClearChat);
-  }, [navigate, setMessages, setQuery, setSelectedFile, setPreviewUrl, setForensicReport, setForensicMode]);
+  }, [navigate, setMessages, setQuery, setSelectedFile, setPreviewUrl, setForensicReport, setForensicMode, activeDraftKey]);
 
   // Dispatch pinned messages count to Header
   useEffect(() => {
@@ -739,7 +800,7 @@ const ChatPage: React.FC = () => {
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
               >
-                <div className="bg-[var(--surface-page)] border border-[var(--border-default)] rounded-lg w-full max-w-sm p-6 shadow-2xl">
+                <div className="bg-[var(--surface-page)] border border-[var(--border-default)] rounded-[var(--radius-sm)] w-full max-w-sm p-6 shadow-2xl">
                   <h3 className={`text-lg font-black mb-4 uppercase tracking-tighter ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                     {dir === 'rtl' ? 'إعادة تسمية المحادثة' : 'Rename Conversation'}
                   </h3>
@@ -772,7 +833,7 @@ const ChatPage: React.FC = () => {
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.95, opacity: 0 }}
                   onClick={(e) => e.stopPropagation()}
-                  className="bg-[var(--surface-card)] border border-[var(--border-default)] rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4"
+                  className="bg-[var(--surface-card)] border border-[var(--border-default)] rounded-[var(--radius-lg)] w-full max-w-sm p-6 shadow-2xl space-y-4"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-[var(--status-danger-subtle)] border border-[var(--status-danger)]/20 flex items-center justify-center text-[var(--fg-danger)] shrink-0">
@@ -792,14 +853,14 @@ const ChatPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setIsDeletingConfirmOpen(false)}
-                      className="flex-1 py-2 rounded-xl text-xs font-bold text-[var(--text-secondary)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-inset)] border border-[var(--border-default)] transition-theme cursor-pointer"
+                      className="flex-1 py-2 rounded-[var(--radius-md)] text-xs font-bold text-[var(--text-secondary)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-inset)] border border-[var(--border-default)] transition-theme cursor-pointer"
                     >
                       {dir === 'rtl' ? 'إلغاء' : 'Cancel'}
                     </button>
                     <button
                       type="button"
                       onClick={confirmDeleteChat}
-                      className="flex-1 py-2 rounded-xl text-xs font-bold text-[var(--ref-neutral-0)] bg-[var(--status-danger)] hover:opacity-90 shadow-sm transition-theme cursor-pointer"
+                      className="flex-1 py-2 rounded-[var(--radius-md)] text-xs font-bold text-[var(--ref-neutral-0)] bg-[var(--status-danger)] hover:opacity-90 shadow-sm transition-theme cursor-pointer"
                     >
                       {dir === 'rtl' ? 'تأكيد الحذف' : 'Delete'}
                     </button>
@@ -822,7 +883,7 @@ const ChatPage: React.FC = () => {
                 <VisitorShell>
                   <div className="w-full flex-1 flex flex-col justify-center items-center py-2 sm:py-6">
                     <div className={`${contentMaxWidthClass} ${contentPaddingClass} mb-2 sm:mb-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} select-none`}>
-                      <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold sm:font-black text-[var(--pub-text-primary)] tracking-tight font-sans leading-snug">
+                      <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold sm:font-black text-[var(--text-primary)] tracking-tight font-sans leading-snug">
                         <span className="sm:hidden">{dir === 'rtl' ? 'ما الذي تريد معرفته اليوم؟' : 'What to explore today?'}</span>
                         <span className="hidden sm:inline">{dir === 'rtl' ? 'ما الذي ترغب في معرفته أو تحليله اليوم؟' : 'What do you want to know?'}</span>
                       </h1>
@@ -848,7 +909,7 @@ const ChatPage: React.FC = () => {
                   <div className={themeConfig.visitor.content}>
                     <div className="w-full flex-1 flex flex-col justify-center items-center py-2 sm:py-6">
                       <div className={`${contentMaxWidthClass} ${contentPaddingClass} mb-2 sm:mb-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} select-none`}>
-                        <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold sm:font-black text-[var(--pub-text-primary)] tracking-tight font-sans leading-snug">
+                        <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold sm:font-black text-[var(--text-primary)] tracking-tight font-sans leading-snug">
                           <span className="sm:hidden">{dir === 'rtl' ? 'ما الذي تريد معرفته اليوم؟' : 'What to explore today?'}</span>
                           <span className="hidden sm:inline">{dir === 'rtl' ? 'ما الذي ترغب في معرفته أو تحليله اليوم؟' : 'What do you want to know?'}</span>
                         </h1>
@@ -863,7 +924,7 @@ const ChatPage: React.FC = () => {
                   </div>
 
                   {/* Footer App Info */}
-                  <div className="text-center pt-2.5 sm:pt-4 pb-[calc(8px+env(safe-area-inset-bottom,0px))] sm:pb-3 border-none select-none text-[9.5px] sm:text-[11px] font-medium text-[var(--pub-text-muted)] px-1 sm:px-2 bg-[var(--pub-surface-canvas)] leading-relaxed">
+                  <div className="text-center pt-2.5 sm:pt-4 pb-[calc(8px+env(safe-area-inset-bottom,0px))] sm:pb-3 border-none select-none text-[11px] font-medium text-[var(--text-muted)] px-1 sm:px-2 bg-transparent leading-relaxed">
                     <span className="sm:hidden">{t('appName')} {dir === 'rtl' ? 'قد يخطئ أحياناً. تحقق من النتائج المهمة.' : 'may be inaccurate. Verify facts.'}</span>
                     <span className="hidden sm:inline">{t('appName')} {dir === 'rtl' ? 'قد يقدم معلومات غير دقيقة أحياناً. يُرجى التحقق من النتائج المهمة.' : 'may display inaccurate info. Verify important facts.'}</span>
                   </div>
@@ -914,7 +975,7 @@ const ChatPage: React.FC = () => {
                                   href={cite.url || cite.link}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="p-3.5 rounded-xl bg-[var(--surface-card)] border border-[var(--border-default)] hover:border-[var(--fg-accent)]/40 transition-all group flex flex-col justify-between gap-2.5 shadow-xs"
+                                  className="p-3.5 rounded-[var(--radius-md)] bg-[var(--surface-card)] border border-[var(--border-default)] hover:border-[var(--fg-accent)]/40 transition-all group flex flex-col justify-between gap-2.5 shadow-xs"
                                 >
                                   <div className="flex items-center gap-2">
                                     <div className="w-5 h-5 rounded-full bg-[var(--surface-subtle)] border border-[var(--border-default)] flex items-center justify-center overflow-hidden shrink-0">
@@ -964,13 +1025,13 @@ const ChatPage: React.FC = () => {
                             {allImages.map((img, iIdx) => (
                               <div
                                 key={`all-img-${iIdx}`}
-                                className="group relative rounded-xl overflow-hidden border border-[var(--border-default)] bg-[var(--surface-card)] aspect-square flex items-center justify-center shadow-xs cursor-pointer"
+                                className="group relative rounded-[var(--radius-md)] overflow-hidden border border-[var(--border-default)] bg-[var(--surface-card)] aspect-square flex items-center justify-center shadow-xs cursor-pointer"
                                 onClick={() => window.open(img.url, '_blank')}
                               >
                                 <img
                                   src={img.url}
                                   alt={img.name}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-media"
                                   referrerPolicy="no-referrer"
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2.5">
@@ -1019,23 +1080,31 @@ const ChatPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Input Area */}
-                <div className="w-full bg-[var(--surface-page)] relative z-20 shrink-0 sticky bottom-0 backdrop-blur-md transition-all duration-300">
-                  <AnimatePresence>
-                    {showScrollBottom && (
-                      <motion.button
-                        initial={{ opacity: 0, y: 10, scale: 0.9 }} 
-                        animate={{ opacity: 1, y: 0, scale: 1 }} 
-                        exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                {/* Sovereign Foreground Layer (طبقة أمامية عائمة حقيقية z-50): Scroll to Bottom Arrow Button */}
+                <AnimatePresence>
+                  {showScrollBottom && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 12, scale: 0.8 }} 
+                      animate={{ opacity: 1, y: 0, scale: 1 }} 
+                      exit={{ opacity: 0, y: 12, scale: 0.8 }} 
+                      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                      className="absolute bottom-28 sm:bottom-32 left-1/2 -translate-x-1/2 z-50 pointer-events-auto"
+                    >
+                      <button
+                        type="button"
                         onClick={() => scrollToBottom()}
-                        className="absolute -top-10 left-1/2 -translate-x-1/2 p-2 bg-transparent text-[var(--text-muted)] hover:text-[var(--fg-accent)] transition-all cursor-pointer z-30 shrink-0 touch-target-44 flex items-center justify-center group"
-                        title={dir === 'rtl' ? 'النزول للأسفل' : 'Scroll to bottom'}
+                        className="w-10 h-10 rounded-full bg-[var(--surface-card)] hover:bg-[var(--surface-subtle)] text-[var(--text-primary)] hover:text-[var(--fg-accent)] border border-[var(--border-default)] hover:border-[var(--border-accent)]/80 shadow-2xl transition-all duration-fast cursor-pointer flex items-center justify-center group active:scale-95 touch-target-44"
+                        title={dir === 'rtl' ? 'النزول لآخر سجل المحادثة' : 'Scroll to latest message'}
+                        aria-label={dir === 'rtl' ? 'النزول لآخر سجل المحادثة' : 'Scroll to latest message'}
                       >
-                        <ArrowDown size={18} className="stroke-[2.5] drop-shadow-sm group-hover:scale-125 transition-transform" />
-                      </motion.button>
-                    )}
-                  </AnimatePresence>
-                  
+                        <ArrowDown size={19} className="stroke-[2.5] text-[var(--text-primary)] group-hover:text-[var(--fg-accent)] transition-colors group-hover:translate-y-0.5 transition-transform" />
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Input Area */}
+                <div className="w-full bg-[var(--surface-page)] relative z-20 shrink-0 sticky bottom-0 backdrop-blur-md transition-all duration-base">
                   <div 
                     className={`${contentMaxWidthClass} ${contentPaddingClass} pt-1.5 sm:pt-2.5 ${showMobileDisclaimer ? 'pb-2 sm:pb-2.5' : 'pb-[calc(4px+env(safe-area-inset-bottom,0px))] sm:pb-2.5'}`}
                   >
@@ -1053,7 +1122,7 @@ const ChatPage: React.FC = () => {
                           animate={{ opacity: 1, height: 'auto', marginTop: 6 }}
                           exit={{ opacity: 0, height: 0, marginTop: 0 }}
                           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                          className="sm:hidden overflow-hidden text-center text-[9.5px] font-medium text-[var(--text-secondary)] select-none px-2 leading-relaxed"
+                          className="sm:hidden overflow-hidden text-center text-[11px] font-medium text-[var(--text-secondary)] select-none px-2 leading-relaxed"
                         >
                           {t('appName')} {dir === 'rtl' ? 'قد يخطئ أحياناً. تحقق من النتائج.' : 'may make mistakes. Verify facts.'}
                         </motion.div>

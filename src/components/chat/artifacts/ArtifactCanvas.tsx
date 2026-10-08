@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useArtifact } from '../../../context/ArtifactContext';
 import { useAppContext } from '../../../context/AppContext';
+import { useResolvedTheme } from '../../../hooks/useResolvedTheme';
 import { useResizeObserver } from '../../../hooks/useResizeObserver';
 import { ArtifactCode } from './ArtifactCode';
 import { ArtifactPreview } from './ArtifactPreview';
@@ -61,7 +62,8 @@ export function ArtifactCanvas() {
     setShowCodeSearch,
     showFileTree
   } = useArtifact();
-  const { dir, language, resolvedTheme } = useAppContext();
+  const { dir, language } = useAppContext();
+  const { isDark } = useResolvedTheme();
   const [copied, setCopied] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -83,7 +85,6 @@ export function ArtifactCanvas() {
   if (!activeArtifact) return null;
 
   const isAr = language === 'ar' || dir === 'rtl';
-  const isDark = resolvedTheme === 'dark';
   const extension = activeArtifact.type === 'react'
     ? 'tsx'
     : activeArtifact.type === 'html'
@@ -185,8 +186,8 @@ export function ArtifactCanvas() {
                 <span className="text-[9.5px] font-bold text-[var(--text-muted)] shrink-0 hidden sm:inline">
                   {isAr ? `الإصدار ${activeArtifact.version || 1}` : `Version ${activeArtifact.version || 1}`}
                 </span>
-                <div className="flex items-center gap-1 px-1.5 py-0.2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-shape-xs border border-emerald-500/20 text-[9.5px] font-bold shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <div className="flex items-center gap-1 px-1.5 py-0.2 bg-[var(--status-success-subtle)] text-[var(--fg-success)] dark:text-[var(--fg-success)] rounded-shape-xs border border-[var(--fg-success)]/20 text-[9.5px] font-bold shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--fg-success)] animate-pulse" />
                   <span>{activeTab === 'preview' ? (isAr ? 'نشط' : 'Live') : (isAr ? 'نشط' : 'Active')}</span>
                 </div>
               </div>
@@ -203,7 +204,7 @@ export function ArtifactCanvas() {
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] border border-transparent'
               }`}
             >
-              <Eye size={14} className={activeTab === 'preview' ? 'text-emerald-500' : ''} />
+              <Eye size={14} className={activeTab === 'preview' ? 'text-[var(--fg-success)]' : ''} />
               <span className="text-[11px] whitespace-nowrap">{isAr ? 'المعاينة' : 'Preview'}</span>
             </button>
 
@@ -378,7 +379,7 @@ export function ArtifactCanvas() {
               className="w-8 h-8 rounded-shape-sm border border-[var(--border-default)] bg-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-subtle)] transition-theme cursor-pointer flex items-center justify-center shrink-0 box-border active:scale-95 relative before:absolute before:-inset-1.5"
               title={isAr ? 'نسخ الكود' : 'Copy Code'}
             >
-              {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+              {copied ? <Check size={14} className="text-[var(--fg-success)]" /> : <Copy size={14} />}
             </button>
 
             <button
@@ -432,7 +433,7 @@ export function ArtifactCanvas() {
         )}
 
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
-          {isFullscreen && (
+          {isFullscreen && activeArtifact.type !== 'image' && (
             <div className="absolute top-3 end-3 z-30 pointer-events-auto">
               <button
                 type="button"
@@ -461,6 +462,7 @@ export function ArtifactCanvas() {
                   onClose={closeArtifact}
                   isFullscreen={isFullscreen}
                   onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
+                  isInChat={true}
                 />
               ) : activeTab === 'code' ? (
                 <ArtifactCode artifact={activeArtifact} />
